@@ -1,0 +1,346 @@
+<title>Zero Minute</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: full-bleed 3D battlefield; a thin status strip on top, one command
+   bar on the bottom (map | resources + selection | orders). Single dark look by
+   choice: field-console gunmetal, sand labels, amber for money and orders. */
+:root {
+  color-scheme: dark;
+  --ink: #0c1013; --panel: #151b20; --panel-2: #1e262d; --edge: #34414c; --edge-hi: #5b6d7f;
+  --text: #e8e3d7; --muted: #909ca6; --sand: #d8c08f; --amber: #f2a93b;
+  --blue: #4aa3ff; --red: #ff5a4d; --good: #7bd88f;
+  --font-d: "Saira Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-m: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --cut: 9px;
+}
+html, body { height: 100%; }
+body { background: var(--ink); color: var(--text); font-family: var(--font-d); font-size: 15px; overflow: hidden; user-select: none; -webkit-user-select: none; }
+#app { position: relative; height: 100%; overflow: hidden; background: #2a2620; }
+#gl, #ov { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#ov { pointer-events: none; }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.lbl { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--sand); }
+.num { font-family: var(--font-m); font-variant-numeric: tabular-nums; }
+
+/* ---- top strip ---- */
+#top { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: linear-gradient(to bottom, rgba(12,16,19,0.88), rgba(12,16,19,0)); pointer-events: none; }
+#top > * { pointer-events: auto; }
+.brand { font-weight: 700; font-size: 19px; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1; }
+.brand small { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.16em; color: var(--sand); margin-top: 3px; }
+.tstat { display: flex; flex-direction: column; gap: 1px; }
+.tstat b { font-family: var(--font-m); font-weight: 500; font-size: 13px; font-variant-numeric: tabular-nums; }
+.spacer { flex: 1 1 auto; }
+#paused { font-weight: 700; letter-spacing: 0.2em; color: var(--amber); }
+.tbtn { background: var(--panel); border: 1px solid var(--edge); padding: 6px 14px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; font-size: 13px; cursor: pointer;
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut)); }
+.tbtn:hover { background: var(--panel-2); border-color: var(--edge-hi); }
+
+/* ---- help ---- */
+#help { z-index: 3; position: absolute; top: 58px; right: max(16px, env(safe-area-inset-right, 0px)); width: min(340px, calc(100% - 32px)); max-height: calc(100% - 300px); overflow: auto;
+  background: rgba(21,27,32,0.94); border: 1px solid var(--edge); padding: 14px 16px 12px;
+  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px); }
+#help h2 { margin: 0 0 8px; font-size: 16px; letter-spacing: 0.12em; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; }
+#help dl { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 12px; font-size: 14px; line-height: 1.25; }
+#help dt { font-family: var(--font-m); font-size: 11px; color: var(--amber); white-space: nowrap; padding-top: 2px; }
+#help dd { margin: 0; color: var(--text); }
+#help p { margin: 10px 0 0; font-size: 13px; color: var(--muted); line-height: 1.35; }
+#help label { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 14px; cursor: pointer; }
+#help-close { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 4px; }
+#help-close:hover { color: var(--text); }
+
+/* ---- toasts / mode ---- */
+#toasts { position: absolute; top: 58px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; width: min(520px, calc(100% - 32px)); }
+.toast { background: rgba(21,27,32,0.92); border-left: 3px solid var(--sand); padding: 5px 14px; font-size: 15px; font-weight: 600; letter-spacing: 0.04em; transition: opacity 0.4s, transform 0.4s; text-align: center; }
+.toast.warn { border-color: var(--amber); } .toast.bad { border-color: var(--red); color: #ffd9d4; }
+.toast.out { opacity: 0; transform: translateY(-6px); }
+#mode { position: absolute; left: 50%; bottom: 250px; transform: translateX(-50%); background: rgba(12,16,19,0.85); border: 1px solid var(--amber); color: var(--amber); padding: 4px 14px; font-weight: 600; letter-spacing: 0.06em; pointer-events: none; white-space: nowrap; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- command bar ---- */
+#bar { position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: stretch;
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: linear-gradient(to top, rgba(12,16,19,0.97) 55%, rgba(12,16,19,0.84)); border-top: 1px solid var(--edge); }
+#bar::before { content: ""; position: absolute; left: 0; right: 0; top: -4px; height: 3px; background: repeating-linear-gradient(90deg, var(--edge) 0 18px, transparent 18px 26px); opacity: 0.7; }
+.frame { background: var(--panel); border: 1px solid var(--edge); position: relative; }
+#mini { padding: 5px; align-self: end; }
+#minimap { display: block; width: 196px; height: 196px; image-rendering: pixelated; cursor: crosshair; background: #000; }
+#mini .lbl { position: absolute; left: 9px; top: 7px; background: rgba(12,16,19,0.75); padding: 1px 5px; pointer-events: none; font-size: 10px; }
+#mid { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+#res { display: flex; gap: 8px; flex-wrap: wrap; }
+.stat { padding: 6px 14px 7px; min-width: 132px; display: flex; flex-direction: column; gap: 2px;
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% 100%, 0 100%, 0 var(--cut)); }
+.stat b { font-family: var(--font-m); font-weight: 700; font-size: 22px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+#st-money b { color: var(--amber); }
+#st-power .meter { height: 4px; background: #0a0d0f; margin-top: 3px; } #st-power .meter i { display: block; height: 100%; background: var(--good); width: 0; }
+#st-power.low b { color: var(--red); } #st-power.low .meter i { background: var(--red); }
+#info { flex: 1 1 auto; padding: 9px 14px; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+#sel-name { font-size: 20px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sel-hp { height: 6px; background: #0a0d0f; max-width: 320px; } #sel-hpf { height: 100%; width: 100%; background: var(--good); }
+#sel-sub { font-size: 14px; color: var(--muted); line-height: 1.3; overflow-wrap: anywhere; }
+#queue { display: flex; gap: 5px; flex-wrap: wrap; margin-top: auto; }
+.qi { width: 38px; height: 38px; background: var(--panel-2); border: 1px solid var(--edge); position: relative; cursor: pointer; padding: 6px; color: var(--sand); }
+.qi:hover { border-color: var(--red); } .qi svg { width: 100%; height: 100%; fill: currentColor; display: block; }
+.qi i { position: absolute; left: 0; right: 0; top: 0; background: rgba(12,16,19,0.72); }
+#cmd { display: grid; grid-template-columns: repeat(3, 126px); grid-auto-rows: 60px; gap: 6px; padding: 8px; align-content: start; min-height: 150px; align-self: end; }
+#cmd .hint { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.35; align-self: center; padding: 0 6px; }
+.cbtn { background: var(--panel-2); border: 1px solid var(--edge); cursor: pointer; padding: 6px 8px 5px; display: grid; grid-template-columns: 20px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; column-gap: 7px; row-gap: 2px; align-items: center; text-align: left; overflow: hidden;
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut)); }
+.cbtn svg { width: 20px; height: 20px; fill: var(--sand); }
+.cbtn .nm { font-weight: 600; font-size: 12.5px; line-height: 1.05; text-transform: uppercase; }
+.cbtn .ct { grid-column: 1 / -1; font-family: var(--font-m); font-size: 10px; color: var(--amber); white-space: nowrap; }
+.cbtn:hover { background: #28323b; border-color: var(--edge-hi); }
+.cbtn.on { border-color: var(--amber); background: #33301f; }
+.cbtn[aria-disabled="true"] { opacity: 0.42; cursor: not-allowed; }
+.cbtn[aria-disabled="true"] .ct { color: var(--muted); }
+
+/* ---- General's rank button, support powers, promotions ---- */
+#btn-gen { display: flex; align-items: center; gap: 8px; position: relative; }
+#btn-gen svg { width: 16px; height: 16px; fill: var(--amber); }
+#btn-gen .xp { width: 54px; height: 4px; background: #0a0d0f; display: block; } #gen-xpf { display: block; height: 100%; width: 0; background: var(--amber); }
+#gen-pts { font-family: var(--font-m); font-size: 11px; background: var(--amber); color: #1a1408; padding: 0 5px; }
+#btn-gen.pulse { border-color: var(--amber); animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 50% { background: #3a3218; } }
+#pw { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: 250px; display: flex; gap: 10px; }
+.pbtn { background: none; border: 0; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 84px; }
+.pbtn .dial { width: 58px; height: 58px; border-radius: 50%; background: var(--panel); border: 2px solid var(--amber); position: relative; display: grid; place-items: center; overflow: hidden; }
+.pbtn .dial svg { width: 28px; height: 28px; fill: var(--sand); }
+.pbtn .dial::after { content: ""; position: absolute; inset: 0; background: conic-gradient(rgba(8,10,12,0.82) calc(var(--p, 0) * 360deg), transparent 0); }
+.pbtn .sec { position: absolute; inset: 0; display: grid; place-items: center; z-index: 1; font-family: var(--font-m); font-size: 15px; font-weight: 700; color: var(--text); }
+.pbtn .pn { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.05; text-align: center; background: rgba(12,16,19,0.8); padding: 2px 5px; }
+.pbtn.cool .dial { border-color: var(--edge); } .pbtn.cool .dial svg { opacity: 0.45; }
+.pbtn.on .dial { background: #33301f; box-shadow: 0 0 0 3px rgba(242,169,59,0.35); }
+.pbtn:hover .dial { border-color: #ffd27a; }
+#mode.bad { border-color: var(--red); color: #ffd9d4; }
+#radar-warn { position: absolute; left: 9px; bottom: 9px; background: rgba(12,16,19,0.85); color: var(--red); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; padding: 1px 5px; pointer-events: none; }
+#promo { z-index: 4; position: absolute; left: 50%; top: 56px; transform: translateX(-50%); width: min(900px, calc(100% - 32px)); max-height: calc(100% - 300px); overflow: auto;
+  background: rgba(21,27,32,0.97); border: 1px solid var(--edge-hi); padding: 16px 18px 18px; }
+#promo header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; margin-bottom: 12px; }
+#promo h2 { margin: 0; font-size: 22px; letter-spacing: 0.12em; text-transform: uppercase; line-height: 1; }
+#promo-head { color: var(--sand); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+#promo-xp { font-family: var(--font-m); font-size: 12px; color: var(--muted); }
+#promo-pts { font-family: var(--font-m); font-size: 12px; color: var(--amber); }
+#promo-close { margin-left: auto; background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; }
+#promo-close:hover { color: var(--text); }
+#promo-tree { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.tier { display: flex; flex-direction: column; gap: 8px; min-width: 0; border-top: 2px solid var(--amber); padding-top: 8px; }
+.tier.locked { border-top-color: var(--edge); }
+.tier h3 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--sand); }
+.tier h3 small { color: var(--muted); font-weight: 600; margin-left: 6px; }
+.node { background: var(--panel-2); border: 1px solid var(--edge); padding: 9px 11px 10px; display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+.node h4 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.1; display: flex; gap: 7px; align-items: center; }
+.node h4 svg { width: 16px; height: 16px; fill: var(--sand); flex: none; }
+.node p { margin: 0; font-size: 14px; line-height: 1.3; color: var(--text); }
+.node p.req { font-size: 12px; color: var(--muted); }
+.node .tag { font-family: var(--font-m); font-size: 11px; color: var(--muted); }
+.node.has { border-color: var(--good); } .node.has .tag { color: var(--good); }
+.node.can { border-color: var(--amber); }
+.node.no { opacity: 0.62; }
+
+/* ---- pre-match setup ---- */
+#setup { position: absolute; inset: 0; z-index: 5; overflow: auto; background: radial-gradient(120% 90% at 50% 0%, #2b2a24 0%, var(--ink) 70%);
+  padding-block: 28px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+#setup .wrap { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+#setup h1 { margin: 0; font-size: clamp(30px, 5vw, 46px); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; line-height: 1; text-wrap: balance; }
+#setup h1 small { display: block; font-size: 13px; letter-spacing: 0.2em; color: var(--sand); margin-top: 8px; font-weight: 600; }
+#setup h2 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--sand); }
+#setup-factions { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.fcard { cursor: pointer; display: block; position: relative; }
+.fcard input, .fchip input { position: absolute; opacity: 0; pointer-events: none; }
+.fbody { box-sizing: border-box; display: flex; flex-direction: column; gap: 7px; height: 100%; background: var(--panel); border: 1px solid var(--edge); padding: 14px 16px 16px;
+  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px); }
+.fcard:hover .fbody { border-color: var(--edge-hi); }
+.fcard input:checked + .fbody { border-color: var(--amber); background: #23261f; }
+.fcard input:focus-visible + .fbody, .fchip input:focus-visible + span { outline: 2px solid var(--amber); outline-offset: 2px; }
+.swatch { width: 42px; height: 6px; display: block; }
+.fname { font-size: 24px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.05; }
+.fdoc { font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--amber); }
+.fblurb { font-size: 15px; line-height: 1.35; color: var(--text); }
+.flist { font-size: 14px; line-height: 1.3; color: var(--muted); }
+.flist em { font-style: normal; font-family: var(--font-m); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--sand); margin-right: 8px; }
+#setup-foes, #setup-levels, #setup .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.fchip.check span small { display: block; font-family: var(--font-m); font-size: 10px; letter-spacing: 0.04em; text-transform: none; color: var(--muted); margin-top: 3px; font-weight: 500; }
+.tgroup { display: flex; align-items: flex-end; gap: 12px; flex-wrap: nowrap; }
+.tctl { display: flex; flex-direction: column; gap: 2px; }
+.tctl select { background: var(--panel); color: var(--text); border: 1px solid var(--edge); font: inherit; font-size: 13px; padding: 3px 6px; }
+.tctl input[type=range] { width: 110px; accent-color: var(--amber); margin: 3px 0 0; }
+.tbtn[aria-pressed="true"] { border-color: var(--amber); color: var(--amber); }
+.tbtn.sm { padding: 4px 9px; font-size: 12px; }
+#replay-bar { display: flex; align-items: center; gap: 6px; }
+#mapbuilder { position: absolute; inset: 0; z-index: 30; background: var(--ink); overflow: auto; padding: 20px max(16px, env(safe-area-inset-left, 0px)); }
+.mb-wrap { max-width: 1040px; margin: 0 auto; } .mb-wrap h2 { font-family: var(--font-d); font-size: 26px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 4px; }
+.mb-body { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; margin-top: 12px; }
+#mb-canvas { width: min(512px, 100%); height: auto; aspect-ratio: 1; border: 1px solid var(--edge); touch-action: none; cursor: crosshair; image-rendering: pixelated; }
+.mb-side { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 12px; } .mb-side .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+#mb-msgs { list-style: none; margin: 0; padding: 0; font-size: 14px; display: flex; flex-direction: column; gap: 4px; } #mb-msgs li { padding: 5px 9px; border-left: 3px solid var(--edge); background: var(--panel); }
+#mb-msgs .bad { border-color: var(--red); } #mb-msgs .warn { border-color: var(--amber); } #mb-msgs .good { border-color: var(--good); }
+.tbtn:disabled { opacity: 0.45; cursor: not-allowed; }
+#sw { display: flex; flex-direction: column; gap: 2px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+#sw span.foe, #hill.foe b { color: var(--red); } #sw span.mine, #hill.mine b { color: var(--good); } #sw b { font-family: var(--font-m); font-weight: 500; margin-left: 6px; }
+.pbtn.super .dial { box-shadow: 0 0 0 2px var(--red); }
+#aar { width: 100%; border-collapse: collapse; margin: 0 0 18px; font-size: 14px; text-align: right; }
+#aar caption { caption-side: top; text-align: left; font-size: 12px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--sand); padding-bottom: 6px; }
+#aar th, #aar td { padding: 5px 8px; border-bottom: 1px solid var(--edge); font-variant-numeric: tabular-nums; }
+#aar tbody th { text-align: left; font-weight: 500; color: var(--muted); }
+#aar thead th { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--amber); }
+#banner .row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.fchip.lvl span { padding: 7px 14px 8px; } .fchip.lvl small { display: block; font-family: var(--font-m); font-size: 10px; letter-spacing: 0.04em; text-transform: none; color: var(--muted); margin-top: 3px; font-weight: 500; }
+.fchip { position: relative; cursor: pointer; }
+.fchip span { display: block; background: var(--panel); border: 1px solid var(--edge); padding: 6px 14px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; font-size: 14px; }
+.fchip input:checked + span { border-color: var(--amber); color: var(--amber); }
+#setup-start { align-self: flex-start; font-size: 18px; padding: 10px 28px; background: var(--amber); color: #1a1408; border-color: var(--amber); font-weight: 700; }
+#setup-start:hover { background: #ffc15c; }
+#setup .note { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.4; max-width: 70ch; }
+
+/* ---- banners ---- */
+#banner, #fatal { z-index: 6; position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); background: rgba(21,27,32,0.96); border: 1px solid var(--edge-hi); padding: 26px 34px; text-align: center; width: min(560px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; }
+#banner h2 { margin: 0; font-size: 44px; letter-spacing: 0.16em; text-transform: uppercase; line-height: 1; }
+#banner p { margin: 10px 0 16px; color: var(--muted); font-size: 16px; }
+#fatal { text-align: left; border-color: var(--red); }
+#fatal h2 { margin: 0 0 8px; font-size: 18px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--red); }
+#fatal pre { margin: 0; font-family: var(--font-m); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); user-select: text; -webkit-user-select: text; }
+#touch { display: none; }
+
+@media (max-width: 860px) {
+  #bar { grid-template-columns: auto minmax(0, 1fr); }
+  #minimap { width: 128px; height: 128px; }
+  #mid { grid-column: 2; } #info { padding: 6px 10px; } #sel-name { font-size: 16px; }
+  .stat { min-width: 0; padding: 4px 10px; } .stat b { font-size: 16px; }
+  #cmd { grid-column: 1 / -1; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); grid-auto-rows: 54px; min-height: 0; }
+  #mode { bottom: 318px; } #pw { bottom: 356px; } #help { max-height: 40%; } .tstat { display: none; }
+  #promo-tree { grid-template-columns: minmax(0, 1fr); } #promo { max-height: calc(100% - 380px); }
+}
+@media (pointer: coarse) { #touch { display: block; margin-top: 8px; color: var(--amber); } }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } #btn-gen.pulse { animation: none; } }
+</style>
+
+<div id="app">
+  <canvas id="gl"></canvas>
+  <canvas id="ov"></canvas>
+
+  <div id="top">
+    <div class="brand">Zero Minute<small id="brand-sub">Skirmish &middot; Phase 4</small></div>
+    <div class="tstat"><span class="lbl">Mission clock</span><b id="clock">00:00</b></div>
+    <div class="tstat"><span class="lbl">Render &middot; Sim 20 Hz</span><b id="perf">starting</b></div>
+    <div class="tstat" id="hill" hidden><span class="lbl">King of the Hill</span><b id="hill-t"></b></div>
+    <div id="sw" hidden aria-live="polite"></div>
+    <div class="tstat" id="treaty" hidden><span class="lbl">Peace treaty</span><b id="treaty-t">5:00</b></div>
+    <div id="paused" hidden>PAUSED</div>
+    <div id="replay-bar" hidden role="group" aria-label="Replay controls"><span class="lbl">Replay</span>
+      <button type="button" class="tbtn sm" data-speed="1" aria-pressed="true">1x</button><button type="button" class="tbtn sm" data-speed="2" aria-pressed="false">2x</button><button type="button" class="tbtn sm" data-speed="4" aria-pressed="false">4x</button>
+      <button type="button" class="tbtn sm" id="rp-fog" aria-pressed="true">Fog of War: on</button></div>
+    <div class="spacer"></div>
+    <div class="tgroup"><label class="tctl"><span class="lbl">Lighting</span><select id="opt-light"><option value="noon">Harsh Noon</option><option value="dusk">Golden Hour Dusk</option><option value="night">Night Ops</option></select></label>
+    <label class="tctl"><span class="lbl">Master volume</span><input type="range" id="vol" min="0" max="100" step="1" value="70"></label>
+    <button type="button" class="tbtn sm" id="btn-mute" aria-pressed="false">Sound on</button></div>
+    <button type="button" class="tbtn" id="btn-gen" aria-expanded="false" aria-controls="promo" title="General's Promotions (G)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.700 1.4 6.800L12 17.200 5.900 20.600l1.400-6.800L2.200 9.100l6.900-.8z"/></svg><span id="gen-rank">Rank 1</span><span class="xp"><i id="gen-xpf"></i></span><b id="gen-pts" hidden>0</b></button>
+    <button type="button" class="tbtn" id="btn-help" aria-expanded="true" aria-controls="help">Controls</button>
+  </div>
+
+  <div id="toasts" aria-live="polite"></div>
+  <div id="mode" hidden></div>
+  <div id="pw" hidden></div>
+
+  <div id="promo" hidden role="dialog" aria-label="General's Promotions">
+    <header><h2>General&rsquo;s Promotions</h2><span id="promo-head"></span><span id="promo-xp"></span><span id="promo-pts"></span><button type="button" id="promo-close">Close</button></header>
+    <div id="promo-tree"></div>
+  </div>
+
+  <div id="help">
+    <h2>Controls <button type="button" id="help-close">Close</button></h2>
+    <dl>
+      <dt>W A S D / arrows</dt><dd>Pan camera (or push the mouse to a screen edge)</dd>
+      <dt>Wheel</dt><dd>Zoom</dd>
+      <dt>Middle-drag, Q / E</dt><dd>Rotate and tilt</dd>
+      <dt>Left-click / drag</dt><dd>Select; drag a box. Shift adds. Double-click takes all of a type</dd>
+      <dt>Right-click</dt><dd>Move, attack, garrison, harvest, repair, rally. Also: capture an Oil Derrick, enter a Tunnel, infiltrate a building</dd>
+      <dt>Ctrl + 1-9</dt><dd>Save control group (Alt + 1-9 also works). 1-9 recalls, twice to jump</dd>
+      <dt>F, then click</dt><dd>Attack-move: advance and engage anything on the way</dd>
+      <dt>V, then click</dt><dd>Guard area: go there, then hold that spot</dd>
+      <dt>R + right-click</dt><dd>Reverse-move: vehicles back up, keeping thick front armor toward the enemy</dd>
+      <dt>X &middot; Z</dt><dd>Scatter &middot; Stop</dd>
+      <dt>Superweapon</dt><dd>Build it with your builder (needs the factory, $5,000). Both sides are warned. After 5:00 its round button lights up: click it, then the target</dd>
+      <dt>G</dt><dd>General&rsquo;s Promotions. Unlocked support powers appear as round buttons: click one, then click the target</dd>
+      <dt>H &middot; P &middot; Esc</dt><dd>Home &middot; Pause &middot; Cancel</dd>
+    </dl>
+    <p>Start: select your builder, build a reactor if your faction uses power, then a supply building beside the Supply Dock south-east of your base. Its truck starts hauling on its own.</p>
+    <label><input type="checkbox" id="opt-edge" checked> Edge scrolling</label>
+    <p id="touch">This build needs a mouse and keyboard.</p>
+  </div>
+
+  <div id="bar">
+    <div id="mini" class="frame"><canvas id="minimap" width="256" height="256" aria-label="Tactical map"></canvas><span class="lbl">Tactical map</span><span id="radar-warn" hidden>Radar degraded</span></div>
+    <div id="mid">
+      <div id="res">
+        <div class="stat frame" id="st-money"><span class="lbl">Supplies</span><b id="money">$0</b></div>
+        <div class="stat frame" id="st-power"><span class="lbl">Power used / made</span><b id="power">0 / 0</b><div class="meter"><i id="powerf"></i></div></div>
+      </div>
+      <div id="info" class="frame">
+        <div id="sel-name">No selection</div>
+        <div id="sel-hp" hidden><div id="sel-hpf"></div></div>
+        <div id="sel-sub">Drag a box over units, or click one.</div>
+        <div id="queue"></div>
+      </div>
+    </div>
+    <div id="cmd" class="frame"><p class="hint">Select a Dozer to build, or a structure to train units.</p></div>
+  </div>
+
+  <div id="setup">
+    <div class="wrap">
+      <h1>Zero Minute<small>Skirmish &middot; choose your doctrine</small></h1>
+      <h2>Your faction</h2>
+      <div id="setup-factions"><p class="note">Loading factions&hellip;</p></div>
+      <h2>Opponent</h2>
+      <div id="setup-foes"></div>
+      <h2>Opponent skill</h2>
+      <div id="setup-levels"></div>
+      <h2>Map</h2>
+      <div id="setup-map" class="chips"></div>
+      <p class="note" id="setup-map-note"></p>
+      <h2>Lighting preset</h2>
+      <div id="setup-light" class="chips"></div>
+      <h2>Starting funds</h2>
+      <div id="setup-funds" class="chips"></div>
+      <h2>Match rules</h2>
+      <div class="chips"><label class="fchip check"><input type="checkbox" id="setup-treaty"><span>5-minute peace treaty<small>No attacks or General&rsquo;s Powers until 5:00</small></span></label>
+        <label class="fchip check"><input type="checkbox" id="setup-nosuper"><span>No superweapons<small>Particle Cannon, Nuclear Missile and Scud Storm cannot be built</small></span></label>
+        <label class="fchip check"><input type="checkbox" id="setup-koth"><span>King of the Hill<small>Hold the map centre alone for 3:00 to win</small></span></label></div>
+      <button type="button" class="tbtn" id="setup-start">Start skirmish</button>
+      <p class="note">Mouse and keyboard. You start with a command building, one builder and two squads; the opponent starts with exactly the same and has to scout you: it sees only what its own units see and gets no extra money at any skill level.</p>
+    </div>
+  </div>
+
+  <div id="mapbuilder" hidden role="dialog" aria-labelledby="mb-title">
+    <div class="mb-wrap">
+      <h2 id="mb-title">Map builder</h2>
+      <p class="note">Pick a tool, then click or drag on the map. Everything you place is mirrored through the centre, so both sides get the same ground.</p>
+      <div class="mb-body">
+        <canvas id="mb-canvas" width="512" height="512" aria-label="Top-down map. North is up."></canvas>
+        <div class="mb-side">
+          <div id="mb-tools" class="chips" role="radiogroup" aria-label="Tool"></div>
+          <div class="chips"><button type="button" class="tbtn sm" id="mb-undo">Undo</button><button type="button" class="tbtn sm" id="mb-canyon">Load Desert Canyon</button><button type="button" class="tbtn sm" id="mb-open">Load Open Desert</button><button type="button" class="tbtn sm" id="mb-clear">Clear all</button></div>
+          <ul id="mb-msgs" aria-live="polite"></ul>
+          <div class="chips"><button type="button" class="tbtn" id="mb-use">Use this map</button><button type="button" class="tbtn" id="mb-cancel">Cancel</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="banner" hidden role="dialog" aria-labelledby="banner-title"><h2 id="banner-title">Victory</h2><p id="banner-sub"></p>
+    <table id="aar"><caption>After-Action Report</caption><thead><tr><td></td><th scope="col" id="aar-you">You</th><th scope="col" id="aar-foe">Enemy</th></tr></thead><tbody id="aar-rows"></tbody></table>
+    <div class="row"><button type="button" class="tbtn" id="aar-replay">Watch replay</button><button type="button" class="tbtn" id="aar-new">New skirmish</button><button type="button" class="tbtn" id="banner-continue">Keep watching</button></div></div>
+  <div id="fatal" hidden><h2>The game could not start</h2><pre id="fatal-text"></pre></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<script>
+// If the game code never arrives, say so instead of leaving a dead lobby. "Booted" means the
+// lobby is live; it must NOT wait for a match to start (the player may sit on the lobby for minutes).
+setTimeout(function () {
+  if (window.__rtsBooted || window.__rtsRunning) return;
+  var box = document.getElementById('fatal'), t = document.getElementById('fatal-text');
+  if (box && box.hidden) { box.hidden = false; t.textContent = (window.THREE ? 'The game scripts did not finish loading.' : 'The 3D library (Three.js) did not load.') + ' Check your connection and reload the page.'; }
+}, 20000);
+</script>
+<script type="module" src="js/main.js"></script>

@@ -1,0 +1,234 @@
+// Combat: weapon slots, target acquisition (fog- and stealth-gated), aiming,
+// firing, projectiles, point-defense interception. All content comes from the
+// faction registry; nothing here knows about specific units.
+import { DT, NEUTRAL, GARRISON_RANGE_BONUS, angDiff } from './defs.js';
+import { UNITS, BLDGS, WEAPONS, VET, HORDE, armorOf } from './factionRegistry.js';
+import { applyDamage, splashDamage, moveTo, stopUnit, isMoving } from './entities.js';
+import { addHazard } from './abilities.js';
+
+const NONE = [];
+export function slotsOf(e) {
+  if (e.wslots) return e.wslots;
+  let out = NONE;
+  if (e.kind === 'bldg') { const w = BLDGS[e.type].weapon; if (w) out = [w]; }
+  else {
+    const d = UNITS[e.type]; out = [];
+    if (d.weapon) out.push(d.salvageWeapons ? d.salvageWeapons[e.tier] : d.weapon);
+    if (d.weapon2) out.push(d.weapon2);
+    if (e.addon && d.hardpoints[e.addon].weapon) out.push(d.hardpoints[e.addon].weapon);
+  }
+  return (e.wslots = out);
+}
+const canUse = (w, t) => (w.garrisonOnly ? t.kind === 'bldg' && t.garrison.length > 0 : (w.vs[armorOf(t)] || 0) > 0);
+// Which slot leads against t. A garrison-clearing weapon is used on its own so
+// the building shell is not shot up alongside it. Returns -1 if nothing can hit t.
+function leadSlot(slots, t) {
+  let best = -1, bv = 0;
+  for (let i = 0; i < slots.length; i++) {
+    const w = WEAPONS[slots[i]]; if (!canUse(w, t)) continue;
+    if (w.garrisonOnly) return i + 100;
+    const v = w.vs[armorOf(t)]; if (v > bv) { bv = v; best = i; }
+  }
+  return best;
+}
+
+// Can shooter s damage t with any of its weapons?
+export function canAttack(s, t) { return leadSlot(slotsOf(s), t) >= 0; }
+
+export function targetable(sim, team, t) {
+  if (sim.tick < sim.treatyUntil) return false; // peace treaty
+  return !!t && !t.dead && !t.ruined && t.team !== team && t.team !== NEUTRAL && !(t.kind === 'unit' && t.inB) &&
+    !(t.kind === 'bldg' && BLDGS[t.type].indestructible) && sim.fog.canSee(team, t);
+}
+const edgeDist = (x, z, t) => Math.hypot(t.x - x, t.z - z) - t.radius;
+
+function acquire(sim, team, x, z, range, slots) {
+  let best = null, bs = 1e9;
+  for (const t of sim.ents) {
+    if (t.team === team || t.team === NEUTRAL || t.dead) continue;
+    const d = edgeDist(x, z, t);
+    if (d > range || !targetable(sim, team, t)) continue;
+    let m = 0;
+    for (let i = 0; i < slots.length; i++) { const w = WEAPONS[slots[i]]; if (canUse(w, t)) m = Math.max(m, w.garrisonOnly ? 1 : w.vs[armorOf(t)]); }
+    if (!m) continue;
+    const threat = (t.kind === 'unit' ? !!UNITS[t.type].weapon : !!BLDGS[t.type].weapon) ? 1 : 0.6;
+    const s = (d + 6) / (m * threat);
+    if (s < bs) { bs = s; best = t; }
+  }
+  return best;
+}
+
+function rateOf(sim, s) { // fire-rate multiplier: veterancy + horde
+  let r = 1 + VET.rate * (s.vet || 0);
+  if (s.horde) r += sim.teams[s.team].flags.hordePlus ? HORDE.bonusPromo : HORDE.bonus;
+  return r;
+}
+function dmgOf(sim, s, w) {
+  let m = 1;
+  if (s.kind === 'unit') {
+    const d = UNITS[s.type];
+    if (d.salvage && !d.salvageWeapons) m *= 1 + 0.25 * s.tier;
+    if (d.nuke && sim.teams[s.team].upgrades.has('r_nuke')) m *= 1.25;
+  }
+  return w.dmg * m;
+}
+
+function fire(sim, s, i, wname, ox, oz, t) {
+  const w = WEAPONS[wname];
+  s.cds[i] = Math.max(1, Math.round(w.cd / rateOf(sim, s)));
+  s.lastFire = sim.tick;
+  if (s.kind === 'unit') { s.revealUntil = sim.tick + 40; if (UNITS[s.type].ammo) s.ammo--; }
+  const dmg = dmgOf(sim, s, w), a = Math.atan2(t.z - oz, t.x - ox), vet = s.vet || 0;
+  if (w.kind === 'hitscan' || w.kind === 'laser' || w.kind === 'spray') {
+    sim.events.push({ t: w.kind === 'hitscan' ? 'tracer' : w.kind, w: wname, x: ox, z: oz, tx: t.x, tz: t.z, sid: s.id, tid: t.id, vet, sAir: !!s.air && !s.landed, tAir: !!t.air && !t.landed });
+    applyDamage(sim, t, dmg, wname, ox, oz, s);
+  } else {
+    sim.projs.push({ id: sim.nextId++, kind: w.kind, w: wname, x: ox, z: oz, px: ox, pz: oz, sx: ox, sz: oz, tid: t.id, tx: t.x, tz: t.z,
+      speed: w.speed, dmg, team: s.team, srcId: s.id, vet, dead: false, a, homing: w.kind !== 'lob', sAir: !!s.air && !s.landed, tAir: !!t.air && !t.landed, thermo: s.kind === 'unit' && !!UNITS[s.type].thermo });
+    sim.events.push({ t: 'fire', k: w.kind, w: wname, x: ox, z: oz, a, sid: s.id, vet });
+  }
+}
+
+// Fire every slot that is ready, in range and able to hit t.
+function fireSlots(sim, s, slots, ox, oz, t, dist, lead, bonus) {
+  const excl = lead >= 100 ? lead - 100 : -1, usesAmmo = s.kind === 'unit' && UNITS[s.type].ammo;
+  for (let i = 0; i < slots.length; i++) {
+    if (excl >= 0 && i !== excl) continue;
+    const w = WEAPONS[slots[i]];
+    if (!canUse(w, t) || dist > w.range + bonus || (w.minRange && dist < w.minRange)) continue;
+    if (usesAmmo && s.ammo <= 0) continue;
+    if (s.bursts[i] > 0) {
+      if (--s.burstCd[i] <= 0) { s.bursts[i]--; s.burstCd[i] = w.burstGap; const keep = s.cds[i]; fire(sim, s, i, slots[i], ox, oz, t); s.cds[i] = keep; }
+      continue;
+    }
+    if (s.cds[i] > 0) continue;
+    fire(sim, s, i, slots[i], ox, oz, t);
+    if (w.burst) { s.bursts[i] = w.burst - 1; s.burstCd[i] = w.burstGap; }
+  }
+}
+function turn(s, field, a, rate) {
+  const diff = angDiff(a, s[field]), ma = rate * DT;
+  s[field] += Math.max(-ma, Math.min(ma, diff));
+  return Math.abs(diff);
+}
+
+function unitCombat(sim, u, d, slots) {
+  const o = u.order;
+  let t = null, maxR = 0;
+  for (let i = 0; i < slots.length; i++) { const w = WEAPONS[slots[i]]; if (!w.garrisonOnly) maxR = Math.max(maxR, w.range); }
+  const forced = o && o.t === 'attack';
+  if (forced) {
+    t = sim.byId.get(o.id);
+    if (!targetable(sim, u.team, t) || leadSlot(slots, t) < 0) { u.order = null; u.target = 0; stopUnit(u); u.guardX = u.x; u.guardZ = u.z; return; }
+    u.target = t.id;
+  } else {
+    const canAuto = !o || o.t === 'amove' || (o.t === 'move' && d.fireMoving);
+    const acqR = (!o || o.t === 'amove') ? Math.max(maxR, d.sight) : maxR;
+    t = u.target ? sim.byId.get(u.target) : null;
+    if (t && (!canAuto || !targetable(sim, u.team, t) || edgeDist(u.x, u.z, t) > acqR + 4 || leadSlot(slots, t) < 0)) { t = null; u.target = 0; }
+    if (!t && canAuto && (sim.tick + u.id) % 5 === 0) { t = acquire(sim, u.team, u.x, u.z, acqR, slots); u.target = t ? t.id : 0; }
+  }
+  if (!t) {
+    u.bursts[0] = u.bursts[1] = u.bursts[2] = 0;
+    if (d.turret) turn(u, 'turret', u.facing, d.turret);
+    // return to post after a chase
+    if (!o && !d.based && !isMoving(u) && Math.hypot(u.x - u.guardX, u.z - u.guardZ) > 6) moveTo(sim, u, u.guardX, u.guardZ);
+    return;
+  }
+  const lead = leadSlot(slots, t), W = WEAPONS[slots[lead >= 100 ? lead - 100 : lead]];
+  const dist = edgeDist(u.x, u.z, t), a = Math.atan2(t.z - u.z, t.x - u.x);
+  if (dist <= W.range) {
+    const holdGround = forced || !o || o.t === 'amove';
+    if (holdGround && !d.based && isMoving(u) && dist <= W.range * 0.92) stopUnit(u);
+    let aimed;
+    if (d.turret) aimed = turn(u, 'turret', a, d.turret) < 0.2;
+    else if (d.based) aimed = Math.abs(angDiff(a, u.facing)) < 0.35; // strike aircraft aim by flying at the target
+    else if (!u.path) { aimed = turn(u, 'facing', a, d.turn) < 0.2; u.turret = u.facing; }
+    else aimed = false;
+    if (aimed) fireSlots(sim, u, slots, u.x, u.z, t, dist, lead, 0);
+  } else {
+    if (d.turret) turn(u, 'turret', a, d.turret);
+    if (o && o.t === 'move') return;
+    // chase; idle units are leashed to their guard position
+    if (!o && Math.hypot(u.x - u.guardX, u.z - u.guardZ) > 26) { u.target = 0; return; }
+    if (d.based) return; // flight logic steers strike aircraft
+    if (!u.pathReq && (!isMoving(u) || (sim.tick + u.id) % 12 === 0)) moveTo(sim, u, t.x, t.z);
+  }
+}
+
+// Occupants fire from the wall (or hull) of their container, with a range bonus.
+function garrisonCombat(sim, e, d, slots) {
+  const b = sim.byId.get(e.inB); if (!b) return;
+  const w0 = WEAPONS[slots[0]], range = w0.range + GARRISON_RANGE_BONUS + b.radius;
+  let t = e.target ? sim.byId.get(e.target) : null;
+  if (t && (!targetable(sim, e.team, t) || edgeDist(b.x, b.z, t) > range || !canUse(w0, t))) { t = null; e.target = 0; }
+  if (!t && (sim.tick + e.id) % 5 === 0) { t = acquire(sim, e.team, b.x, b.z, range, slots.slice(0, 1)); e.target = t ? t.id : 0; }
+  if (t && e.cds[0] <= 0) {
+    const a = Math.atan2(t.z - b.z, t.x - b.x);
+    fire(sim, e, 0, slots[0], b.x + Math.cos(a) * b.radius, b.z + Math.sin(a) * b.radius, t);
+  }
+}
+
+function tryIntercept(sim, p, t) {
+  for (const u of sim.pdlUnits) {
+    if (u.team === p.team || u.dead || u.emp || u.inB || u.pdlCd > 0) continue;
+    if (Math.hypot(u.x - p.x, u.z - p.z) > 13) continue;
+    if (t && Math.hypot(u.x - t.x, u.z - t.z) > 16) continue; // only covers itself and close neighbours
+    const base = UNITS[u.type].pdl || 70;
+    u.pdlCd = Math.round(base * (sim.teams[u.team].flags.fastPdl ? 0.6 : 1));
+    sim.events.push({ t: 'pdl', x: u.x, z: u.z, tx: p.x, tz: p.z, sid: u.id, tAir: p.tAir });
+    return true;
+  }
+  return false;
+}
+
+function stepProjectiles(sim) {
+  for (const p of sim.projs) {
+    p.px = p.x; p.pz = p.z;
+    const W = WEAPONS[p.w];
+    let t = sim.byId.get(p.tid);
+    const valid = !!t && !t.dead && !t.ruined && !(t.kind === 'unit' && t.inB);
+    if (!valid) t = null;
+    if (p.homing && t) { p.tx = t.x; p.tz = t.z; }
+    if (W.intercept && sim.pdlUnits.length && tryIntercept(sim, p, t)) { p.dead = true; continue; }
+    const dx = p.tx - p.x, dz = p.tz - p.z, d = Math.hypot(dx, dz), step = p.speed * DT;
+    if (d > step) { p.x += dx / d * step; p.z += dz / d * step; p.a = Math.atan2(dz, dx); continue; }
+    p.x = p.tx; p.z = p.tz; p.dead = true;
+    const src = sim.byId.get(p.srcId) || { team: p.team };
+    let hit = false;
+    if (W.splash) { splashDamage(sim, p.x, p.z, W.splash, p.dmg, p.w, src, p.sx, p.sz); hit = true; }
+    else if (t && Math.hypot(t.x - p.x, t.z - p.z) <= t.radius + 2) { applyDamage(sim, t, p.dmg, p.w, p.sx, p.sz, src); hit = true; }
+    if (W.hazard) {
+      const big = p.thermo && sim.teams[p.team].upgrades.has('r_thermo');
+      addHazard(sim, W.hazard.kind, p.x, p.z, W.hazard.r * (big ? 1.4 : 1), W.hazard.secs * (big ? 1.5 : 1), W.hazard.dps, p.team, !!W.clearsGarrison);
+    }
+    sim.events.push({ t: 'impact', k: p.kind, w: p.w, x: p.x, z: p.z, hit, onBldg: !!t && t.kind === 'bldg', air: !!t && !!t.air && !t.landed, splash: W.splash || 0 });
+  }
+  if (sim.projs.length) sim.projs = sim.projs.filter(p => !p.dead);
+}
+
+export function stepCombat(sim) {
+  const pdl = sim.pdlUnits; pdl.length = 0;
+  for (const e of sim.ents) {
+    if (e.dead) continue;
+    const slots = slotsOf(e);
+    if (e.kind === 'unit') {
+      const d = UNITS[e.type];
+      if (d.pdl || (d.pdlUpgrade && sim.teams[e.team].upgrades.has('v_pdl'))) { if (e.pdlCd > 0) e.pdlCd--; pdl.push(e); }
+      if (!slots.length) continue;
+      for (let i = 0; i < slots.length; i++) if (e.cds[i] > 0) e.cds[i]--;
+      if (e.emp || e.landed && e.as !== 'out') continue;
+      if (e.inB) garrisonCombat(sim, e, d, slots); else unitCombat(sim, e, d, slots);
+    } else if (slots.length && e.done) {
+      const d = BLDGS[e.type], w = WEAPONS[slots[0]];
+      e.pturret = e.turret;
+      if (e.cds[0] > 0) e.cds[0]--;
+      if (e.offline || (d.power < 0 && sim.teams[e.team].low)) { e.target = 0; continue; } // no power, no radar
+      let t = e.target ? sim.byId.get(e.target) : null;
+      if (t && (!targetable(sim, e.team, t) || edgeDist(e.x, e.z, t) > w.range || !canUse(w, t))) { t = null; e.target = 0; }
+      if (!t && (sim.tick + e.id) % 5 === 0) { t = acquire(sim, e.team, e.x, e.z, w.range, slots); e.target = t ? t.id : 0; }
+      if (t) { const a = Math.atan2(t.z - e.z, t.x - e.x); if (turn(e, 'turret', a, d.turret) < 0.2) fireSlots(sim, e, slots, e.x, e.z, t, edgeDist(e.x, e.z, t), 0, 0); }
+    }
+  }
+  stepProjectiles(sim);
+}

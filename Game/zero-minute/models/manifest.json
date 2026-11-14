@@ -1,0 +1,3 @@
+{
+  "_readme": "Optional external models. Map a model key to a .glb in this folder, e.g. \"abrams\": \"abrams.glb\" or \"abrams\": { \"file\": \"abrams.glb\", \"length\": 4.7, \"rotY\": 90 }. Keys: abrams, battlemaster, overlord, technical, scoutcar, comanche, drone, a10, plus any other unit model key in js/sim/factionRegistry.js. With no entries, every unit uses its procedural model."
+}

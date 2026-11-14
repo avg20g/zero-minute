@@ -1,0 +1,196 @@
+// Model factory checks, run in Node with a structural stand-in for THREE:
+//   - prism geometry is closed and wound outward (it cannot be eyeballed here, so it is proven)
+//   - each rebuilt silhouette has the defining features of its real counterpart, in the right places
+//   - paints are matte and nothing is emissive
+//   - the .glb path parses, fits, orients and replaces the procedural model; bad files fall back
+import { THREE, made } from './stub-three.mjs';
+globalThis.THREE = THREE;
+const { prismPositions, isConvex, parseGLB } = await import('../js/render/meshdata.js');
+const MF = await import('../js/render/modelFactory.js');
+const { UNITS, POWERS } = await import('../js/sim/factionRegistry.js');
+let fails = 0, checks = 0; const ok = (c, msg) => { checks++; if (!c) { fails++; console.log('  FAIL', msg); } };
+const near = (a, b, tol) => Math.abs(a - b) <= tol;
+
+// ---- helpers over a built rig
+function parts(rig) { // every mesh with its position in the body frame (translations only; enough for placement checks)
+  const out = [];
+  const walk = (o, x, y, z, sc) => { const px = x + o.position.x * sc, py = y + o.position.y * sc, pz = z + o.position.z * sc, s2 = sc * o.scale.x;
+    if (o.isMesh) out.push({ name: o.name, x: px, y: py, z: pz, sx: o.scale.x * sc, sy: o.scale.y * sc, sz: o.scale.z * sc, m: o }); else for (const c of o.children) walk(c, px, py, pz, o === rig.body ? sc : s2); };
+  for (const c of rig.body.children) walk(c, 0, 0, 0, 1);
+  return out;
+}
+const named = (ps, n) => ps.filter(p => p.name === n);
+const ext = (pts, i) => [Math.min(...pts.map(p => p[i])), Math.max(...pts.map(p => p[i]))];
+function outward(pos) { // all faces of a convex solid point away from its centroid
+  let cx = 0, cy = 0, cz = 0; const n = pos.length / 3; for (let i = 0; i < pos.length; i += 3) { cx += pos[i] / n; cy += pos[i + 1] / n; cz += pos[i + 2] / n; }
+  for (let i = 0; i < pos.length; i += 9) {
+    const ux = pos[i + 3] - pos[i], uy = pos[i + 4] - pos[i + 1], uz = pos[i + 5] - pos[i + 2], vx = pos[i + 6] - pos[i], vy = pos[i + 7] - pos[i + 1], vz = pos[i + 8] - pos[i + 2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const mx = (pos[i] + pos[i + 3] + pos[i + 6]) / 3 - cx, my = (pos[i + 1] + pos[i + 4] + pos[i + 7]) / 3 - cy, mz = (pos[i + 2] + pos[i + 5] + pos[i + 8]) / 3 - cz;
+    if (nx * mx + ny * my + nz * mz <= 1e-9) return false;
+  }
+  return true;
+}
+const P = MF.paint('vanguard', 0), PR = MF.paint('redhammer', 1), PS = MF.paint('sandstorm', 0);
+
+// ---------------------------------------------------------------- 1. prism geometry
+{
+  let n = 0;
+  for (const mode of ['side', 'plan']) for (const k of [3, 4, 5, 8]) for (const flip of [false, true]) {
+    let pts = []; for (let i = 0; i < k; i++) { const a = i / k * Math.PI * 2; pts.push([Math.cos(a) * (1 + 0.3 * (i % 2)) + 0.4, Math.sin(a) * 0.7 - 0.2]); }
+    if (!isConvex(pts)) pts = pts.map((p, i) => [Math.cos(i / k * 6.2832), Math.sin(i / k * 6.2832)]);
+    if (flip) pts.reverse();
+    const pos = prismPositions(pts, 1.5, mode); n++;
+    ok(pos.length === (2 * (k - 2) + 2 * k) * 9, `prism ${mode} ${k}-gon triangle count`); ok(outward(pos), `prism ${mode} ${k}-gon${flip ? ' (reversed input)' : ''} wound outward`);
+  }
+  ok(!isConvex([[0, 0], [2, 0], [1, 0.2], [2, 2], [0, 2]]), 'isConvex rejects a dented profile');
+  console.log(`prisms         : ${n} test solids closed and wound outward for either input order`);
+}
+
+// ---------------------------------------------------------------- 2. every assembly: profiles convex, faces outward, matte, no glow
+{
+  const rigs = { abrams: MF.ASSEMBLY.abrams(P), overlord: MF.ASSEMBLY.overlord(PR), battlemaster: MF.ASSEMBLY.battlemaster(PR), technical: MF.ASSEMBLY.technical(PS), scoutcar: MF.ASSEMBLY.scoutcar(PR),
+    comanche: MF.ASSEMBLY.comanche(P), drone: MF.ASSEMBLY.drone(P), a10: MF.AIRCRAFT.a10(P), rocket: MF.createRocket() };
+  let prisms = 0, meshes = 0;
+  for (const [k, r] of Object.entries(rigs)) r.g.traverse((o) => {
+    if (!o.isMesh) return; meshes++;
+    if (o.userData.profile) { prisms++; ok(isConvex(o.userData.profile), `${k}/${o.name}: profile is convex`); ok(outward(o.geometry.attributes.position.array), `${k}/${o.name}: faces wound outward`); }
+  });
+  const glow = made.materials.filter(m => m.emissive !== undefined || m.emissiveIntensity);
+  ok(glow.length === 0, `no emissive materials in the factory (${glow.length})`);
+  const shiny = made.materials.filter(m => m.roughness < 0.55 && m.color.hex !== 0x121a22);
+  ok(shiny.length === 0, `every paint and metal is matte (roughness >= 0.55); only glass is glossy (${shiny.map(m => m.color.hex.toString(16))})`);
+  const hull = [P.hull, PR.hull, PS.hull];
+  ok(hull.every(m => m.roughness >= 0.85 && m.metalness <= 0.1), 'hull paints: roughness >= 0.85, metalness <= 0.1');
+  console.log(`assemblies     : ${Object.keys(rigs).length} rigs, ${meshes} meshes, ${prisms} extruded profiles all convex and outward; ${made.materials.length} materials, 0 emissive`);
+  globalThis.__rigs = rigs;
+}
+const R = globalThis.__rigs;
+
+// ---------------------------------------------------------------- 3. M1A2 Abrams profile
+{
+  const ps = parts(R.abrams), hullP = named(ps, 'hull')[0].m.userData.profile, [hx0, hx1] = ext(hullP, 0), hullLen = hx1 - hx0;
+  const hullW = 2.26, barrel = named(ps, 'barrel')[0], evac = named(ps, 'evacuator')[0], shell = named(ps, 'turretshell')[0];
+  ok(named(ps, 'roadwheel').length === 14 && named(ps, 'roadwheel').filter(p => p.z > 0).length === 7, 'Abrams: 7 road wheels per side');
+  ok(named(ps, 'sprocket').every(p => p.x < 0) && named(ps, 'idler').every(p => p.x > 0) && named(ps, 'sprocket').length === 2, 'Abrams: rear drive sprockets, front idlers');
+  ok(named(ps, 'skirt').length === 2, 'Abrams: side skirts');
+  const brl = barrel.sy, ratio = brl / hullLen; ok(ratio > 0.6 && ratio < 0.72, `Abrams: barrel/hull length ${ratio.toFixed(2)} (real 5.28/7.93 = 0.67)`);
+  const along = (evac.x - (barrel.x - brl / 2)) / brl; ok(along > 0.35 && along < 0.65 && evac.sx > barrel.sx * 1.3, `Abrams: bore evacuator at ${(along * 100).toFixed(0)}% of the barrel, fatter than the tube`);
+  const tp = shell.m.userData.profile, tw = ext(tp, 1)[1] - ext(tp, 1)[0], tl = ext(tp, 0)[1] - ext(tp, 0)[0], th = 0.46;
+  ok(tw / hullW > 0.75 && th / tl < 0.25, `Abrams: turret wide (${(tw / hullW * 100).toFixed(0)}% of hull width) and low (${(th / tl).toFixed(2)} height/length)`);
+  ok(tp.filter(p => p[0] > 1.2).every(p => Math.abs(p[1]) < tw * 0.3), 'Abrams: turret front tapers to wedge cheeks');
+  const bustle = named(ps, 'bustle')[0], rack = named(ps, 'bustlerack');
+  ok(bustle && bustle.x < shell.x + ext(tp, 0)[0] + 0.2 && rack.length >= 3 && rack.every(p => p.x < bustle.x), 'Abrams: rear turret bustle with a stowage rack behind it');
+  const glacis = hullP.find(p => p[1] === 1.02 && p[0] > 0), nose = hullP.find(p => p[0] === hx1 && p[1] > 0.8), slope = Math.atan2(glacis[1] - nose[1], nose[0] - glacis[0]) * 180 / Math.PI;
+  ok(slope > 4 && slope < 15, `Abrams: long shallow glacis (${slope.toFixed(1)} deg from horizontal)`);
+  const top = Math.max(...ps.filter(p => !['antenna', 'aamg'].includes(p.name)).map(p => p.y + (p.m.userData.profile ? 0.23 : 0))); ok(top / hullLen < 0.36, `Abrams: low-slung, roof height/hull length ${(top / hullLen).toFixed(2)} (real 0.31)`);
+  ok(named(ps, 'turretring').length === 1 && named(ps, 'turretring')[0].sx > 0.6, 'Abrams: turret ring');
+  ok(R.abrams.turret && R.abrams.muzzle > 4.5, 'Abrams: turret rig and muzzle point');
+  console.log(`M1A2 profile   : hull ${hullLen.toFixed(2)} x ${hullW} m, 14 road wheels, barrel ${brl} m (${ratio.toFixed(2)} of hull), evacuator at ${(along * 100).toFixed(0)}%, wedge turret + bustle rack, glacis ${slope.toFixed(1)} deg`);
+  globalThis.__abramsSlope = slope;
+}
+// ---------------------------------------------------------------- 4. Soviet heavy (dual barrel) and Battlemaster
+{
+  const ps = parts(R.overlord), barrels = named(ps, 'barrel').filter(p => p.sy > 3), hullP = named(ps, 'hull')[0].m.userData.profile;
+  ok(barrels.length === 2 && near(barrels[0].z, -barrels[1].z, 1e-6) && barrels[0].z !== 0, 'Heavy: two main guns side by side');
+  ok(named(ps, 'evacuator').length === 2, 'Heavy: bore evacuator on each gun');
+  const era = named(ps, 'era'); ok(era.length >= 20 && era.some(p => p.m.parent === R.overlord.turret) && era.some(p => Math.abs(p.z) > 1.4), `Heavy: ${era.length} reactive armour bricks on glacis, turret and skirts`);
+  const shell = named(ps, 'turretshell')[0]; ok(shell.m.geometry.kind === 'sphere', 'Heavy: rounded cast turret (dome, not a box)');
+  const drums = named(ps, 'fueldrum'), rear = ext(hullP, 0)[0]; ok(drums.length === 2 && drums.every(d => d.x < rear), 'Heavy: two fuel drums hung behind the hull rear');
+  ok(named(ps, 'log').length === 1 && named(ps, 'snorkel').length === 1, 'Heavy: unditching log and snorkel tube');
+  const g0 = hullP.find(p => p[1] === 1.26 && p[0] > 0), n0 = hullP.find(p => p[0] === 2.95), slope = Math.atan2(g0[1] - n0[1], n0[0] - g0[0]) * 180 / Math.PI;
+  ok(slope > globalThis.__abramsSlope + 5, `Heavy: glacis steeper than the Abrams (${slope.toFixed(1)} deg)`);
+  ok(named(ps, 'roadwheel').length === 12, 'Heavy: 6 large road wheels per side');
+  ok(R.overlord.addons.gatling.visible === false && R.overlord.addons.bunker.visible === false, 'Heavy: hardpoints present, hidden until fitted');
+  const bm = R.battlemaster, bps = parts(bm);
+  ok(named(bps, 'barrel').filter(p => p.m.parent === bm.turret).length === 1 && near(bm.body.scale.x, 0.76, 1e-9) && !bm.addons, 'Battlemaster: single gun, same hull at 0.76 scale, no hardpoints');
+  console.log(`Soviet heavy   : dual 125 mm with evacuators, cast dome turret, ${era.length} ERA bricks, 2 rear fuel drums, log + snorkel, glacis ${slope.toFixed(1)} deg; Battlemaster = single-gun 0.76 scale`);
+}
+// ---------------------------------------------------------------- 5. Technical
+{
+  const r = R.technical, ps = parts(r), cab = named(ps, 'cab')[0].m.userData.profile, bed = named(ps, 'flatbed')[0];
+  ok(named(ps, 'wheel').length === 4, 'Technical: four road wheels');
+  ok(bed.x + bed.sx / 2 <= ext(cab, 0)[0] + 0.05 && named(ps, 'bedside').every(p => p.y + p.sy / 2 < ext(cab, 1)[1] - 0.3), 'Technical: open flatbed behind the cab, sides well below the roof line');
+  const pin = named(ps, 'pintle')[0]; ok(pin && pin.x > bed.x - bed.sx / 2 && pin.x < bed.x + bed.sx / 2 && pin.y > bed.y, 'Technical: pintle mount standing in the bed');
+  const [mg, cn, rk] = r.tiers, count = (g, n) => { let c = 0; g.traverse(o => { if (o.isMesh && o.name === n) c++; }); return c; };
+  ok(count(mg, 'barrel') === 1 && count(cn, 'barrel') === 2 && count(rk, 'tube') === 12, 'Technical: HMG (1 barrel), twin autocannon, 12-tube rocket pod');
+  ok(mg.visible && !cn.visible && !rk.visible && mg.parent === r.turret, 'Technical: starts with the HMG; other fits appear with salvage tiers');
+  console.log('Technical      : pickup cab + open flatbed, pintle mount with gunner, 3 weapon fits (HMG / twin cannon / 12-tube pod)');
+}
+// ---------------------------------------------------------------- 6. Attack helicopter
+{
+  const r = R.comanche, ps = parts(r), can = named(ps, 'canopy').sort((a, b) => b.x - a.x);
+  ok(can.length === 2 && can[0].x - can[1].x > 0.5 && can[1].y > can[0].y + 0.15, 'Helicopter: two cockpits in tandem, rear seat stepped up');
+  const wings = named(ps, 'stubwing'), pods = named(ps, 'pod');
+  ok(wings.length === 2 && wings[0].z === -wings[1].z && pods.length === 2 && pods.every(p => p.y < wings[0].y && Math.abs(p.z) > 1), 'Helicopter: stub wings with a missile pod under each');
+  let blades = 0, tail = 0; r.rotor.traverse(o => { if (o.name === 'blade') blades++; }); r.rotorTail.traverse(o => { if (o.name === 'tailblade') tail++; });
+  const fus = named(ps, 'fuselage')[0].m.userData.profile;
+  ok(blades === 5 && r.rotor.position.y > ext(fus, 1)[1] && Math.abs(r.rotor.position.x) < 0.3, 'Helicopter: 5-blade main rotor on a mast above the fuselage');
+  ok(tail >= 4 && r.rotorTail.position.x < -3 && named(ps, 'fenestron').length === 2, 'Helicopter: shrouded tail rotor at the end of the boom');
+  ok(named(ps, 'stabilizer')[0].y > named(ps, 'fin')[0].y, 'Helicopter: T-tail');
+  const len = ext(fus, 0)[1] - ext(fus, 0)[0], w = 0.9; ok(len / w > 4, `Helicopter: sleek fuselage (${(len / w).toFixed(1)} : 1)`);
+  ok(r.turret.position.y < 0 && r.turret.position.x > 1.5, 'Helicopter: chin gun turret under the nose');
+  console.log(`Helicopter     : tandem stepped cockpit, ${(len / w).toFixed(1)}:1 fuselage, stub wings + pods, 5-blade main rotor, shrouded tail rotor, T-tail, chin gun`);
+}
+// ---------------------------------------------------------------- 7. A-10 Thunderbolt II
+{
+  const r = R.a10, ps = parts(r), wings = named(ps, 'wing'), eng = named(ps, 'engine'), fins = named(ps, 'fin'), tp = named(ps, 'tailplane')[0], fus = named(ps, 'fuselage')[0];
+  const nose = named(ps, 'nose')[0], gun = named(ps, 'gau8')[0], can = named(ps, 'canopy')[0];
+  ok(wings.length === 4 && wings.every(p => p.m.rotation.y === 0), 'A-10: wing panels have zero sweep');
+  const span = 2 * Math.max(...wings.map(p => Math.abs(p.z) + p.sz / 2)), noseTip = nose.x + nose.m.geometry.params[2] / 2, tail = Math.min(...ps.map(p => p.x - (p.name === 'tailcone' ? 0.75 : 0))), length = noseTip - tail;
+  const chord = Math.max(...wings.map(p => p.sx));
+  ok(span / length > 0.95 && span / length < 1.2, `A-10: span/length ${(span / length).toFixed(2)} (real 17.53/16.26 = 1.08)`);
+  ok(span / chord > 5.5, `A-10: long wing, span/chord ${(span / chord).toFixed(1)}`);
+  const le = Math.max(...wings.map(p => p.x + p.sx / 2)), te = Math.min(...wings.map(p => p.x - p.sx / 2)), fr = fus.sx;
+  ok(eng.length === 2 && eng[0].z === -eng[1].z && eng.every(e => e.y - e.sx > 0.3 && e.x + e.sy / 2 < te && e.x - e.sy / 2 > tp.x && Math.abs(e.z) > fr), 'A-10: twin turbofan pods, above the fuselage, aft of the wing, ahead of the tail, outboard of the body');
+  ok(named(ps, 'intake').length === 2 && named(ps, 'exhaust').length === 2 && named(ps, 'enginepylon').length === 2, 'A-10: each pod has an intake, an exhaust and a pylon');
+  ok(fins.length === 2 && fins.every(f => near(Math.abs(f.z), tp.sz / 2, 0.1) && f.y > tp.y) && !ps.some(p => p.name === 'fin' && p.z === 0), 'A-10: twin fins on the tailplane tips (H-tail), no centre fin');
+  ok(can.m.geometry.kind === 'sphere' && can.x - can.sx > le && can.y > fr * 0.8, 'A-10: bubble canopy, forward of the wing');
+  const gunTip = gun.x + gun.sy / 2; ok(gunTip > noseTip + 0.5 && gun.y < 0, `A-10: GAU-8 protrudes ${(gunTip - noseTip).toFixed(2)} m beyond the nose, below the centreline`);
+  ok(named(ps, 'rocket').length === POWERS.a10.rockets.n && named(ps, 'rocket').every(p => p.y < wings[0].y), `A-10: ${POWERS.a10.rockets.n} underwing rockets, matching the salvo the power fires`);
+  ok(named(ps, 'gearpod').length === 2, 'A-10: main gear pods under the wing');
+  console.log(`A-10           : ${length.toFixed(1)} m long, ${span.toFixed(1)} m span (ratio ${(span / length).toFixed(2)}), unswept wing, 2 high rear turbofans, H-tail, bubble canopy, GAU-8 ${(gunTip - noseTip).toFixed(2)} m proud of the nose, 6 rockets`);
+}
+// ---------------------------------------------------------------- 8. external .glb path
+{
+  // build a tiny valid GLB: a 1 x 0.5 x 3 "hull" box (long axis Z, as glTF models face +Z) with a child "Turret" box
+  const boxMesh = (sx, sy, sz) => { const p = []; for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) p.push(x * sx / 2, y * sy / 2, z * sz / 2);
+    return { pos: new Float32Array(p), idx: new Uint16Array([0, 1, 3, 0, 3, 2, 4, 6, 7, 4, 7, 5, 0, 4, 5, 0, 5, 1, 2, 3, 7, 2, 7, 6, 0, 2, 6, 0, 6, 4, 1, 5, 7, 1, 7, 3]) }; };
+  const makeGLB = (extra = {}) => {
+    const a = boxMesh(1, 0.5, 3), b = boxMesh(0.6, 0.3, 0.8), chunks = [a.pos, a.idx, b.pos, b.idx].map(t => new Uint8Array(t.buffer));
+    const views = []; let off = 0; for (const c of chunks) { views.push({ buffer: 0, byteOffset: off, byteLength: c.length }); off += c.length; off += (4 - off % 4) % 4; }
+    const bin = new Uint8Array(off); chunks.forEach((c, i) => bin.set(c, views[i].byteOffset));
+    const json = { asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ name: 'Hull', mesh: 0, children: [1] }, { name: 'Turret', mesh: 1, translation: [0, 0.4, 0.2] }],
+      meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1, material: 0 }] }, { primitives: [{ attributes: { POSITION: 2 }, indices: 3, material: 0 }] }],
+      materials: [{ name: 'od', pbrMetallicRoughness: { baseColorFactor: [0.2, 0.25, 0.12, 1], metallicFactor: 0.05, roughnessFactor: 0.9 } }],
+      accessors: [{ bufferView: 0, componentType: 5126, count: 8, type: 'VEC3' }, { bufferView: 1, componentType: 5123, count: 36, type: 'SCALAR' }, { bufferView: 2, componentType: 5126, count: 8, type: 'VEC3' }, { bufferView: 3, componentType: 5123, count: 36, type: 'SCALAR' }],
+      bufferViews: views, buffers: [{ byteLength: bin.length }], ...extra };
+    let js = new TextEncoder().encode(JSON.stringify(json)); const pad = (4 - js.length % 4) % 4; const jp = new Uint8Array(js.length + pad).fill(0x20); jp.set(js);
+    const out = new ArrayBuffer(12 + 8 + jp.length + 8 + bin.length), dv = new DataView(out), u8 = new Uint8Array(out);
+    dv.setUint32(0, 0x46546C67, true); dv.setUint32(4, 2, true); dv.setUint32(8, out.byteLength, true);
+    dv.setUint32(12, jp.length, true); dv.setUint32(16, 0x4E4F534A, true); u8.set(jp, 20);
+    dv.setUint32(20 + jp.length, bin.length, true); dv.setUint32(24 + jp.length, 0x004E4942, true); u8.set(bin, 28 + jp.length);
+    return out;
+  };
+  const d = parseGLB(makeGLB());
+  ok(d.triangles === 24 && d.roots.length === 1 && d.roots[0].name === 'Hull' && d.roots[0].children[0].name === 'Turret', 'GLB: node tree and triangle count parsed');
+  ok(near(d.bounds.min[2], -1.5, 1e-6) && near(d.bounds.max[2], 1.5, 1e-6) && near(d.bounds.max[1], 0.55, 1e-6), 'GLB: bounds include child node transforms');
+  ok(d.materials[0].roughness === 0.9 && near(d.materials[0].color[1], 0.25, 1e-9), 'GLB: PBR base colour / roughness read');
+  let threw = 0; for (const bad of [new ArrayBuffer(40), makeGLB({ extensionsRequired: ['KHR_draco_mesh_compression'] })]) { try { parseGLB(bad); } catch (e) { threw++; } }
+  ok(threw === 2, 'GLB: non-GLB data and Draco-compressed files are rejected, not half-loaded');
+  // through the factory: manifest + files served by a fake fetch
+  const files = { 'models/manifest.json': JSON.stringify({ _readme: 'x', abrams: 'abrams.glb', overlord: { file: 'broken.glb' }, comanche: 'missing.glb' }), 'models/abrams.glb': makeGLB(), 'models/broken.glb': new ArrayBuffer(64) };
+  globalThis.fetch = async (url) => { const f = files[url]; return { ok: f !== undefined, status: f !== undefined ? 200 : 404, json: async () => JSON.parse(f), arrayBuffer: async () => f }; };
+  const rep = await MF.loadExternalModels();
+  ok(rep.loaded.join() === 'abrams' && rep.failed.length === 2, `GLB: 1 model loaded, 2 bad entries reported and skipped (${rep.failed.map(f => f.split(':')[0])})`);
+  const tank = MF.createModel({ kind: 'unit', type: 'v_tank', team: 0 }), heavy = MF.createModel({ kind: 'unit', type: 'r_overlord', team: 1 }), heli = MF.createModel({ kind: 'unit', type: 'v_comanche', team: 0 });
+  ok(tank.source === 'glb' && heavy.source === 'assembly' && heli.source === 'assembly', 'GLB: supplied model replaces the procedural one; broken and missing files fall back to procedural');
+  const fit = tank.body.children[0];
+  ok(near(fit.scale.x, UNITS.v_tank.radius * 2.3 / 3, 1e-9) && near(fit.rotation.y, Math.PI / 2, 1e-9), 'GLB: auto-scaled to the unit length and turned from glTF +Z to face +X');
+  ok(near(fit.children[0].position.y, 0.25, 1e-9), 'GLB: ground vehicles sit on their lowest point');
+  ok(tank.turret && tank.turret.name === 'Turret' && tank.noRecoil === true && tank.body && tank.g, 'GLB: node named "Turret" becomes the aiming turret');
+  globalThis.fetch = async () => ({ ok: false, status: 404 });
+  const none = await MF.loadExternalModels('nowhere/'); ok(none.loaded.length === 0 && none.failed.length === 0, 'GLB: no manifest means no external models and no errors');
+  console.log('external .glb  : parse, bounds, materials, auto-fit, orientation, turret node, fallback on bad or missing files');
+}
+console.log(fails ? `MODELS: ${fails} FAILURES of ${checks}` : `MODELS: all ${checks} checks passed`);

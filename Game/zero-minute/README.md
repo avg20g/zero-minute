@@ -157,6 +157,21 @@ guard and promotions, so attack-move is F and guard is V.
   (this could freeze an AI builder). Units now only cut a corner when the way ahead is open.
 - Tests: `node test/batch6.mjs` (68 checks) and section E of `python3 test/browser5.py <outdir>`.
 
+## Batch 7: garrisons, powers and fog, Battlemaster fix
+- **Garrison size**: civilian buildings hold 3 to 8 squads by type (`BLDGS.civ.caps`; it was 2 for all).
+- **Taking a garrison out**: select the building you hold, then press U (all), Shift + U (one squad), or
+  right-click the ground (all leave and walk there). The Evacuate buttons were unreachable before: a held
+  building's command card never showed them. Command `{ t: 'evacuate', id, count, x, z }`.
+- **Powers light the fog**: using any support power or superweapon shows its target area (power radius
+  + 10 m) to that team for 16 s (`sim.reveals`). Rule change: A-10 rockets can now guide inside it.
+- **Powers wreck civilian buildings**: empty ones and enemy-held ones take full power damage
+  (`strikeDamage`). Buildings you hold are spared. Ordinary unit fire still leaves empty buildings alone.
+- **Captured Oil Derricks** watch about 29 m around them (this already worked; now covered by a test).
+- **Battlemaster fix**: the Overlord's Gatling turret and Battle Bunker were built hidden on every
+  Battlemaster, and the mesh baker merged hidden parts into the drawn model. They are no longer built,
+  and `bakeRig` skips hidden parts.
+- Tests: `node test/batch7.mjs` (26 checks) and section F of `python3 test/browser5.py <outdir>`.
+
 ## Replays
 A replay is the match setup plus the player's commands with their tick numbers
 (a 20-minute match is a few kilobytes). The AI runs inside the simulation, so
@@ -182,6 +197,7 @@ Node (simulation only):
     node test/batch5.mjs      generals, Forest River, water and bridges, building types
     node test/batch6.mjs      force attack, move markers, cancel build, Chinooks, helipad repair,
                               new maps and brushes
+    node test/batch7.mjs      garrison size and exit, powers light fog and wreck buildings
     node test/bench.mjs       simulation speed benchmark
     node test/addon.mjs       superweapons, No-Superweapons rule, new powers,
                               King of the Hill, AI use of all of them

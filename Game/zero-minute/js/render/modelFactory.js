@@ -119,7 +119,7 @@ function abrams(P) {
 // ---------------------------------------------------------------- Soviet-pattern tanks (Red Hammer)
 // Steep glacis, rounded cast turret, reactive armour bricks, rear fuel drums, unditching log.
 // `dual` gives the heavy its second 125 mm gun; the Battlemaster is the same hull at 0.76 scale.
-function sovietTank(P, dual) {
+function sovietTank(P, dual, hardpoints = true) {
   const s = shared(), g = new THREE.Group(), b = grp(g);
   for (const k of [-1, 1]) {
     runningGear(b, 5.8, k * 1.2, 0.5, 6, 0.3, 0.98);
@@ -145,6 +145,7 @@ function sovietTank(P, dual) {
   for (const k of [-1, 1]) box(t, P.dark, 0.6, 0.24, 0.34, -1.0, 0.2, k * 0.72, 'stowage');
   cyl(t, P.dark, 0.11, 1.5, -1.34, 0.32, 0, 'z', 'snorkel'); cyl(t, s.gunmetal, 0.012, 1.2, -0.9, 1.0, 0.5, 'y', 'antenna');
   box(t, P.id, 0.5, 0.02, 0.5, -0.4, 0.6, 0.15, 'idpanel');
+  if (!hardpoints) return { g, body: b, turret: t, turretX: -0.15, muzzle: 4.7, muzzleY: 1.58 };
   // turret-roof and rear-deck hardpoints (shown once fitted)
   const gat = grp(t, -0.6, 0.56, 0.5, 'gatling'); cyl(gat, s.gunmetal, 0.2, 0.3, 0, 0.15, 0, 'y'); box(gat, s.gunmetal, 0.5, 0.26, 0.4, 0.05, 0.42, 0);
   for (const [dy, dz] of [[0.06, 0.06], [0.06, -0.06], [-0.06, 0.06], [-0.06, -0.06]]) cyl(gat, s.gunmetal, 0.028, 1.2, 0.85, 0.42 + dy, dz, 'x', 'barrel');
@@ -152,7 +153,9 @@ function sovietTank(P, dual) {
   gat.visible = false; bun.visible = false;
   return { g, body: b, turret: t, turretX: -0.15, muzzle: 4.7, muzzleY: 1.58, addons: { gatling: gat, bunker: bun } };
 }
-function battlemaster(P) { const r = sovietTank(P, false); r.body.scale.setScalar(0.76); r.muzzle *= 0.76; r.muzzleY *= 0.76; delete r.addons; return r; }
+// The Battlemaster has no hardpoints, so the Overlord's Gatling turret and Battle Bunker are never built for it. They used to be built and hidden:
+// hidden parts used to be merged into the drawn mesh, so every Battlemaster carried both.
+function battlemaster(P) { const r = sovietTank(P, false, false); r.body.scale.setScalar(0.76); r.muzzle *= 0.76; r.muzzleY *= 0.76; return r; }
 
 // ---------------------------------------------------------------- Technical (Sandstorm)
 // Stripped pickup: open flatbed, pintle mount, and three weapon fits for the salvage tiers.
@@ -519,6 +522,7 @@ export function bakeRig(rig) {
     const gather = (o, toNode) => {
       for (const c of o.children.slice()) {
         if (onPath.has(c)) { next.push(c); continue; }             // animated node (or leads to one): stays a node
+        if (!c.visible) continue;                                   // a hidden part nothing can switch on again: never draw it
         c.updateMatrix(); const m = toNode.clone().multiply(c.matrix);
         if (c.isMesh) {
           const b = mergeable(c);

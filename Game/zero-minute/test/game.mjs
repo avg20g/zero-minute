@@ -60,9 +60,11 @@ function scriptedGame(ticks, log) {
 {
   const sim = new Sim({ ai: false });
   const civ = sim.ents.find(e => e.type === 'civ');
+  civ.variant = 6;   // log cabin: the smallest building, holds 3 squads (batch 7 raised every building from 2)
+  const sq0 = spawnNear(sim, 'v_ranger', PLAYER, civ.x - 16, civ.z + 30); sim.issue({ t: 'garrison', ids: [sq0.id], target: civ.id }); run(sim, 300);
   const sq = spawnNear(sim, 'v_ranger', PLAYER, civ.x - 20, civ.z + 30), sq2 = spawnNear(sim, 'v_ranger', PLAYER, civ.x - 24, civ.z + 30), sq3 = spawnNear(sim, 'v_ranger', PLAYER, civ.x - 28, civ.z + 30);
   sim.issue({ t: 'garrison', ids: [sq.id, sq2.id, sq3.id], target: civ.id }); run(sim, 300);
-  ok(civ.garrison.length === 2 && civ.team === PLAYER, 'two squads inside (capacity 2), got ' + civ.garrison.length); ok([sq, sq2, sq3].filter(u => !u.inB && !u.order).length === 1, 'third squad turned away');
+  ok(civ.garrison.length === 3 && civ.team === PLAYER, 'three squads inside (capacity 3), got ' + civ.garrison.length); ok([sq, sq2, sq3].filter(u => !u.inB && !u.order).length === 1, 'fourth squad turned away');
   const foe = makeUnit(sim, 's_buggy', ENEMY, civ.x + 34, civ.z, Math.PI); foe.order = { t: 'hold' };
   const hp0 = foe.hp; run(sim, 100); ok(foe.hp < hp0 || foe.dead, 'garrison fires out');
   sim.issue({ t: 'evacuate', id: civ.id }); run(sim, 5);

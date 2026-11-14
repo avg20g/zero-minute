@@ -106,6 +106,7 @@ export class Hud {
         case 'msg': if ((e.team ?? PLAYER) === PLAYER) this.toast(e.text, 'warn'); break;
         case 'cash': if (e.team === PLAYER && !e.quiet) this.float(e.x, e.z, 6, '+$' + e.amt, '#f2a93b'); break;
         case 'done': if (e.team === PLAYER) this.toast(BLDGS[e.type].name + ' complete'); break;
+        case 'evacuate': if (e.team === PLAYER && e.n) this.float(e.x, e.z, 6, e.n + ' OUT', '#4aa3ff'); break;
         case 'cancelbuild': if (e.team === PLAYER) { this.toast('Construction cancelled: $' + fmt(e.amt) + ' refunded'); this.float(e.x, e.z, 5, '+$' + e.amt, '#f2a93b'); } break;
         case 'helipad': if (e.team === PLAYER) this.float(e.x, e.z, 4, 'REPAIRING', '#7dffa0'); break;
         // Superweapons are public: both sides are told when one comes online, where it is, and when it fires.
@@ -117,7 +118,7 @@ export class Hud {
         case 'upgrade': if (e.team === PLAYER) this.toast(UPGRADES[e.id].name + ' researched'); break;
         case 'addon': if (e.team === PLAYER) this.toast(UNITS.r_overlord.hardpoints[e.type].name + ' fitted'); break;
         case 'dockEmpty': if (fog.exp[PLAYER][sim.nav.cellOf(e.x, e.z)]) this.toast('Supply Dock depleted. Collectors will move to another dock.', 'warn'); break;
-        case 'garrison': if (e.team === PLAYER) this.toast('Squad garrisoned'); break;
+        case 'garrison': if (e.team === PLAYER) this.toast('Squad garrisoned. Select the building and press U to take it out.'); break;
         case 'hit': {
           const t = sim.byId.get(e.id);
           if (t && this.shows(t)) this.float(e.x, e.z, 3.5, ZONE_NAME[e.zone] + ' HIT ×' + ZONE_MULT[e.zone], e.zone === 2 ? '#ff5a4d' : '#f2a93b');
@@ -175,7 +176,8 @@ export class Hud {
       else if (act === 'scatter') { if (units.length) { sim.issue({ t: 'scatter', ids: units.map(u => u.id) }); ui.sfx && ui.sfx('order'); } }
       else if (act === 'deploy') sim.issue({ t: 'deploy', ids: units.filter(u => UNITS[u.type].deploy).map(u => u.id) });
       else if (act === 'addon') { for (const u of units) if (UNITS[u.type].hardpoints && !u.addon && !u.addonQ) sim.issue({ t: 'addon', id: u.id, type: arg }); }
-      else if (act === 'evac') { for (const id of ui.selection) sim.issue({ t: 'evacuate', id }); }
+      else if (act === 'evac') ctl.evacuate(0);
+      else if (act === 'evac1') ctl.evacuate(1);
     });
     $('queue').addEventListener('click', (ev) => {
       const b = ev.target.closest('button[data-idx]'); if (!b) return;
@@ -265,8 +267,10 @@ export class Hud {
       if (dep.length) out.push({ act: 'deploy', icon: ICON.income, name: dep.every(u => u.deployed) ? 'Pack up' : 'Deploy hack', key: '+$6/s', on: dep.every(u => u.deployed) });
       const ov = units.filter(u => UNITS[u.type].hardpoints && !u.addon && !u.addonQ);
       if (ov.length) for (const [k, hp] of Object.entries(UNITS[ov[0].type].hardpoints)) out.push({ act: 'addon:' + k, icon: k === 'gatling' ? ICON.defense : ICON.barracks, name: hp.name, cost: hp.cost, why: T.money < hp.cost ? 'Insufficient funds' : '' });
-      if (units.some(u => u.garrison && u.garrison.length)) out.push({ act: 'evac', icon: ICON.evac, name: 'Unload bunker' });
+      if (units.some(u => u.garrison && u.garrison.length)) out.push({ act: 'evac', icon: ICON.evac, name: 'Unload bunker', key: 'U' });
     } else if (bldgs.length) {
+      // a civilian building you hold counts as yours while the garrison is inside: this is where its exit buttons go
+      for (const id of this.ui.selection) { const e = sim.byId.get(id); if (e && e.type === 'civ' && e.team === PLAYER && e.garrison.length) { out.push({ act: 'evac', icon: ICON.evac, name: 'Evacuate all', key: 'U', tip: 'Every squad leaves the building. Or right-click the ground to send them straight there.' }); out.push({ act: 'evac1', icon: ICON.evac, name: 'Take out one squad', key: 'Shift+U', tip: 'Only the last squad that went in comes out.' }); break; } }
       const seen = new Set(), sites = bldgs.filter(b => !b.done);
       if (sites.length) out.push({ act: 'cancelbuild', icon: ICON.cancel, name: 'Cancel construction', key: 'refund $' + fmt(sites.reduce((a, b) => a + BLDGS[b.type].cost, 0)), tip: 'Remove the unfinished building and get its full price back.' });
       for (const b of bldgs) {
@@ -284,8 +288,6 @@ export class Hud {
           out.push({ act: 'train:up:' + u, icon: ICON.up, name: UPGRADES[u].name, cost: UPGRADES[u].cost, why: q ? 'Already in production' : T.money < UPGRADES[u].cost ? 'Insufficient funds' : '', tip: UPGRADES[u].desc });
         }
       }
-    } else {
-      for (const id of this.ui.selection) { const e = sim.byId.get(id); if (e && e.type === 'civ' && e.team === PLAYER && e.garrison.length) { out.push({ act: 'evac', icon: ICON.evac, name: 'Evacuate' }); break; } }
     }
     return out;
   }
@@ -326,7 +328,7 @@ export class Hud {
       const d = BLDGS[e.type];
       if (e.type === 'dock') return e.supplies > 0 ? `$${fmt(e.supplies)} of supplies left` : 'Depleted';
       if (d.capturable) return (e.team === PLAYER ? 'Yours: +$' + d.income.amt + ' every 2 s' : e.team === NEUTRAL || !sim.fog.canSee(PLAYER, e) ? 'Send infantry to capture it' : 'Enemy-held: send infantry to retake it');
-      if (e.type === 'civ') out.push(e.ruined ? 'Destroyed' : `Garrison ${e.team === PLAYER || sim.fog.canSee(PLAYER, e) ? e.garrison.length : '?'}/${d.capacity}`);
+      if (e.type === 'civ') out.push(e.ruined ? 'Destroyed' : `Garrison ${e.team === PLAYER || sim.fog.canSee(PLAYER, e) ? e.garrison.length : '?'}/${capacityOf(e)}` + (e.team === PLAYER && e.garrison.length ? ' · press U, or right-click the ground, to take them out' : ''));
       else if (!e.done) out.push(`Building ${Math.floor(e.progress * 100)}%`);
       else if (mine) {
         if (e.disabledUntil > sim.tick) out.push('SABOTAGED ' + Math.ceil((e.disabledUntil - sim.tick) / TICK_HZ) + ' s');

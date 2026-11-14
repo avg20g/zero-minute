@@ -153,22 +153,24 @@ export function freeSpot(sim, wx, wz, cls, radius, maxR = 14, ignoreId = 0) {
 // ---------------- garrisons / containers ----------------
 // A container is a civilian building or a unit with a Battle Bunker hardpoint.
 export function capacityOf(c) {
-  if (c.kind === 'bldg') return BLDGS[c.type].capacity || 0;
+  if (c.kind === 'bldg') { const d = BLDGS[c.type]; return (d.caps && d.caps[c.variant | 0]) || d.capacity || 0; }
   return c.addon && UNITS[c.type].hardpoints[c.addon].capacity || 0;
 }
-export function ejectGarrison(sim, c, hpFactor = 1) {
-  if (!c.garrison || !c.garrison.length) return;
+// `count`: how many squads leave (default: all of them, last in first out). Returns the units that came out.
+export function ejectGarrison(sim, c, hpFactor = 1, count = 1e9) {
+  if (!c.garrison || !c.garrison.length) return [];
+  const leaving = c.garrison.splice(Math.max(0, c.garrison.length - count)), out = [];
   const hw = c.kind === 'bldg' ? c.w * CELL * 0.5 : c.radius, hh = c.kind === 'bldg' ? c.h * CELL * 0.5 : c.radius;
   let k = 0;
-  for (const id of c.garrison) {
-    const u = sim.byId.get(id); if (!u || u.dead) continue;
+  for (const id of leaving) {
+    const u = sim.byId.get(id); if (!u || u.dead) continue; out.push(u);
     const a = k++ * 2.4, s = freeSpot(sim, c.x + Math.cos(a) * (hw + 2.5), c.z + Math.sin(a) * (hh + 2.5), 0, u.radius, 10, u.id);
     if (s) { u.x = s[0]; u.z = s[1]; }
     u.px = u.x; u.pz = u.z; u.lx = u.x; u.lz = u.z; u.inB = 0; u.order = null; u.target = 0; u.guardX = u.x; u.guardZ = u.z; u.stillT = 0;
     u.hp = Math.max(1, u.hp * hpFactor);
   }
-  c.garrison.length = 0;
-  if (c.type === 'civ') c.team = NEUTRAL;
+  if (c.type === 'civ' && !c.garrison.length) c.team = NEUTRAL;
+  return out;
 }
 // Flush a garrison: occupants take damage and are thrown out; the shell is untouched.
 export function clearGarrison(sim, c, dmg, src) {
@@ -282,6 +284,17 @@ export function splashDamage(sim, x, z, r, dmg, wname, src, sx = x, sz = z) {
     if (e.kind === 'unit' && e.inB) continue;
     const d = e.kind === 'unit' ? Math.max(0, Math.hypot(e.x - x, e.z - z) - e.radius) : rectDist(e, x, z);
     if (d > r) continue;
+    applyDamage(sim, e, dmg * (1 - 0.6 * d / r), wname, sx, sz, src);
+  }
+}
+
+// Area damage from a support power or superweapon: like splashDamage, and it also wrecks civilian buildings that nobody holds.
+// (Ones the enemy holds were already hit; ones you hold are spared, like the rest of your own side.)
+export function strikeDamage(sim, x, z, r, dmg, wname, src, sx = x, sz = z) {
+  splashDamage(sim, x, z, r, dmg, wname, src, sx, sz);
+  for (const e of sim.ents) {
+    if (e.type !== 'civ' || e.dead || e.ruined || e.team !== NEUTRAL) continue;
+    const d = rectDist(e, x, z); if (d > r) continue;
     applyDamage(sim, e, dmg * (1 - 0.6 * d / r), wname, sx, sz, src);
   }
 }

@@ -114,6 +114,7 @@ export class Controls {
     }
     if (!units.length) {
       for (const b of this.selectedOwn('bldg')) if (BLDGS[b.type].trains) { sim.issue({ t: 'rally', id: b.id, x: g.x, z: g.z }); this.ping(g.x, g.z, '#f2a93b'); }
+      for (const b of this.selectedOwn('bldg')) if (b.garrison && b.garrison.length && (!t || t.id !== b.id)) { sim.issue({ t: 'evacuate', id: b.id, x: g.x, z: g.z }); this.ping(g.x, g.z, '#4aa3ff'); }   // right-click with a held building selected: everyone out, and walk there
       return;
     }
     const total = units.length, rest = new Set(units.map(u => u.id));
@@ -161,6 +162,8 @@ export class Controls {
     pw.x = g.x; pw.z = g.z; pw.err = powerError(this.sim, PLAYER, pw.id, g.x, g.z) || ''; pw.ok = !pw.err;
   }
   cancelModes() { const ui = this.ui, had = ui.place || ui.amove || ui.power || ui.force; ui.place = null; ui.amove = false; ui.power = null; ui.force = false; return !!had; }
+  // Take garrisons out: every selected building or bunker you hold. count 1 = just one squad.
+  evacuate(count = 0) { let n = 0; for (const id of this.ui.selection) { const e = this.sim.byId.get(id); if (e && e.team === PLAYER && e.garrison && e.garrison.length) { this.sim.issue({ t: 'evacuate', id, count }); n++; } } if (n && this.ui.sfx) this.ui.sfx('order'); return n > 0; }
   landRepair() { const ids = this.selectedOwn('unit').filter(u => UNITS[u.type].heli).map(u => u.id); if (ids.length) { this.sim.issue({ t: 'landrepair', ids }); this.ui.sfx && this.ui.sfx('order'); } return ids.length > 0; }
 
   // ---------- groups ----------
@@ -237,6 +240,7 @@ export class Controls {
         case 'KeyF': if (this.selectedOwn('unit').some(u => UNITS[u.type].weapon)) { this.cancelModes(); ui.amove = true; ui.guard = false; } break;
         case 'KeyT': if (this.selectedOwn('unit').some(u => UNITS[u.type].weapon)) { this.cancelModes(); ui.force = true; } break;
         case 'KeyL': this.landRepair(); break;
+        case 'KeyU': this.evacuate(e.shiftKey ? 1 : 0); break;
         case 'KeyG': ui.togglePromo && ui.togglePromo(); break;
         case 'Escape': if (ui.promoOpen) ui.togglePromo(); else if (ui.wp) ui.wp = false; else if (!this.cancelModes()) ui.selection.clear(); break;
         case 'KeyH': { const cc = this.sim.ents.find(b => b.kind === 'bldg' && b.team === PLAYER && BLDGS[b.type].role === 'cc'); if (cc) this.rig.focus(cc.x, cc.z); break; }

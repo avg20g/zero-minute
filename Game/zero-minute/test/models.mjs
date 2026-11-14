@@ -74,6 +74,21 @@ const P = MF.paint('vanguard', 0), PR = MF.paint('redhammer', 1), PS = MF.paint(
     ok(rigs.chinook.rotor && rigs.chinook.rotor2 && rigs.chinook.rotor2.position.y > rigs.chinook.rotor.position.y && count(rigs.chinook, 'blade') === 6 && count(rigs.chinook, 'wheel') === 4, 'Chinook: two three-blade rotors in tandem, the aft one higher, four wheels');
     const span = MF.CHINOOK.rotor * MF.CHINOOK.scale; ok(Math.abs(rigs.chinook.rotor.position.x - rigs.chinook.rotor2.position.x) < span && span > 6.5, 'the rotor discs overlap, as on the real aircraft');
   }
+  { // batch 7: the Battlemaster must not carry the Overlord's add-ons, and no model may hide parts the view cannot reach
+    const bm = MF.ASSEMBLY.battlemaster(PR), ov = MF.ASSEMBLY.overlord(PR);
+    const nodes = (r) => { const out = []; const walk = (o) => { out.push(o); (o.children || []).forEach(walk); }; walk(r.g); return out; };
+    ok(!nodes(bm).some(o => o.name === 'gatling' || o.name === 'bunker') && !bm.addons, 'Battlemaster: no Gatling turret and no bunker on the model');
+    ok(nodes(bm).every(o => o.visible !== false), 'Battlemaster: nothing hidden that could be drawn by mistake');
+    ok(ov.addons && ov.addons.gatling.visible === false && ov.addons.bunker.visible === false && nodes(ov).includes(ov.addons.gatling), 'Overlord: still has both add-ons, hidden until they are bought');
+    const top = (r) => { let y = -9; for (const o of nodes(r)) if (o.isMesh && o.name !== 'antenna') { let wy = 0; for (let q = o; q && q !== r.g; q = q.parent) wy += q.position.y * (q === o ? 1 : 1); y = Math.max(y, wy); } return y; };
+    for (const [k, mk] of Object.entries(MF.ASSEMBLY)) {
+      const r = mk(k === 'battlemaster' || k === 'overlord' || k === 'j11' ? PR : P), kept = new Set();
+      const ref = (v) => { if (!v || typeof v !== 'object') return; if (v.isObject3D || v.children) { kept.add(v); return; } if (Array.isArray(v)) v.forEach(ref); else for (const q in v) ref(v[q]); };
+      for (const q in r) ref(r[q]);
+      const stray = nodes(r).filter(o => o.visible === false && !kept.has(o)).map(o => o.name || '?');
+      ok(stray.length === 0, k + ': every hidden part is one the view can switch on' + (stray.length ? ' (stray: ' + stray.join(', ') + ')' : ''));
+    }
+  }
   globalThis.__rigs = rigs;
 }
 const R = globalThis.__rigs;

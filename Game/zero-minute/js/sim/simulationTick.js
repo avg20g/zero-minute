@@ -28,7 +28,7 @@ export class Sim {
     this.fog = new Fog();
     this.ents = []; this.byId = new Map(); this.nextId = 1;
     this.projs = []; this.events = []; this.cmds = []; this.pathQ = [];
-    this.strikes = []; this.hazards = []; this.crates = []; this.pdlUnits = [];
+    this.strikes = []; this.hazards = []; this.crates = []; this.pdlUnits = []; this.reveals = [];
     const f = opts.factions || ['vanguard', 'redhammer'];
     const money = opts.money ?? 8000;
     this.teams = [mkTeam(f[0], money), mkTeam(f[1], money)]; // equal starting cash; the AI never receives a bonus
@@ -305,7 +305,17 @@ function applyCommand(sim, c) {
       for (const u of units((u, d) => d.canGarrison && u !== b)) { freeUnit(sim, u); stopUnit(u); u.order = { t: 'garrison', id: b.id }; }
       break;
     }
-    case 'evacuate': { const b = sim.byId.get(c.id); if (b && b.team === team && b.garrison && b.garrison.length) ejectGarrison(sim, b); break; }
+    case 'evacuate': { // empty a garrison: all squads, or `count` of them; with x,z they walk to that point once outside
+      const b = sim.byId.get(c.id); if (!b || b.team !== team || !b.garrison || !b.garrison.length) break;
+      const out = ejectGarrison(sim, b, 1, c.count > 0 ? c.count | 0 : 1e9);
+      if (out.length && c.x >= 0 && c.z >= 0) {
+        if (sim.nav.dirty) sim.nav.rebuild();
+        const slots = formationSlots(sim, out, c.x, c.z);
+        out.forEach((u, i) => { u.order = { t: 'move', x: slots[i][0], z: slots[i][1], rev: false }; moveTo(sim, u, slots[i][0], slots[i][1]); });
+      }
+      sim.events.push({ t: 'evacuate', id: b.id, team, x: b.x, z: b.z, n: out.length });
+      break;
+    }
     case 'harvest': {
       const b = sim.byId.get(c.target); if (!b) break;
       for (const u of units((u, d) => d.harvester)) {

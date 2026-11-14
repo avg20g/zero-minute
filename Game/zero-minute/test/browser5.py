@@ -230,11 +230,37 @@ async def main():
         sb6 = await pg.evaluate("(async () => { const g = window.__rts, T = g.sim.teams[0], R = await import('./js/sim/factionRegistry.js'); return { rank: T.rank, promos: T.promos.size, tree: R.FACTIONS[T.faction].tree.length, powers: document.querySelectorAll('#pw button').length, points: T.points }; })()")
         print('sandbox rank   :', sb6)
         if not (sb6['rank'] == 5 and sb6['promos'] == sb6['tree'] and sb6['powers'] >= 1): fail('sandbox full rank in the page')
+        # ---- F. batch 7 (same sandbox match: China on Urban Megacity): garrison in and out with the real mouse and keys, power lights the fog
+        gz = await pg.evaluate("""async () => { const g = window.__rts, s = g.sim, E = await import('./js/sim/entities.js');
+            const hq = s.ents.find(e => e.kind === 'bldg' && e.team === 0), civ = s.ents.filter(e => e.type === 'civ' && !e.ruined).sort((a, b) => Math.hypot(a.x - hq.x, a.z - hq.z) - Math.hypot(b.x - hq.x, b.z - hq.z))[0];
+            const sq = []; for (let i = 0; i < 4; i++) sq.push(E.spawnNear(s, 'r_conscript', 0, civ.x - 12, civ.z + 9 + i * 2));
+            await new Promise(r => setTimeout(r, 300)); s.issue({ t: 'garrison', ids: sq.map(u => u.id), target: civ.id });
+            const t0 = performance.now(); while (civ.garrison.length < 4 && performance.now() - t0 < 30000) await new Promise(r => setTimeout(r, 100));
+            g.ui.selection.clear(); g.rig.focus(civ.x, civ.z); await new Promise(r => setTimeout(r, 700));
+            const p = { x: 0, y: 0 }, rc = document.getElementById('gl').getBoundingClientRect(), scr = (x, y, z) => { g.view.project(x, y, z, p); return [p.x + rc.left, p.y + rc.top]; };
+            window.__g = { civ, sq }; return { inside: civ.garrison.length, cap: E.capacityOf(civ), team: civ.team, at: scr(civ.x, 3, civ.z), ground: scr(civ.x - 16, 0.3, civ.z + 18), gx: civ.x - 16, gz: civ.z + 18, bm: !!g.view.views.get(E.spawnNear(s, 'r_tank', 0, hq.x + 30, hq.z + 30).id) || 'pending' }; }""")
+        await pg.mouse.click(gz['at'][0], gz['at'][1]); await pg.wait_for_timeout(500)
+        g1s = await pg.evaluate("({ selected: window.__rts.ui.selection.has(window.__g.civ.id), btns: [...document.querySelectorAll('#cmd button')].map(b => b.querySelector('.nm').textContent), info: document.getElementById('info').textContent })")
+        await pg.keyboard.press('Shift+U'); await pg.wait_for_timeout(400); one = await pg.evaluate("window.__g.civ.garrison.length")
+        await pg.mouse.click(gz['ground'][0], gz['ground'][1], button='right'); await pg.wait_for_timeout(500)
+        out = await pg.evaluate("(() => { const { civ, sq } = window.__g; return { left: civ.garrison.length, team: civ.team, walking: sq.filter(u => u.order && u.order.t === 'move').length }; })()")
+        await pg.evaluate("(() => { const { civ, sq } = window.__g; window.__rts.sim.issue({ t: 'garrison', ids: [sq[0].id, sq[1].id], target: civ.id }); })()"); await pg.wait_for_timeout(6000)
+        await pg.mouse.click(gz['at'][0], gz['at'][1]); await pg.wait_for_timeout(300); back_in = await pg.evaluate("window.__g.civ.garrison.length"); await pg.keyboard.press('u'); await pg.wait_for_timeout(400); allout = await pg.evaluate("window.__g.civ.garrison.length")
+        print('garrison UI    : in', gz['inside'], 'of', gz['cap'], '| click selects it', g1s['selected'], g1s['btns'], '| Shift+U ->', one, '| right-click ground ->', out, '| back in', back_in, '| U ->', allout)
+        print('   info line   :', ' '.join(g1s['info'].split())[:150])
+        if not (gz['inside'] == 4 and gz['cap'] >= 3 and g1s['selected'] and 'Evacuate all' in g1s['btns'] and 'Take out one squad' in g1s['btns'] and ('/' + str(gz['cap'])) in g1s['info'] and one == 3 and out['left'] == 0 and out['team'] == 2 and out['walking'] == 3 and back_in == 2 and allout == 0): fail('garrison exit with real mouse and keys')
+        pf = await pg.evaluate("""async () => { const g = window.__rts, s = g.sim, P = await import('./js/sim/powers.js'); const tx = 256, tz = 256, i = 128 * 256 + 128;
+            const before = { vis: s.fog.vis[0][i], shade: Math.round(g.view.fowCur[i]), err: P.powerError(s, 0, 'barrage', tx, tz) };
+            const civ = s.ents.filter(e => e.type === 'civ' && !e.ruined && e.team === 2).sort((a, b) => Math.hypot(a.x - tx, a.z - tz) - Math.hypot(b.x - tx, b.z - tz))[0], hp0 = civ.hp;
+            const cast = P.usePower(s, 0, 'barrage', civ.x, civ.z), j = Math.floor(civ.z / 2) * 256 + Math.floor(civ.x / 2); await new Promise(r => setTimeout(r, 9000));
+            return { before, cast, lit: s.fog.vis[0][j], shade: Math.round(g.view.fowCur[j]), reveals: s.reveals.length, civHp: [hp0, Math.round(civ.hp)], ruined: civ.ruined }; }""")
+        print('power in fog   :', pf)
+        if not (pf['before']['vis'] == 0 and pf['before']['shade'] < 130 and pf['before']['err'] is None and pf['cast'] and pf['lit'] == 1 and pf['shade'] > 230 and pf['civHp'][1] < pf['civHp'][0]): fail('power lights the fog and damages an empty building')
         await grab()
         print('three.js API   : properties the game read that the real r158 classes do not have:', len(reads)); [print('    ', k, '<-', v) for k, v in sorted(reads.items())]
         print('console errors :', len(errs)); [print('   ', e[:400]) for e in errs[:10]]
         bad += len(errs) + len(reads)
         await b.close()
-    print('BATCH 3-6 CLIENT:', 'all checks passed' if not bad else f'{bad} FAILURES')
+    print('BATCH 3-7 CLIENT:', 'all checks passed' if not bad else f'{bad} FAILURES')
 try: asyncio.run(main())
 finally: srv.terminate()

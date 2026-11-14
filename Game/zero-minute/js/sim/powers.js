@@ -7,7 +7,7 @@
 //   3. Whether the other side sees a strike is decided by strikeVisible().
 import { N, CELL, WORLD } from './defs.js';
 import { FACTIONS, POWERS, UNITS, BLDGS, generalOf, nodePower } from './factionRegistry.js';
-import { splashDamage, kill, makeUnit, makeBldg, freeSpot, canPlace, spawnNear } from './entities.js';
+import { strikeDamage, kill, makeUnit, makeBldg, freeSpot, canPlace, spawnNear } from './entities.js';
 import { addHazard } from './abilities.js';
 
 export function hasPower(sim, team, id) {
@@ -92,6 +92,7 @@ function plane(sim, team, model, payload, x, z, lateral = 0, delay = 0) {
   p.px = p.x; p.pz = p.z; p.y = p.py = planeAlt(p); sim.strikes.push(p);
 }
 
+export const REVEAL_PAD = 10, REVEAL_SECS = 16;   // metres past the power's own radius, and how long the area stays lit
 export function usePower(sim, team, id, x, z) {
   const err = powerError(sim, team, id, x, z);
   if (err) { sim.events.push({ t: 'msg', team, text: err }); return false; }
@@ -99,6 +100,8 @@ export function usePower(sim, team, id, x, z) {
   const G = generalOf(T), hk = id === 'cashhack' && G && G.hack ? G.hack : null;
   T.powerReady[id] = sim.tick + (hk ? hk.cd : P.cd) * 20; T.powersUsed++;
   sim.events.push({ t: 'power', id, team, x, z });
+  // Using a power lights up its target area for that team: you see what you hit (and what you missed).
+  sim.reveals.push({ team, x, z, r: Math.max(P.radius, (P.line || 0) / 2, P.beam ? P.beam.sweep : 0) + REVEAL_PAD, until: sim.tick + (P.reveal || REVEAL_SECS) * 20 });
   if (P.super) sim.events.push({ t: 'superlaunch', id, team });        // public warning: both sides hear the klaxon, nobody is told where
   switch (id) {
     case 'paradrop': plane(sim, team, 'bomber', 'paradrop', x, z); break;
@@ -138,7 +141,7 @@ export function usePower(sim, team, id, x, z) {
 function detonate(sim, p, x, z) {
   const src = { team: p.team };
   if (p.payload === 'fab') {
-    splashDamage(sim, x, z, POWERS.fab.radius, 420, 'fab', src);
+    strikeDamage(sim, x, z, POWERS.fab.radius, 420, 'fab', src);
     addHazard(sim, 'thermal', x, z, 15, 7, 30, p.team, true);
     sim.events.push({ t: 'fab', x, z, r: POWERS.fab.radius, team: p.team });
   } else if (p.payload === 'toxin') {
@@ -170,7 +173,7 @@ export function stepPowers(sim) {
         // stage 1: 30 mm burst walks down the target line, landing ahead of the aircraft
         while (p.next <= 24 && p.s + 20 >= p.next) {
           const j = (sim.rand() - 0.5) * 3.5, ix = p.tx + p.dx * p.next - p.dz * j, iz = p.tz + p.dz * p.next + p.dx * j;
-          if (ix > 2 && iz > 2 && ix < WORLD - 2 && iz < WORLD - 2) { splashDamage(sim, ix, iz, A.gun.r, A.gun.dmg, 'a10gun', { team: p.team }, p.x, p.z); sim.events.push({ t: 'strafe', x: ix, z: iz, team: p.team }); }
+          if (ix > 2 && iz > 2 && ix < WORLD - 2 && iz < WORLD - 2) { strikeDamage(sim, ix, iz, A.gun.r, A.gun.dmg, 'a10gun', { team: p.team }, p.x, p.z); sim.events.push({ t: 'strafe', x: ix, z: iz, team: p.team }); }
           p.next += A.gun.step;
         }
         // stage 2: six underwing rockets, released in pairs during the dive
@@ -185,24 +188,24 @@ export function stepPowers(sim) {
       if (p.t <= 0) {
         p.dead = true; p.x = p.tx; p.z = p.tz;
         const R = POWERS.a10.rockets;
-        splashDamage(sim, p.tx, p.tz, R.r, R.dmg, 'a10rocket', { team: p.team }, p.sx, p.sz);
+        strikeDamage(sim, p.tx, p.tz, R.r, R.dmg, 'a10rocket', { team: p.team }, p.sx, p.sz);
         sim.events.push({ t: 'rockethit', x: p.tx, z: p.tz, team: p.team, guided: p.guided, id: p.id, sx: p.sx, sz: p.sz, sy: p.sy });
       }
     } else if (p.kind === 'pbeam') { // the beam walks along its line, burning whatever it crosses
       const B = POWERS.particle.beam, u = p.n / B.ticks;
       p.x = Math.min(WORLD - 3, Math.max(3, p.sx + p.dx * B.sweep * (u - 0.5))); p.z = Math.min(WORLD - 3, Math.max(3, p.sz + p.dz * B.sweep * (u - 0.5)));
-      if (p.n % B.every === 0) { splashDamage(sim, p.x, p.z, B.r, B.dmg, 'particle', { team: p.team }); sim.events.push({ t: 'pbeam', x: p.x, z: p.z, team: p.team, k: p.n }); }
+      if (p.n % B.every === 0) { strikeDamage(sim, p.x, p.z, B.r, B.dmg, 'particle', { team: p.team }); sim.events.push({ t: 'pbeam', x: p.x, z: p.z, team: p.team, k: p.n }); }
       if (++p.n >= B.ticks) p.dead = true;
     } else if (--p.t <= 0) {
       p.dead = true;
       if (p.kind === 'nuke') {
         const P = POWERS.nuke;
-        splashDamage(sim, p.x, p.z, P.radius, P.dmg, 'nuke', { team: p.team });
+        strikeDamage(sim, p.x, p.z, P.radius, P.dmg, 'nuke', { team: p.team });
         addHazard(sim, 'thermal', p.x, p.z, P.fallout.r, P.fallout.secs, P.fallout.dps, p.team, true);
         sim.events.push({ t: 'nuke', x: p.x, z: p.z, r: P.radius, team: p.team });
       } else if (p.kind === 'scud') {
         const P = POWERS.scud;
-        splashDamage(sim, p.x, p.z, P.r, P.dmg, 'scud', { team: p.team });
+        strikeDamage(sim, p.x, p.z, P.r, P.dmg, 'scud', { team: p.team });
         addHazard(sim, 'toxin', p.x, p.z, P.toxin.r, P.toxin.secs, P.toxin.dps, p.team, true);
         sim.events.push({ t: 'scudhit', x: p.x, z: p.z, r: P.toxin.r, team: p.team });
       } else if (p.kind === 'para') {
@@ -214,12 +217,12 @@ export function stepPowers(sim) {
         if (s) { const b = makeBldg(sim, 's_tunnel', p.team, s[0], s[1], true); sim.nav.dirty = true; sim.events.push({ t: 'sneak', x: b.x, z: b.z, team: p.team, id: b.id }); }
         else sim.events.push({ t: 'msg', team: p.team, text: 'Sneak Attack failed: the ground was blocked' });
       }
-      else if (p.kind === 'shell') { splashDamage(sim, p.x, p.z, 7, 95, 'artillery', { team: p.team }); sim.events.push({ t: 'shellhit', x: p.x, z: p.z, team: p.team }); }
+      else if (p.kind === 'shell') { strikeDamage(sim, p.x, p.z, 7, 95, 'artillery', { team: p.team }); sim.events.push({ t: 'shellhit', x: p.x, z: p.z, team: p.team }); }
       else if (p.kind === 'bomb') detonate(sim, p, p.x, p.z);
       else if (p.kind === 'carpet') { // the stick of bombs walks along the bomber's track
         const B = POWERS.b2; for (let i = 0; i < B.n; i++) { const a = (i / (B.n - 1) - 0.5) * B.line, lat = (i % 2 ? 3 : -3); sim.strikes.push({ id: sim.nextId++, kind: 'bomblet', team: p.team, x: p.x + p.dx * a - p.dz * lat, z: p.z + p.dz * a + p.dx * lat, px: 0, pz: 0, t: 2 + i * 3, dead: false }); }
       }
-      else if (p.kind === 'bomblet') { splashDamage(sim, p.x, p.z, POWERS.b2.r, POWERS.b2.dmg, 'artillery', { team: p.team }); sim.events.push({ t: 'shellhit', x: p.x, z: p.z, team: p.team }); }
+      else if (p.kind === 'bomblet') { strikeDamage(sim, p.x, p.z, POWERS.b2.r, POWERS.b2.dmg, 'artillery', { team: p.team }); sim.events.push({ t: 'shellhit', x: p.x, z: p.z, team: p.team }); }
       else if (p.kind === 'ambush') {
         const roster = FACTIONS[sim.teams[p.team].faction].ambush || ['s_rpg', 's_rpg', 's_guerrilla'];
         let made = 0;

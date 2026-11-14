@@ -155,7 +155,9 @@ export const BLDGS = {
   s_market:   { model: 'market', role: 'income', name: 'Black Market', faction: 'sandstorm', cost: 2500, secs: 20, hp: 1200, w: 6, h: 6, power: 0, sight: 30, income: { amt: 25, every: 40 }, needs: 's_factory' },
 
   // neutral map objects
-  civ:     { model: 'civ', name: 'Civilian Building', hp: 1200, w: 6, h: 6, sight: 40, capacity: 2 },
+  // caps: infantry squads each building type holds (same order as CIV_KINDS in map.js: apartment, market hall, office tower, mosque,
+  // warehouse, farmhouse, log cabin, barn, fuel station, water tower). `capacity` is the fallback.
+  civ:     { model: 'civ', name: 'Civilian Building', hp: 1200, w: 6, h: 6, sight: 40, capacity: 5, caps: [6, 5, 8, 5, 6, 4, 3, 4, 3, 3] },
   dock:    { model: 'dock', name: 'Supply Dock', hp: 1e9, w: 8, h: 6, sight: 0, indestructible: true },
   derrick: { model: 'derrick', name: 'Oil Derrick', hp: 1e9, w: 4, h: 4, sight: 26, indestructible: true, capturable: true, income: { amt: 30, every: 40 }, captureXp: 150, captureTicks: 100 },
 };

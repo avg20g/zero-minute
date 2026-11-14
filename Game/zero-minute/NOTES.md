@@ -21,3 +21,8 @@ Status:
 - models done (jets distinct finishes, gold F-22 canopy, chinook w/ rotor2; models.mjs 226). NEXT: maps urban/arctic + biomes (environmentFX BIOME_SURFACES, terrain trees, minimap, setup chips), builder brushes (spec.paint), browser tests, README, publish v11, zip batch6.
 - maps URBAN_MAP/ARCTIC_MAP + MAPS list + BIOMES (urban,snow) + brushes (spec.paint, tools paintrock/painthill/paintwater, #mb-size) done; batch6.mjs 68/68; chinook tuned (cost 800 carry 200 load 80). NEXT: browser5.py update (maps list, 13 tools, 4 biomes, section E for batch 6), run all node+browser, README batch 6, play.html, publish v11, zip batch6, commit, final reply (decline McBeth name again; aircraft-batch6.png in scratchpad).
 - all tests green (17 node, 5 browser), README + play.html done. Remaining: publish v11, zip batch6, commit to device, send, final reply.
+
+# Batch 7 (after v11): 1) evacuate garrison option (visible/usable) 2) bigger garrison capacity 3) powers clear fog at target 4) captured buildings (derrick etc) keep small sight 5) powers damage civ buildings even when empty/garrisoned 6) Battlemaster: remove turret(?) + bulky back
+Status:
+- batch7 sim+UI code done (caps per civ kind, evacuate count/x,z + U key, sim.reveals on usePower, strikeDamage hits neutral civ, battlemaster addons removed + bakeRig skips hidden). test/batch7.mjs passing. TODO: models.mjs battlemaster checks, browser checks (select held civ, U, right-click evac, power in fog), all suites, README, publish v12, zip batch7.
+- batch 7 all tests green; README + play.html done. Remaining: publish v12, zip batch7, commit (zip + battlemaster-before-after.png), reply.

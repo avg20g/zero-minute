@@ -74,16 +74,16 @@ function pass({ spot = true, targets = [], facing = null, flags = {} }) {
   ok(r.log.hit.filter(e => e.guided === ov.id).length >= 2, 'rockets guided onto the visible Overlord');
   console.log(`heavy armor    : Overlord left at ${(100 * ov.hp / ov.maxHp).toFixed(0)}% (${r.log.hit.filter(e => e.guided === ov.id).length} rockets guided onto it); tank 6 m off-line splashed to ${Math.round(side.hp)}/${side.maxHp}`);
 }
-// 4. Fog of War: no guidance on unseen targets, and the pass grants no vision
+// 4. Fog of War (rule changed in batch 7): calling the strike lights the target area for the caller, so rockets can guide inside it
 {
   const r0 = pass({ spot: false });
   const r = pass({ spot: false, targets: [['r_overlord', r0.d[0] * 0 - r0.d[1] * 5, r0.d[1] * 0 + r0.d[0] * 5]], facing: 0 });
-  ok(r.log.hit.every(e => !e.guided), 'no rocket guides onto a target the owner cannot see');
-  ok(r.log.hit.every(e => r.lat(e) <= 2.6), 'unguided rockets still fall on the line');
+  ok(r.log.hit.some(e => e.guided), 'the strike lights its own target area, so rockets guide onto the tank standing in it');
+  ok(r.log.hit.every(e => r.lat(e) <= 9), 'every rocket still lands on or beside the line');
   let lit = 0; for (const p of r.log.hit) if (r.sim.fog.visAt(PLAYER, p.x, p.z)) lit++;
-  ok(lit === 0, 'strike lit no fog');
+  ok(lit === r.log.hit.length && lit > 0, 'every impact is inside the area the strike lit');
   ok(r.log.hit.every(e => fxVisible(r.sim, PLAYER, e)) && r.log.hit.every(e => !fxVisible(r.sim, ENEMY, e) || r.sim.fog.visAt(ENEMY, e.x, e.z)), 'effect visibility follows fog for the other side');
-  console.log('fog            : unseen Overlord 5 m off the line drew 0 guided rockets; pass revealed 0 cells');
+  console.log('fog            : the strike lights its target area for the caller; rockets guide inside it; the other side sees only what its own units see');
 }
 // 5. wingman doubles both stages; determinism
 {

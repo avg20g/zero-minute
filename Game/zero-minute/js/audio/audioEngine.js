@@ -215,6 +215,7 @@ export class AudioEngine {
         case 'rocketfire': if (hear(e)) this.whoosh(e.x, e.z); break;
         case 'strafe': if (hear(e)) this.gau8(e.x, e.z); break;
         case 'fab': if (hear(e)) this.explosion(e.x, e.z, 3.4); break;
+        case 'suicide': if (hear(e)) this.explosion(e.x, e.z, 2.2); break;
         case 'nuke': this.explosion(e.x, e.z, hear(e) ? 5 : 2.2); break;                   // a nuclear blast is heard across the map, fogged or not
         case 'scudhit': if (hear(e)) this.explosion(e.x, e.z, 2.2); break;
         case 'pbeam': if (e.k % 6 === 0 && hear(e)) this.laser(e.x, e.z); break;

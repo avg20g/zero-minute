@@ -5,10 +5,10 @@ import { TEAM } from '../ui/teamColors.js';
 import THREE from '../lib/three.js';
 import { N, CELL, PLAYER, NEUTRAL, angDiff } from '../sim/defs.js';
 import { UNITS, BLDGS, WEAPONS, POWERS } from '../sim/factionRegistry.js';
-import { heightAt } from '../sim/map.js';
+import { heightAt, WATER_Y } from '../sim/map.js';
 import { strikeVisible, fxVisible } from '../sim/powers.js';
 import { fowUniforms } from './gfx.js';
-import { buildTerrain, buildRocks } from './terrain.js';
+import { buildTerrain, buildRocks, buildWater, buildBridges, buildTrees } from './terrain.js';
 import { Environment, makeTerrainTextures, terrainMaterial } from './environmentFX.js';
 import { createModel, createPlane, createRocket, buildGhost, buildCrate, buildBomb, bakeStats } from './modelFactory.js';
 import { VFX, VET_TRACER } from './vfxManager.js';
@@ -39,9 +39,11 @@ export class View {
     this.fowFrame = 0;
 
     const aniso = Math.min(8, r.capabilities.getMaxAnisotropy());
-    this.terrainTex = makeTerrainTextures(aniso);
+    this.terrainTex = makeTerrainTextures(aniso, this.map.biome);
     scene.add(buildTerrain(this.map, terrainMaterial(this.terrainTex)));
     scene.add(buildRocks(this.map));
+    if (this.map.hasWater) { scene.add(buildWater(this.map)); scene.add(buildBridges(this.map)); }
+    if (this.map.trees.length) scene.add(buildTrees(this.map));
 
     this.fx = new VFX(scene, this.map);
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) this.fx.shakeOn = false;
@@ -161,6 +163,7 @@ export class View {
         }
         case 'strafe': if (see(e)) { const y = fx.h(e.x, e.z); fx.explosion(e.x, y, e.z, 0.55); fx.dust(e.x, y, e.z, 5, 4, 1.6, 0.4); fx.crater(e.x, e.z, 3.4); } break;
         case 'shellhit': if (see(e)) { fx.explosion(e.x, fx.h(e.x, e.z), e.z, 1.5); fx.crater(e.x, e.z, 7.5); fx.shock(e.x, fx.h(e.x, e.z) + 0.4, e.z, 8, 0.35, 0xffd9a0); } break;
+        case 'suicide': if (see(e)) { const y = fx.h(e.x, e.z) + (e.air ? 6 : 0); fx.explosion(e.x, y, e.z, 2.0); if (!e.air) fx.crater(e.x, e.z, 6); fx.shock(e.x, y + 0.4, e.z, e.r * 1.3, 0.4, 0xffd9a0); fx.shake(e.x, e.z, 0.7); } break;
         case 'touchdown': if (see(e)) { const y = fx.h(e.x, e.z) + 0.5; fx.dust(e.x, y, e.z, 8, 3, 1.2, 0.3); } break; // tyre smoke
         case 'fab': if (see(e)) fx.megaBlast(e.x, e.z, e.r); break;
         case 'nuke': if (see(e)) { fx.megaBlast(e.x, e.z, e.r); fx.megaBlast(e.x, e.z, e.r * 0.55); fx.smokeColumn(e.x, e.z, 9); fx.shake(e.x, e.z, 2.2); } else fx.shake(e.x, e.z, 0.5); break; // the ground shakes for everyone
@@ -236,7 +239,7 @@ export class View {
         const x = e.px + (e.x - e.px) * alpha, z = e.pz + (e.z - e.pz) * alpha;
         const f = e.pfacing + angDiff(e.facing, e.pfacing) * alpha, gy = heightAt(map, x, z);
         const c = Math.cos(f), s = Math.sin(f);
-        let y = gy;
+        let y = map.hasWater && !e.air ? Math.max(gy, WATER_Y - (e.cls === 0 ? 1.0 : 0.6)) : gy;   // amphibious units ride in the water, not on the river bed
         if (e.air) {
           // height comes from the simulation (take-off roll, climb, glide slope): wheels on the tarmac at 0, cruise at 1
           const ak = e.paltK + (e.altK - e.paltK) * alpha, g0 = v.ground || 1.1; v.alt = g0 + (d.alt - g0) * ak; y = gy + v.alt;

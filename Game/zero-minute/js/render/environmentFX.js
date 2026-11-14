@@ -61,7 +61,13 @@ export const SURFACES = {
     return [h, 104 * k, 80 * k, 56 * k, 0.93 + 0.07 * clod];
   },
 };
+SURFACES.grass = (u, v) => { // forest floor: tufted grass, darker in the clumps, patches gone dry and yellow
+  const n = fbmT(u, v, 6, 131), fine = hash((u * S) | 0, (v * S) | 0, 133), clump = tnoise(u * 22, v * 22, 22, 137), dry = ss(0.58, 0.9, fbmT(u, v, 3, 139));
+  const k = (0.66 + 0.5 * n) * (0.82 + 0.3 * fine) * (0.8 + 0.3 * clump);
+  return [0.3 * n + 0.45 * clump + 0.2 * fine, (70 + 62 * dry) * k, (112 + 22 * dry) * k, (46 + 12 * dry) * k, 0.96];
+};
 export const SURFACE_ORDER = ['sand', 'rock', 'asphalt', 'dirt'];
+export const BIOME_SURFACES = { desert: SURFACE_ORDER, woods: ['grass', 'rock', 'asphalt', 'dirt'] }; // the first slot is the open ground of the biome
 // Pure data for one material: albedo, tangent-space normal and roughness, as RGBA byte arrays.
 export function surfaceMaps(name, bump = 2.2) {
   const f = SURFACES[name], H = new Float32Array(S * S), albedo = new Uint8ClampedArray(S * S * 4), normal = new Uint8ClampedArray(S * S * 4), rough = new Uint8ClampedArray(S * S * 4);
@@ -80,10 +86,10 @@ export function surfaceMaps(name, bump = 2.2) {
 // Canvas-generated maps for all four surfaces, plus the GPU textures built from them. Albedo and
 // roughness share one RGBA texture (roughness in alpha), which keeps the terrain inside the
 // 16 texture units WebGL guarantees: 4 albedo+roughness, 4 normal, shadow, fog-of-war, environment.
-export function makeTerrainTextures(aniso = 4) {
+export function makeTerrainTextures(aniso = 4, biome = 'desert') {
   const set = { canvases: {}, albedoRough: [], normal: [] };
   const toCanvas = (bytes) => { const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'), im = g.createImageData(S, S); im.data.set(bytes); g.putImageData(im, 0, 0); return c; };
-  for (const name of SURFACE_ORDER) {
+  for (const name of BIOME_SURFACES[biome] || SURFACE_ORDER) {
     const m = surfaceMaps(name);
     set.canvases[name] = { albedo: toCanvas(m.albedo), normal: toCanvas(m.normal), roughness: toCanvas(m.rough) };
     const packed = new Uint8Array(S * S * 4);

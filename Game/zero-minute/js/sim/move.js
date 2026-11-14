@@ -32,8 +32,8 @@ export function stepMovement(sim) {
     u.px = u.x; u.pz = u.z; u.pfacing = u.facing; u.pturret = u.turret; u.arrived = false;
 
     // Standing inside something solid (a building was placed on us): walk out.
-    if (!nav.passAt(u.x, u.z, u.cls)) {
-      const c = nav.nearest((u.x / CELL) | 0, (u.z / CELL) | 0, u.cls, -1, 14);
+    if (!nav.passAt(u.x, u.z, u.nc)) {
+      const c = nav.nearest((u.x / CELL) | 0, (u.z / CELL) | 0, u.nc, -1, 14);
       if (c >= 0) {
         const tx = ((c % N) + 0.5) * CELL, tz = (((c / N) | 0) + 0.5) * CELL, l = Math.hypot(tx - u.x, tz - u.z) || 1;
         const s = Math.min(l, 7 * DT); u.x += (tx - u.x) / l * s; u.z += (tz - u.z) / l * s;
@@ -128,9 +128,9 @@ export function stepMovement(sim) {
       if (!following && u.cls === 1) u.spd = 0;
     }
     const nx = u.x + u.vx * DT, nz = u.z + u.vz * DT;
-    if (nav.passAt(nx, nz, u.cls)) { u.x = nx; u.z = nz; }
-    else if (nav.passAt(nx, u.z, u.cls)) { u.x = nx; }
-    else if (nav.passAt(u.x, nz, u.cls)) { u.z = nz; }
+    if (nav.passAt(nx, nz, u.nc)) { u.x = nx; u.z = nz; }
+    else if (nav.passAt(nx, u.z, u.nc)) { u.x = nx; }
+    else if (nav.passAt(u.x, nz, u.nc)) { u.z = nz; }
     else u.spd *= 0.5;
 
     // --- stuck detection (2 Hz, staggered) ---
@@ -161,9 +161,9 @@ export function stepMovement(sim) {
         const tot = wu + wo; if (!tot) continue;
         const pen = (rr - dd) * (tot === 1 ? 1 : 0.7), nx = rx / dd, nz = rz / dd;
         const ux = u.x - nx * pen * wu / tot, uz = u.z - nz * pen * wu / tot;
-        if (wu && nav.passAt(ux, uz, u.cls)) { u.x = ux; u.z = uz; }
+        if (wu && nav.passAt(ux, uz, u.nc)) { u.x = ux; u.z = uz; }
         const ox = o.x + nx * pen * wo / tot, oz = o.z + nz * pen * wo / tot;
-        if (wo && nav.passAt(ox, oz, o.cls)) { o.x = ox; o.z = oz; }
+        if (wo && nav.passAt(ox, oz, o.nc)) { o.x = ox; o.z = oz; }
       }
     }
   }
@@ -177,7 +177,7 @@ export function stepPaths(sim, budget = 18000) { // ~7 ms of search at most per 
     if (!u) continue;
     u.queued = false;
     if (u.dead || !u.pathReq) continue;
-    const r = sim.nav.findPath(u.x, u.z, u.pathReq.x, u.pathReq.z, u.cls);
+    const r = sim.nav.findPath(u.x, u.z, u.pathReq.x, u.pathReq.z, u.nc);
     budget -= r.expanded; sim.stats.paths++; sim.stats.expanded += r.expanded;
     if (r.path) {
       if (u.pathReq.thenX !== undefined) r.path.push(u.pathReq.thenX, u.pathReq.thenZ);
@@ -201,7 +201,7 @@ export function formationSlots(sim, units, tx, tz) {
     const row = (i / cols) | 0, col = i % cols, inRow = Math.min(cols, n - row * cols);
     const lat = (col - (inRow - 1) / 2) * sp, back = row * sp;
     let px = tx - fz * lat - fx * back, pz = tz + fx * lat - fz * back;
-    const cls = units[i].cls;
+    const cls = units[i].nc;
     let c = nav.nearest(Math.floor(px / CELL), Math.floor(pz / CELL), cls, -1, 10);
     if (c >= 0 && (used.has(c) || !nav.passAt(px, pz, cls))) {
       // take the closest unused free cell

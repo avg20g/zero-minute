@@ -112,6 +112,27 @@ guard and promotions, so attack-move is F and guard is V.
 - **Raptor** rebuilt from F-22A proportions (`RAPTOR` in `render/modelFactory.js`); `node test/shape.mjs raptor`
   dumps the model for drawing silhouettes.
 
+## Batch 5: generals, Forest River, building types
+- **Faction names**: United States, China, ISIS (internal ids are still `vanguard`, `redhammer`, `sandstorm`).
+- **Six generals** (two per faction, chosen in the lobby; data in `GENERALS`, `js/sim/factionRegistry.js`):
+  - United States: *General Drudgereport.com*, Air Force (F-15E Strike Eagle with 2 bunker-buster bombs and no
+    air-to-air weapon, Stealth Comanche upgrade, B-2 carpet bomb in place of the A-10 pass);
+    *General Maddox*, Marine Corps (every ground unit crosses water, LAV-25 with a TOW missile upgrade).
+  - China: *Secretary Yuec'an Tsie Mie*, Cyber (permanent watch on enemy buildings, Cash Hack from the start,
+    $2,500 per use, 150 s recharge); *General Tsao, Chicken*, Mass Assault (tanks and infantry cost 25% less).
+  - ISIS: *EWSAMA BEN ALLADIN*, Stealth (units are hidden while they stand still, suicide bomber, FPV attack
+    drone); *Nuclear Nadal*, WMD (Scud Launcher vehicle, Anthrax upgrade, toxin damage x1.25, Scud Storm
+    recharges 20% faster).
+- **Forest River map**: woods ground, about 3,200 trees, a river with two bridges and a ford per side.
+  Water blocks ground units unless they are amphibious. Map specs take `biome`, `trees`, `water`, `bridges`.
+- **Map builder**: River and Bridge tools, Ground type (desert or woods), and a Building type list
+  (10 types). The white-building bug is fixed: a building's number is now its type, not its list position.
+- **Aircraft**: faster ground handling (order to wheels-up 3.6 s for the F-22, 6.3 s for the J-11;
+  helicopter lift-off 2.2 s). Returning jets fly to an outer fix, then an inner fix, so they always
+  arrive lined up with the runway.
+- **Models from real dimensions**: F-15E, J-11 (replaces the MiG), B-2, LAV-25, Scud launcher, FPV drone.
+- Tests: `node test/batch5.mjs` (52 checks) and section D of `python3 test/browser5.py <outdir>`.
+
 ## Replays
 A replay is the match setup plus the player's commands with their tick numbers
 (a 20-minute match is a few kilobytes). The AI runs inside the simulation, so
@@ -134,6 +155,7 @@ Node (simulation only):
                               reverse-move, scatter, 20-minute replay + tamper check
     node test/air.mjs         runway take-off and landing, runway sharing, helipad, AI use
     node test/maps.mjs        map tools, validator, AI match on a custom map, sandbox
+    node test/batch5.mjs      generals, Forest River, water and bridges, building types
     node test/bench.mjs       simulation speed benchmark
     node test/addon.mjs       superweapons, No-Superweapons rule, new powers,
                               King of the Hill, AI use of all of them

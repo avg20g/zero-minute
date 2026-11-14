@@ -1,7 +1,7 @@
 // Terrain mesh (257x257 verts) with per-vertex splat weights for environmentFX's shader, and rock scatter.
 import THREE from '../lib/three.js';
 import { N, CELL, WORLD } from '../sim/defs.js';
-import { fbm, heightAt } from '../sim/map.js';
+import { fbm, heightAt, WATER_Y } from '../sim/map.js';
 import { std } from './gfx.js';
 
 const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
@@ -21,7 +21,7 @@ function roadMask(map) { // 0..1 per vertex
     }
   }
   // paved plaza around the town blocks
-  for (const [cx, cz] of map.civs) for (let j = cz - 3; j <= cz + 9; j++) for (let i = cx - 3; i <= cx + 9; i++) {
+  if (map.biome !== 'woods') for (const [cx, cz] of map.civs) for (let j = cz - 3; j <= cz + 9; j++) for (let i = cx - 3; i <= cx + 9; i++) {
     const d = Math.max(Math.abs(i - (cx + 3)) - 4, Math.abs(j - (cz + 3)) - 4);
     const v = sstep(2.5, 0.5, d) * 0.85; if (v > out[j * V + i]) out[j * V + i] = v;
   }
@@ -47,6 +47,7 @@ export function terrainAttributes(map) {
     const flat = 1 - sstep(0.2, 0.6, map.rock[k]);                       // roads and pads only on the canyon floor
     let rock = sstep(0.3, 0.8, slope), asphalt = sstep(0.45, 0.9, road[k]) * flat;
     let dirt = Math.max(pad[k] * flat, sstep(0.08, 0.4, road[k]) * (1 - sstep(0.45, 0.9, road[k])) * 0.6 * flat); // pads + dusty road shoulders
+    if (map.hasWater) { const wet = sstep(WATER_Y + 0.5, WATER_Y - 0.5, H[k]); rock *= 1 - wet; dirt = Math.max(dirt, wet); asphalt *= 1 - wet; } // muddy river bed and banks
     asphalt *= 1 - pad[k] * 0.6; rock = Math.min(1, rock);
     const rest = 1 - rock; asphalt *= rest; dirt = Math.min(dirt, 1 - asphalt) * rest;
     const sand = Math.max(0, 1 - rock - asphalt - dirt);
@@ -106,3 +107,38 @@ export function buildRocks(map) {
   return mesh;
 }
 export { WORLD };
+
+// ---------------------------------------------------------------- water, bridges, trees (woods maps)
+// One flat, slightly see-through sheet at the water level: the terrain is only below it inside river beds.
+export function buildWater(map) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(WORLD, WORLD), std(0x2c6c86, 0.1, 0.25, { transparent: true, opacity: 0.78 }));
+  m.rotation.x = -Math.PI / 2; m.position.set(WORLD / 2, WATER_Y, WORLD / 2); m.receiveShadow = true; m.renderOrder = 1;
+  return m;
+}
+// A bridge is a causeway (the river bed is not cut under it) with a plank deck, kerbs and end posts.
+export function buildBridges(map) {
+  const g = new THREE.Group(), box = new THREE.BoxGeometry(1, 1, 1), deck = std(0x6f6253, 0.92, 0), rail = std(0x4a4138, 0.9, 0.1);
+  for (const [x0, z0, x1, z1, hw] of map.bridges) {
+    const b = new THREE.Group(), len = Math.hypot(x1 - x0, z1 - z0) * CELL + 6, wid = hw * 2 * CELL - 2, mx = (x0 + x1) / 2 * CELL, mz = (z0 + z1) / 2 * CELL;
+    b.position.set(mx, heightAt(map, mx, mz) + 0.12, mz); b.rotation.y = -Math.atan2(z1 - z0, x1 - x0);
+    const add = (mat, sx, sy, sz, x, y, z) => { const m = new THREE.Mesh(box, mat); m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; b.add(m); };
+    add(deck, len, 0.3, wid, 0, 0, 0);
+    for (const k of [-1, 1]) { add(rail, len, 0.7, 0.3, 0, 0.5, k * (wid / 2 + 0.1)); for (const e of [-1, 1]) add(rail, 0.6, 1.5, 0.6, e * (len / 2 - 0.3), 0.75, k * (wid / 2 + 0.1)); }
+    g.add(b);
+  }
+  return g;
+}
+// Every tree is one instance of a shared trunk and a shared crown: two draw calls for the whole forest.
+export function buildTrees(map) {
+  const g = new THREE.Group(), n = map.trees.length / 3; if (!n) return g;
+  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.22, 0.32, 1, 6), std(0x4b3826, 0.95, 0), n);
+  const crown = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 7), std(0x2f5a2c, 0.95, 0, { flatShading: true }), n);
+  const M = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
+  for (let i = 0; i < n; i++) {
+    const x = map.trees[i * 3], z = map.trees[i * 3 + 1], s = map.trees[i * 3 + 2], y = heightAt(map, x, z), h = 5.5 * s;
+    p.set(x, y + h * 0.2, z); sc.set(s, h * 0.4, s); M.compose(p, q, sc); trunk.setMatrixAt(i, M);
+    p.set(x, y + h * 0.68, z); sc.set(1.9 * s, h * 0.75, 1.9 * s); M.compose(p, q, sc); crown.setMatrixAt(i, M);
+  }
+  for (const m of [trunk, crown]) { m.instanceMatrix.needsUpdate = true; m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; g.add(m); }
+  return g;
+}

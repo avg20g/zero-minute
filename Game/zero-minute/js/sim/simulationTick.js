@@ -2,7 +2,7 @@
 // Nothing in here touches the DOM, the clock, or Math.random. All three
 // factions run through this one loop; their differences are registry data.
 import { N, CELL, WORLD, PLAYER, ENEMY, NEUTRAL } from './defs.js';
-import { UNITS, BLDGS, FACTIONS, UPGRADES } from './factionRegistry.js';
+import { UNITS, BLDGS, FACTIONS, UPGRADES, GENERALS, trainsOf, upgradesOf, unitCost } from './factionRegistry.js';
 import { generateMap } from './map.js';
 import { Nav } from './pathfinding.js';
 import { Fog } from './fog.js';
@@ -32,8 +32,10 @@ export class Sim {
     const f = opts.factions || ['vanguard', 'redhammer'];
     const money = opts.money ?? 8000;
     this.teams = [mkTeam(f[0], money), mkTeam(f[1], money)]; // equal starting cash; the AI never receives a bonus
+    const gens = (opts.generals || []).map((g, i) => (g && GENERALS[g] && GENERALS[g].faction === f[i]) ? g : null);
+    this.teams.forEach((T, i) => { T.general = gens[i] || null; const G = T.general && GENERALS[T.general]; if (G && G.grant) for (const id of G.grant) T.promos.add(id); });
     this.tick = 0; this.winner = -1;
-    this.setup = { factions: f.slice(), money, difficulty: opts.difficulty || 'medium', seed: this.rng, treaty: opts.treaty || 0, noSuper: !!opts.noSuper, koth: !!opts.koth, noEnemy: !!opts.noEnemy, map: opts.map || null }; // everything a replay needs
+    this.setup = { factions: f.slice(), money, difficulty: opts.difficulty || 'medium', seed: this.rng, treaty: opts.treaty || 0, noSuper: !!opts.noSuper, koth: !!opts.koth, noEnemy: !!opts.noEnemy, map: opts.map || null, generals: [gens[0] || null, gens[1] || null] }; // everything a replay needs
     this.noSuper = !!opts.noSuper;               // lobby rule: superweapons cannot be built
     this.koth = null;                            // King of the Hill state, set in setupSkirmish when the mode is on
     this.treatyUntil = (opts.treaty || 0) * 20; // peace treaty: nobody can be targeted before this tick
@@ -125,7 +127,7 @@ function checkVictory(sim) {
 // ---------------- Scenario ----------------
 function setupSkirmish(sim) {
   const m = sim.map;
-  for (let i = 0; i < m.civs.length; i++) { const b = makeBldg(sim, 'civ', NEUTRAL, m.civs[i][0], m.civs[i][1]); b.variant = i; }
+  for (let i = 0; i < m.civs.length; i++) { const b = makeBldg(sim, 'civ', NEUTRAL, m.civs[i][0], m.civs[i][1]); b.variant = m.civs[i][2] | 0; } // variant = building kind (CIV_KINDS)
   for (const d of m.docks) { const b = makeBldg(sim, 'dock', NEUTRAL, d.x, d.z); b.supplies = b.maxSupplies = d.amount; }
   for (const d of m.derricks) makeBldg(sim, 'derrick', NEUTRAL, d[0], d[1]);
   sim.nav.rebuild();
@@ -236,22 +238,23 @@ function applyCommand(sim, c) {
       const bd = BLDGS[b.type];
       if (c.type.startsWith('up:')) {
         const id = c.type.slice(3), up = UPGRADES[id];
-        if (!up || !(bd.upgrades || []).includes(id) || upgradeTaken(sim, team, id)) break;
+        if (!up || !upgradesOf(T, b.type).includes(id) || upgradeTaken(sim, team, id)) break;
         if (T.money < up.cost) { msg(sim, team, 'Insufficient funds'); break; }
         T.money -= up.cost; b.queue.push(c.type); break;
       }
       const d = UNITS[c.type];
-      if (!d || !(bd.trains || []).includes(c.type)) break;
+      if (!d || !trainsOf(T, b.type).includes(c.type)) break;
       if (d.promo && !T.promos.has(d.promo)) { msg(sim, team, 'Requires a General’s promotion'); break; }
       if (d.based && padCount(sim, b) >= b.pads.length) { msg(sim, team, 'Airfield is full'); break; }
-      if (T.money < d.cost) { msg(sim, team, 'Insufficient funds'); break; }
-      T.money -= d.cost; b.queue.push(c.type);
+      const price = unitCost(T, c.type);                 // a general may make some units cheaper
+      if (T.money < price) { msg(sim, team, 'Insufficient funds'); break; }
+      T.money -= price; b.queue.push(c.type);
       break;
     }
     case 'cancel': {
-      const b = own(sim, c.id, team); if (!b || c.idx >= b.queue.length) break;
+      const b = own(sim, c.id, team); if (!b || !(c.idx >= 0) || c.idx >= b.queue.length) break;   // a malformed index is ignored, never a crash
       const q = b.queue[c.idx];
-      T.money += q.startsWith('up:') ? UPGRADES[q.slice(3)].cost : UNITS[q].cost;
+      T.money += q.startsWith('up:') ? UPGRADES[q.slice(3)].cost : unitCost(T, q);
       b.queue.splice(c.idx, 1); if (c.idx === 0) b.prod = 0;
       break;
     }

@@ -40,7 +40,7 @@ async def main():
         info = await pg.evaluate("""async () => { const g = window.__rts, s = g.sim, E = await import('./js/sim/entities.js'), P = await import('./js/sim/powers.js');
             const hq = s.ents.find(e => e.kind === 'bldg' && e.team === 0); const tx = hq.x + 46, tz = hq.z - 6;
             for (const d of [-14, 0, 14]) { const u = E.spawnNear(s, 'r_tank', 1, tx + d * 0.98, tz - d * 0.13); u.order = { t: 'hold' }; }
-            s.teams[0].promos.add('v_a10'); g.rig.focus(tx, tz);
+            s.teams[0].general = null; s.teams[0].promos.add('v_a10'); g.rig.focus(tx, tz);   // no general: the Air Force general swaps the A-10 for a B-2
             const okCast = P.usePower(s, 0, 'a10', tx, tz); const pl = s.strikes.find(p => p.kind === 'plane');
             return { ok: okCast, tx: pl.tx, tz: pl.tz, dx: pl.dx, dz: pl.dz, tick: s.tick }; }""")
         await pg.wait_for_timeout(8500)
@@ -68,7 +68,7 @@ async def main():
         # ---- C. enemy pass in the player's fog: nothing may be drawn
         await pg.evaluate("() => { const L = window.__log; L.crater.length = L.explosion.length = L.streak.length = L.events.length = 0; L.tracer = L.planes = L.rockets = 0; }")
         fog = await pg.evaluate("""async () => { const g = window.__rts, s = g.sim, P = await import('./js/sim/powers.js');
-            const hq = s.ents.find(e => e.kind === 'bldg' && e.team === 1); s.teams[1].promos.add('v_a10'); s.teams[1].powerReady.a10 = 0;
+            const hq = s.ents.find(e => e.kind === 'bldg' && e.team === 1); s.teams[1].general = null; s.teams[1].promos.add('v_a10'); s.teams[1].powerReady.a10 = 0;
             const x = hq.x - 30, z = hq.z + 20; const cast = P.usePower(s, 1, 'a10', x, z);
             return { cast, playerSees: s.fog.visAt(0, x, z) }; }""")
         await pg.wait_for_timeout(8500)

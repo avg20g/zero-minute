@@ -44,6 +44,10 @@ const mirrorRect = (x, z, w, h) => [N - x - w, N - z - h];
 //   derricks (half) [x, z]                            Oil Derricks (4 x 4)
 //   civs (half)     [x, z]                            civilian buildings (6 x 6)
 //   roads (half)    [x0, z0, x1, z1, halfWidth]
+//   civs (half)     [x, z, kind]                      kind is an index into CIV_KINDS (see below)
+//   water (half)    [x0, z0, x1, z1, halfWidth]       river segments: blocked for everything except amphibious units and aircraft
+//   bridges (half)  [x0, z0, x1, z1, halfWidth]       crossings: the river is not cut inside a bridge strip
+//   biome           'desert' | 'woods'                ground textures; woods also grows trees (trees: 0..1 density)
 //   start           [x, z]                            your Command Center (10 x 10); the enemy gets the mirror
 export const DEFAULT_MAP = {
   name: 'Desert Canyon', mesas: MESA_HALF, ramps: RAMP_HALF,
@@ -53,16 +57,34 @@ export const DEFAULT_MAP = {
   derricks: [[92, 152]], start: [30, 196], rampTop: [46, 127],
 };
 export const OPEN_MAP = { name: 'Open Desert', mesas: [], ramps: [], civs: [[118, 100]], docks: [{ x: 62, z: 222, amount: 30000 }, { x: 120, z: 190, amount: 30000 }], roads: [[35, 201, 127.5, 127.5, 4]], derricks: [[92, 152]], start: [30, 196] };
+// Civilian building kinds the map builder offers (index = the building's `variant`). Names only: the models live in render/models.js.
+export const CIV_KINDS = ['Apartment block', 'Market hall', 'Office tower', 'Mosque', 'Warehouse', 'Farmhouse', 'Log cabin', 'Barn', 'Fuel station', 'Water tower'];
+export const WATER_Y = -0.9, WATER_DEPTH = 2.6;   // water surface height, and how far the river bed is cut below the ground
+// Woods map: a river runs corner to corner between the bases, with three bridges, rocky hills, cabins and thick forest.
+export const FOREST_MAP = {
+  name: 'Forest River', biome: 'woods', trees: 0.45,
+  mesas: [[62, 120, 10, 8, 5], [182, 216, 12, 7, 5]], ramps: [],
+  water: [[8, 38, 90, 100, 5], [90, 100, 128, 128, 5]],
+  bridges: [[134, 119.5, 122, 136.5, 4.5], [56.5, 61, 43.5, 79, 4.5]],
+  roads: [[40, 200, 100, 160, 3], [100, 160, 123, 135, 3], [58, 182, 49, 82, 3]],
+  docks: [{ x: 62, z: 222, amount: 30000 }, { x: 150, z: 204, amount: 30000 }], derricks: [[96, 150]],
+  civs: [[112, 172, 6], [72, 152, 7], [128, 150, 5]], start: [30, 196],
+};
 export const FOOT = { dock: [8, 6], derrick: [4, 4], civ: [6, 6], start: [10, 10] };
 export const cloneSpec = (s) => JSON.parse(JSON.stringify(s));
 
 export function generateMap(spec) {
   const S = spec || DEFAULT_MAP;
-  const mesas = [], ramps = [];
+  const mesas = [], ramps = [], rivers = [], bridges = [];
+  const seg2 = (r, mir) => mir ? [N - r[0], N - r[1], N - r[2], N - r[3], r[4]] : r.slice();
+  for (const r of S.water || []) { rivers.push(seg2(r, false)); rivers.push(seg2(r, true)); }
+  for (const r of S.bridges || []) { bridges.push(seg2(r, false)); bridges.push(seg2(r, true)); }
+  const segD = (px, pz, q) => { const vx = q[2] - q[0], vz = q[3] - q[1], l2 = vx * vx + vz * vz || 1, t = Math.min(1, Math.max(0, ((px - q[0]) * vx + (pz - q[1]) * vz) / l2)); return Math.hypot(px - q[0] - vx * t, pz - q[1] - vz * t); };
   for (const m of S.mesas || []) { mesas.push(m); mesas.push([N - m[0], N - m[1], m[2], m[3], m[4]]); }
   for (const r of S.ramps || []) { ramps.push(r); ramps.push({ x: N - r.x, z: N - r.z, dx: -r.dx, dz: -r.dz, len: r.len, hw: r.hw }); }
 
   const V = N + 1;
+  const wetV = new Float32Array(V * V);   // 0..1: how deep in the river each vertex is
   const height = new Float32Array(V * V);
   const rock = new Float32Array(V * V); // 0 floor .. 1 mesa (for texturing)
 
@@ -88,26 +110,50 @@ export function generateMap(spec) {
     const dune = (fbm(i * 0.045, j * 0.045, 11) - 0.5) * 1.6;
     height[j * V + i] = MESA_H * e + dune * (1 - 0.7 * e);
     rock[j * V + i] = e;
+    if (rivers.length) { // cut the river bed, except under bridges (a bridge is a causeway with a deck on top)
+      let w = 0; for (const q of rivers) { if (Math.abs(i - (q[0] + q[2]) / 2) > Math.abs(q[2] - q[0]) / 2 + q[4] + 6 || Math.abs(j - (q[1] + q[3]) / 2) > Math.abs(q[3] - q[1]) / 2 + q[4] + 6) continue; w = Math.max(w, sstep(q[4] + 4.5, q[4] - 0.5, segD(i, j, q))); } // gentle banks: steep ones would count as cliffs and wall the river off
+      if (w > 0) { for (const q of bridges) w *= 1 - sstep(q[4] + 0.6, q[4] - 0.6, segD(i, j, q)); wetV[j * V + i] = w; height[j * V + i] = (height[j * V + i] * (1 - 0.6 * w)) - WATER_DEPTH * w; }
+    }
   }
 
-  const blocked = new Uint8Array(N * N);
+  const blocked = new Uint8Array(N * N), water = new Uint8Array(N * N);
   for (let z = 0; z < N; z++) for (let x = 0; x < N; x++) {
     const a = height[z * V + x], b = height[z * V + x + 1], c = height[(z + 1) * V + x], d = height[(z + 1) * V + x + 1];
     const steep = Math.max(a, b, c, d) - Math.min(a, b, c, d) > 1.5;
     if (steep || x < 3 || z < 3 || x >= N - 3 || z >= N - 3) blocked[z * N + x] = 1;
+    if (rivers.length && (wetV[z * V + x] + wetV[z * V + x + 1] + wetV[(z + 1) * V + x] + wetV[(z + 1) * V + x + 1]) > 2.2) { water[z * N + x] = 1; if (!steep) blocked[z * N + x] = 2; } // 2 = blocked by water only: amphibious units may cross
   }
 
   // Features (top-left cell of each footprint), mirrored through the centre
   const both = (list, w, h, f) => { const out = []; for (const q of list || []) { out.push(f(q, false)); out.push(f(q, true)); } return out; };
-  const civs = (S.civsFixed || []).map(c => c.slice()).concat(both(S.civs, 6, 6, (c, mir) => mir ? mirrorRect(c[0], c[1], 6, 6) : c.slice()));
+  const civs = (S.civsFixed || []).map((c, i) => [c[0], c[1], c[2] ?? i % 4]).concat(both(S.civs, 6, 6, (c, mir) => { const p = mir ? mirrorRect(c[0], c[1], 6, 6) : c; return [p[0], p[1], (c[2] | 0) % CIV_KINDS.length]; }));
   const docks = both(S.docks, 8, 6, (d, mir) => { if (!mir) return { x: d.x, z: d.z, amount: d.amount }; const [mx, mz] = mirrorRect(d.x, d.z, 8, 6); return { x: mx, z: mz, amount: d.amount }; });
   const roads = both(S.roads, 0, 0, (r, mir) => mir ? [N - r[0], N - r[1], N - r[2], N - r[3], r[4]] : r.slice());
   const derricks = both(S.derricks, 4, 4, (d, mir) => mir ? mirrorRect(d[0], d[1], 4, 4) : d.slice());
   const st = S.start, sc = [st[0] + 5, st[1] + 5];
   // choke point the AI watches: the top of the first ramp, or (no ramps) a point a third of the way to the centre
   const rt = S.rampTop || (S.ramps && S.ramps[0] ? [S.ramps[0].x, S.ramps[0].z] : [sc[0] + (N / 2 - sc[0]) / 3, sc[1] + (N / 2 - sc[1]) / 3]);
+  // Trees (woods): clumps from a noise field, never on rock, water, roads, bridges, bases or other objects. Decoration only: they do not block.
+  const trees = [];
+  if (S.biome === 'woods' && (S.trees ?? 0.6) > 0) {
+    const dens = S.trees ?? 0.6, keep = new Uint8Array(N * N);
+    const mark = (x, z, w, h, pad) => { for (let j = Math.max(0, z - pad); j < Math.min(N, z + h + pad); j++) for (let i = Math.max(0, x - pad); i < Math.min(N, x + w + pad); i++) keep[j * N + i] = 1; };
+    mark(st[0], st[1], 10, 10, 20); const es = mirrorRect(st[0], st[1], 10, 10); mark(es[0], es[1], 10, 10, 20);
+    for (const d of docks) mark(d.x, d.z, 8, 6, 5); for (const d of derricks) mark(d[0], d[1], 4, 4, 3); for (const c of civs) mark(c[0], c[1], 6, 6, 2);
+    for (let gz = 5; gz < N - 5; gz += 2) for (let gx = 5; gx < N - 5; gx += 2) {
+      const k = gz * N + gx; if (blocked[k] || keep[k] || rock[gz * V + gx] > 0.15) continue;
+      if (fbm(gx * 0.055, gz * 0.055, 5) < 0.62 - dens * 0.3 || hash2(gx, gz, 77) > 0.3 + dens * 0.5) continue;
+      let near = false; for (const r of roads) if (segD(gx, gz, r) < r[4] + 2) { near = true; break; }
+      if (!near) for (const r of bridges) if (segD(gx, gz, r) < r[4] + 3) { near = true; break; }
+      if (!near) for (const r of rivers) if (segD(gx, gz, r) < r[4] + 3.5) { near = true; break; }
+      if (near) continue;
+      const tx = gx + hash2(gx, gz, 78) * 1.6, tz = gz + hash2(gx, gz, 79) * 1.6, tk = Math.floor(tz) * N + Math.floor(tx);
+      if (blocked[tk] || water[tk]) continue;                       // the jittered spot itself must be dry, open ground
+      trees.push(tx * CELL, tz * CELL, 0.75 + hash2(gx, gz, 80) * 0.7);
+    }
+  }
   return {
-    N, V, height, rock, blocked, civs, docks, derricks, roads, ramps, mirrorRect, custom: !!spec, name: S.name || 'Custom',
+    N, V, height, rock, blocked, water, hasWater: rivers.length > 0, bridges, trees, biome: S.biome || 'desert', civs, docks, derricks, roads, ramps, mirrorRect, custom: !!spec, name: S.name || 'Custom',
     start: [{ cc: [st[0], st[1]] }, { cc: mirrorRect(st[0], st[1], 10, 10) }],
     rampTop: [{ x: rt[0] * CELL, z: rt[1] * CELL }, { x: (N - rt[0]) * CELL, z: (N - rt[1]) * CELL }],
   };
@@ -115,7 +161,7 @@ export function generateMap(spec) {
 
 // Checks a spec before a match starts. Errors stop the match; warnings do not.
 // Returns { ok, errors, warnings, map } with the generated map so the caller can draw a preview.
-export const MAP_LIMITS = { mesas: 24, docks: 6, derricks: 8, civs: 12, roads: 16 };
+export const MAP_LIMITS = { mesas: 24, docks: 6, derricks: 8, civs: 12, roads: 16, water: 12, bridges: 8 };
 export function validateMap(spec) {
   const errors = [], warnings = [];
   const S = spec; let map = null;
@@ -138,7 +184,7 @@ export function validateMap(spec) {
   for (const [name, x, z, w, h] of items) {
     if (x < 4 || z < 4 || x + w > N - 4 || z + h > N - 4) { errors.push(`${name} at ${x}, ${z} is off the map.`); continue; }
     let rocky = 0; for (let j = z; j < z + h; j++) for (let i = x; i < x + w; i++) if (B[j * N + i]) rocky++;
-    if (rocky) errors.push(`${name} at ${x}, ${z} sits on rock.`);
+    if (rocky) errors.push(`${name} at ${x}, ${z} sits on rock or water.`);
     for (const o of rects) if (x < o.r[0] + o.r[2] && x + w > o.r[0] && z < o.r[1] + o.r[3] && z + h > o.r[1]) { errors.push(`${name} at ${x}, ${z} overlaps ${o.n}.`); break; }
     rects.push({ n: `another object at ${x}, ${z}`, r: [x, z, w, h] });
     for (let j = z; j < z + h; j++) for (let i = x; i < x + w; i++) occupied[j * N + i] = 1;

@@ -6,7 +6,7 @@
 //   2. A strike grants no vision.
 //   3. Whether the other side sees a strike is decided by strikeVisible().
 import { N, CELL, WORLD } from './defs.js';
-import { FACTIONS, POWERS, UNITS, BLDGS } from './factionRegistry.js';
+import { FACTIONS, POWERS, UNITS, BLDGS, generalOf, nodePower } from './factionRegistry.js';
 import { splashDamage, kill, makeUnit, makeBldg, freeSpot, canPlace, spawnNear } from './entities.js';
 import { addHazard } from './abilities.js';
 
@@ -17,7 +17,7 @@ export function hasPower(sim, team, id) {
     for (const e of sim.ents) if (e.kind === 'bldg' && e.team === team && e.type === P.super && e.done && !e.dead) return true;
     return false;
   }
-  return FACTIONS[T.faction].tree.some(n => n.power === id && T.promos.has(n.id));
+  return FACTIONS[T.faction].tree.some(n => n.power && nodePower(T, n) === id && T.promos.has(n.id));   // a general may swap a power (A-10 -> B-2)
 }
 // The superweapon power a team's faction can build, and whether it is standing right now.
 export function superOf(sim, team) { const b = FACTIONS[sim.teams[team].faction].roles.super; return b ? BLDGS[b].superPower : null; }
@@ -96,13 +96,15 @@ export function usePower(sim, team, id, x, z) {
   const err = powerError(sim, team, id, x, z);
   if (err) { sim.events.push({ t: 'msg', team, text: err }); return false; }
   const T = sim.teams[team], P = POWERS[id];
-  T.powerReady[id] = sim.tick + P.cd * 20; T.powersUsed++;
+  const G = generalOf(T), hk = id === 'cashhack' && G && G.hack ? G.hack : null;
+  T.powerReady[id] = sim.tick + (hk ? hk.cd : P.cd) * 20; T.powersUsed++;
   sim.events.push({ t: 'power', id, team, x, z });
   if (P.super) sim.events.push({ t: 'superlaunch', id, team });        // public warning: both sides hear the klaxon, nobody is told where
   switch (id) {
     case 'paradrop': plane(sim, team, 'bomber', 'paradrop', x, z); break;
+    case 'b2': plane(sim, team, 'b2', 'carpet', x, z); break;
     case 'cashhack': {
-      const b = hackTarget(sim, team, x, z), E = sim.teams[b.team], amt = Math.min(P.amount, Math.max(0, Math.floor(E.money)));
+      const b = hackTarget(sim, team, x, z), E = sim.teams[b.team], amt = Math.min(hk ? hk.amount : P.amount, Math.max(0, Math.floor(E.money)));
       E.money -= amt; T.money += amt; T.hacked = (T.hacked || 0) + amt;
       sim.events.push({ t: 'cashhack', x: b.x, z: b.z, team, victim: b.team, amt });
       break;
@@ -175,7 +177,7 @@ export function stepPowers(sim) {
         while (p.rk < A.rockets.n && p.s >= -78 + (p.rk >> 1) * 13) launchRocket(sim, p, p.rk++);
       } else if (!p.dropped && p.s >= -30) { // bomb release: lands on the aim point 0.6 s later
         p.dropped = true;
-        sim.strikes.push({ id: sim.nextId++, kind: p.payload === 'paradrop' ? 'para' : 'bomb', payload: p.payload, team: p.team, x: p.tx, z: p.tz, px: p.tx, pz: p.tz, t: p.payload === 'paradrop' ? 60 : 12, dead: false });
+        sim.strikes.push({ id: sim.nextId++, kind: p.payload === 'paradrop' ? 'para' : p.payload === 'carpet' ? 'carpet' : 'bomb', dx: p.dx, dz: p.dz, payload: p.payload, team: p.team, x: p.tx, z: p.tz, px: p.tx, pz: p.tz, t: p.payload === 'paradrop' ? 60 : 12, dead: false });
       }
       if (p.s > 260) p.dead = true;
     } else if (p.kind === 'rocket') {
@@ -214,6 +216,10 @@ export function stepPowers(sim) {
       }
       else if (p.kind === 'shell') { splashDamage(sim, p.x, p.z, 7, 95, 'artillery', { team: p.team }); sim.events.push({ t: 'shellhit', x: p.x, z: p.z, team: p.team }); }
       else if (p.kind === 'bomb') detonate(sim, p, p.x, p.z);
+      else if (p.kind === 'carpet') { // the stick of bombs walks along the bomber's track
+        const B = POWERS.b2; for (let i = 0; i < B.n; i++) { const a = (i / (B.n - 1) - 0.5) * B.line, lat = (i % 2 ? 3 : -3); sim.strikes.push({ id: sim.nextId++, kind: 'bomblet', team: p.team, x: p.x + p.dx * a - p.dz * lat, z: p.z + p.dz * a + p.dx * lat, px: 0, pz: 0, t: 2 + i * 3, dead: false }); }
+      }
+      else if (p.kind === 'bomblet') { splashDamage(sim, p.x, p.z, POWERS.b2.r, POWERS.b2.dmg, 'artillery', { team: p.team }); sim.events.push({ t: 'shellhit', x: p.x, z: p.z, team: p.team }); }
       else if (p.kind === 'ambush') {
         const roster = FACTIONS[sim.teams[p.team].faction].ambush || ['s_rpg', 's_rpg', 's_guerrilla'];
         let made = 0;

@@ -1,7 +1,7 @@
 // Economy: power, production queues (units and upgrades), construction/repair,
 // supply harvesting. Roles come from the faction registry.
 import { CELL, DT, LOAD_TICKS, UNLOAD_TICKS, angDiff } from './defs.js';
-import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS } from './factionRegistry.js';
+import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS, generalOf } from './factionRegistry.js';
 import { rectDist, reqPath, moveTo, stopUnit, releaseSlot, spawnNear, makeUnit } from './entities.js';
 import { claimPad } from './air.js';
 
@@ -21,7 +21,8 @@ export function completeBldg(sim, b) {
   sim.events.push({ t: 'done', id: b.id, team: b.team, type: b.type, x: b.x, z: b.z });
   const sp = BLDGS[b.type].superPower;
   if (sp) { // superweapon online: the 5-minute countdown starts, and by rule BOTH sides are told where it is
-    sim.teams[b.team].powerReady[sp] = sim.tick + POWERS[sp].cd * 20; b.seen[0] = b.seen[1] = true;
+    const G = generalOf(sim.teams[b.team]);
+    sim.teams[b.team].powerReady[sp] = sim.tick + Math.round(POWERS[sp].cd * 20 * (G && G.superCd || 1)); b.seen[0] = b.seen[1] = true;
     sim.events.push({ t: 'superbuilt', id: sp, bid: b.id, team: b.team, x: b.x, z: b.z });
   }
   if (BLDGS[b.type].role === 'supply') spawnNear(sim, FACTIONS[sim.teams[b.team].faction].roles.truck, b.team, b.x + (b.w / 2 + 3) * CELL, b.z, 0);
@@ -38,6 +39,7 @@ export function stepProduction(sim) {
     b.prod = 0; b.queue.shift();
     if (up) {
       T.upgrades.add(up);
+      for (const u of sim.ents) if (u.kind === 'unit' && u.team === b.team) { u.wslots = null; if (up === 'v_stealthrotor' && u.type === 'v_comanche') u.stealthMode = 'always'; } // new weapons and stealth apply to units already built
       if (up === 'r_nuke') for (const u of sim.ents) if (u.kind === 'unit' && u.team === b.team && UNITS[u.type].nuke) u.ms = UNITS[u.type].speed * 1.15;
       sim.events.push({ t: 'upgrade', id: up, team: b.team });
       continue;

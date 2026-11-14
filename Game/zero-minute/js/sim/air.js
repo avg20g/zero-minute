@@ -8,15 +8,15 @@ import { DT, WORLD, angDiff } from './defs.js';
 import { UNITS } from './factionRegistry.js';
 import { kill } from './entities.js';
 
-export const TAXI = 4;            // m/s on the ground
-export const GROUND_TURN = 1.8;   // rad/s while taxiing and lining up
-export const ACCEL = 7;           // m/s^2 on the take-off roll
-export const BRAKE = 7;           // m/s^2 on the landing roll
-export const ROTATE = 0.6;        // fraction of the runway used before the nose comes up
-export const CLIMB_TICKS = 70;    // ticks from lift-off to cruise altitude
-export const FINAL = 90;          // metres from the approach fix to the runway threshold
-export const APPROACH = 0.42;     // approach speed as a fraction of cruise speed
-export const SPOOL = 50, LIFT = 70; // helicopter: ticks of rotor spool-up, then ticks to climb
+export const TAXI = 11;           // m/s on the ground
+export const GROUND_TURN = 4.5;   // rad/s while taxiing and lining up
+export const ACCEL = 20;          // m/s^2 on the take-off roll
+export const BRAKE = 22;          // m/s^2 on the landing roll
+export const ROTATE = 0.5;        // fraction of the runway used before the nose comes up
+export const CLIMB_TICKS = 30;    // ticks from lift-off to cruise altitude
+export const FINAL = 55;          // metres from the approach fix to the runway threshold
+export const APPROACH = 0.6;      // approach speed as a fraction of cruise speed
+export const SPOOL = 14, LIFT = 30; // helicopter: ticks of rotor spool-up, then ticks to climb
 export const LOITER = 600;        // ticks an aircraft holds over its destination before going home (30 s)
 export const ORBIT = 22;          // metres: radius of the holding circle
 const ON_RUNWAY = { taxi: 1, backtaxi: 1, lineup: 1, roll: 1, final: 1, rollout: 1, taxiin: 1, park: 1 };
@@ -79,7 +79,7 @@ function fighter(sim, u, d) {
     u.home = 0; u.pad = -1; u.rw = -1;
     if (caught || !claimPad(sim, u)) { kill(sim, u); return true; } // nowhere to land
     home = sim.byId.get(u.home);
-    u.as = u.altK > 0 ? 'return' : 'parked';
+    u.as = u.altK > 0 ? 'return' : 'parked'; u.appr = 0;
   }
   const pad = home.pads[u.pad], R = runway(home, u.rw >= 0 ? u.rw : 0), out = R.dir > 0 ? 0 : Math.PI; // its runway (once locked) and the take-off heading
   switch (u.as) {
@@ -103,12 +103,12 @@ function fighter(sim, u, d) {
       u.x = clampW(u.x + u.vx * DT); u.z = R.z;
       const run = (u.x - R.ax) * R.dir;
       if (run > R.len * ROTATE) { u.altK = Math.min(1, u.altK + 1 / CLIMB_TICKS); u.landed = false; }
-      if (u.altK >= 1) { freeRunway(home, u); u.as = u.order && u.ammo > 0 ? 'out' : 'return'; } // locked until here: nobody starts an approach into a climb-out
+      if (u.altK >= 1) { freeRunway(home, u); u.appr = 0; u.as = u.order && u.ammo > 0 ? 'out' : 'return'; } // locked until here: nobody starts an approach into a climb-out
       return true;
     }
     case 'out': {
       const o = u.order;
-      if (!o || u.ammo <= 0) { u.as = 'return'; if (!(o && o.guard)) u.order = null; u.target = 0; u.loiterT = 0; break; } // a guard order survives the trip home to re-arm
+      if (!o || u.ammo <= 0) { u.as = 'return'; u.appr = 0; if (!(o && o.guard)) u.order = null; u.target = 0; u.loiterT = 0; break; } // a guard order survives the trip home to re-arm
       if (u.loiterO !== o) { u.loiterO = o; u.loiterT = 0; }
       const t = sim.byId.get(o.t === 'attack' ? o.id : u.target);
       if (t && !t.dead) { // attack run. A jet cannot turn inside its own turning circle: if the target is close and
@@ -127,24 +127,27 @@ function fighter(sim, u, d) {
       if (Math.hypot(dx, dz) > ORBIT + 14) { u.goal = { x: o.x, z: o.z }; break; }               // still on the way
       o.t = 'amove';
       const a = Math.atan2(dz, dx) + 0.55; u.goal = { x: clampW(o.x + Math.cos(a) * ORBIT), z: clampW(o.z + Math.sin(a) * ORBIT) };
-      if (!o.guard && ++u.loiterT >= LOITER) { u.as = 'return'; u.order = null; u.target = 0; u.loiterT = 0; }
+      if (!o.guard && ++u.loiterT >= LOITER) { u.as = 'return'; u.appr = 0; u.order = null; u.target = 0; u.loiterT = 0; }
       break;
     }
     case 'return': { // fly to the approach fix off the end of the field; orbit there while both runways are busy
       if (u.order) { if (u.ammo > 0) { u.as = 'out'; break; } if (!u.order.guard) u.order = null; }
-      const fx = clampW(R.cx + R.dir * FINAL);
+      // Two fixes on the extended centreline: fly to the outer one first, then inbound to the inner one, so the
+      // aircraft always reaches the inner fix already pointing at the runway (whatever direction it came home from).
+      const fx = clampW(R.cx + R.dir * FINAL), ox = clampW(R.cx + R.dir * (FINAL + 70));
+      if (!u.appr) { u.goal = { x: ox, z: home.z }; if (Math.hypot(ox - u.x, home.z - u.z) < 26) u.appr = 1; break; }
       u.goal = { x: fx, z: home.z };
-      if (Math.hypot(fx - u.x, home.z - u.z) < 22 && lockRunway(sim, home, u)) u.as = 'final';
+      if (Math.hypot(fx - u.x, home.z - u.z) < 16) { if (lockRunway(sim, home, u)) u.as = 'final'; else u.appr = 0; } // runways busy: back out and come round again
       break;
     }
     case 'final': { // capture the centreline, slow down, and descend on a straight glide slope to the threshold
       const td = R.cx - R.dir * 3, togo = (u.x - td) * R.dir;
-      const df = angDiff(Math.atan2(R.z - u.z, -R.dir * 16), u.facing), ma = d.turn * DT;
+      const df = angDiff(Math.atan2(R.z - u.z, -R.dir * Math.max(18, u.spd * 1.3)), u.facing), ma = d.turn * DT; // aim further ahead when faster, so it settles on the line instead of weaving
       u.facing += Math.max(-ma, Math.min(ma, df));
       u.spd += Math.max(-9 * DT, Math.min(9 * DT, u.ms * APPROACH - u.spd));
       u.vx = Math.cos(u.facing) * u.spd; u.vz = Math.sin(u.facing) * u.spd; u.x = clampW(u.x + u.vx * DT); u.z = clampW(u.z + u.vz * DT);
       u.altK = Math.max(0, Math.min(u.altK, togo / FINAL));
-      if (togo < 14 && Math.abs(u.z - R.z) > 3.5) { freeRunway(home, u); u.as = 'return'; break; }    // not lined up: go around
+      if (togo < 14 && Math.abs(u.z - R.z) > 3.5) { freeRunway(home, u); u.as = 'return'; u.appr = 0; break; }    // not lined up: go around
       if (togo <= 0) { u.altK = 0; u.landed = true; u.as = 'rollout'; sim.events.push({ t: 'touchdown', x: u.x, z: u.z, id: u.id }); }
       return true;
     }

@@ -21,6 +21,11 @@ export const WEAPONS = {
   stinger:     { range: 50, dmg: 40, cd: 30, kind: 'missile', speed: 64, intercept: true, vs: { inf: 0.5, light: 1.1, heavy: 0.9, bldg: 0.3, air: 1.6 } },
   gatling:     { range: 38, dmg: 6,  cd: 2,  kind: 'hitscan', vs: { inf: 1, light: 0.7, heavy: 0.15, bldg: 0.1, air: 1 } },
   inferno:     { range: 72, minRange: 18, dmg: 45, cd: 90, kind: 'lob', speed: 40, arc: 16, splash: 6, clearsGarrison: true, hazard: { kind: 'fire', r: 6, secs: 6, dps: 16 }, vs: { inf: 1, light: 0.8, heavy: 0.3, bldg: 0.6 } },
+  bunker_bomb: { range: 30, dmg: 300, cd: 16, kind: 'missile', speed: 60, splash: 6, vs: { inf: 0.6, light: 0.9, heavy: 1, bldg: 2.2 } },          // F-15E: two per sortie, no use against aircraft
+  lav_gun:     { range: 30, dmg: 9, cd: 3, kind: 'hitscan', vs: { inf: 1, light: 0.9, heavy: 0.25, bldg: 0.2, air: 0.5 } },                          // 25 mm chain gun
+  tow:         { range: 46, dmg: 170, cd: 110, kind: 'missile', speed: 60, intercept: true, vs: { inf: 0.2, light: 1, heavy: 1.9, bldg: 0.9 } },      // TOW upgrade: built to kill tanks
+  vest:        { range: 2.6, dmg: 1, cd: 999, kind: 'hitscan', vs: { inf: 1, light: 1, heavy: 1, bldg: 1 } },                                        // suicide units: reaching this range triggers the blast
+  scud_missile: { range: 120, dmg: 320, cd: 400, kind: 'shell', speed: 55, splash: 10, hazard: { kind: 'toxin', r: 7, secs: 10, dps: 16 }, vs: { inf: 1, light: 1, heavy: 0.7, bldg: 1.1 } },
   raptor_missile: { range: 46, dmg: 115, cd: 20, kind: 'missile', speed: 95, burst: 2, burstGap: 4, intercept: true, splash: 4, vs: { inf: 0.6, light: 1, heavy: 1.1, bldg: 0.9, air: 1.4 } },
   mig_missile: { range: 44, dmg: 110, cd: 20, kind: 'missile', speed: 90, burst: 2, burstGap: 4, intercept: true, splash: 5, hazard: { kind: 'fire', r: 4.5, secs: 4, dps: 16 }, vs: { inf: 0.8, light: 1, heavy: 1, bldg: 1 } },
   tech_mg:     { range: 30, dmg: 6,  cd: 4,  kind: 'hitscan', vs: { inf: 1, light: 0.6, heavy: 0.12, bldg: 0.12, air: 0.6 } },
@@ -62,7 +67,7 @@ export const UNITS = {
   v_drone:      { model: 'drone', name: 'Recon Drone', faction: 'vanguard', cost: 400, secs: 6, hp: 90, speed: 24, turn: 3.2, radius: 1.2, cls: 1, sight: 46, armor: 'air', air: true, alt: 18, scout: true },
   v_comanche:   { model: 'comanche', name: 'Comanche Gunship', faction: 'vanguard', cost: 1500, secs: 14, hp: 260, speed: 16, turn: 2.6, radius: 2.2, cls: 1, sight: 44, armor: 'air',
                   weapon: 'chaingun', weapon2: 'heli_rocket', turret: 5, air: true, alt: 13, fireMoving: true, heli: true },
-  v_raptor:     { model: 'raptor', name: 'Raptor Strike Fighter', faction: 'vanguard', cost: 1400, secs: 12, hp: 220, speed: 36, turn: 2.3, radius: 2.4, cls: 1, sight: 40, armor: 'air',
+  v_raptor:     { model: 'raptor', name: 'F-22 Raptor', faction: 'vanguard', cost: 1400, secs: 12, hp: 220, speed: 36, turn: 2.3, radius: 2.4, cls: 1, sight: 40, armor: 'air',
                   weapon: 'raptor_missile', air: true, alt: 20, fireMoving: true, based: true, ammo: 2, reload: 110 },
   // ---- Red Hammer Pact
   r_dozer:      { ...DOZER, name: 'Dozer', faction: 'redhammer' },
@@ -77,10 +82,21 @@ export const UNITS = {
                   weapon: 'dual_cannon', turret: 2.2, fireMoving: true, dirArmor: true, tank: true, nuke: true,
                   hardpoints: { gatling: { name: 'Gatling Cannon', cost: 500, secs: 8, weapon: 'gatling' }, bunker: { name: 'Battle Bunker', cost: 400, secs: 8, capacity: 1 } } },
   r_inferno:    { model: 'inferno', name: 'Inferno Cannon', faction: 'redhammer', cost: 900, secs: 12, hp: 240, speed: 7, turn: 1.6, radius: 1.9, cls: 1, sight: 30, armor: 'light', weapon: 'inferno', thermo: true },
-  r_mig:        { model: 'mig', name: 'MiG Strike Fighter', faction: 'redhammer', cost: 1200, secs: 12, hp: 200, speed: 34, turn: 2.2, radius: 2.4, cls: 1, sight: 40, armor: 'air',
+  r_mig:        { model: 'j11', name: 'J-11 Fighter', faction: 'redhammer', cost: 1200, secs: 12, hp: 200, speed: 34, turn: 2.2, radius: 2.4, cls: 1, sight: 40, armor: 'air',
                   weapon: 'mig_missile', air: true, alt: 20, fireMoving: true, based: true, ammo: 2, reload: 120, thermo: true },
   r_hind:       { model: 'hind', name: 'Hind Gunship', faction: 'redhammer', cost: 1500, secs: 14, hp: 340, speed: 14, turn: 2.2, radius: 2.4, cls: 1, sight: 42, armor: 'air',
                   weapon: 'chaingun', weapon2: 'heli_rocket', turret: 5, air: true, alt: 13, fireMoving: true, heli: true },
+  // ---- general-only units (see GENERALS)
+  v_f15:        { model: 'f15e', name: 'F-15E Strike Eagle', faction: 'vanguard', cost: 1600, secs: 13, hp: 240, speed: 34, turn: 2.1, radius: 2.5, cls: 1, sight: 40, armor: 'air',
+                  weapon: 'bunker_bomb', air: true, alt: 20, fireMoving: true, based: true, ammo: 2, reload: 130 },
+  v_lav:        { model: 'lav25', name: 'LAV-25', faction: 'vanguard', cost: 900, secs: 9, hp: 300, speed: 13, turn: 2.8, radius: 2.0, cls: 1, sight: 34, armor: 'light',
+                  weapon: 'lav_gun', upWeapon: { v_tow: 'tow' }, turret: 4, fireMoving: true, amph: true },
+  s_bomber:     { model: 'bomber', name: 'Suicide Bomber', faction: 'sandstorm', cost: 300, secs: 5, hp: 70, speed: 9.5, turn: 9, radius: 0.8, cls: 0, sight: 26, armor: 'inf',
+                  weapon: 'vest', infantry: true, suicide: { r: 7, dmg: 280 } },
+  s_fpv:        { model: 'fpv', name: 'FPV Attack Drone', faction: 'sandstorm', cost: 350, secs: 6, hp: 40, speed: 24, turn: 4, radius: 1.0, cls: 1, sight: 34, armor: 'air',
+                  weapon: 'vest', air: true, alt: 8, fireMoving: true, suicide: { r: 5, dmg: 230 } },
+  s_scudtruck:  { model: 'scudtel', name: 'Scud Launcher', faction: 'sandstorm', cost: 1500, secs: 16, hp: 260, speed: 7, turn: 1.4, radius: 2.8, cls: 1, sight: 30, armor: 'light',
+                  weapon: 'scud_missile' },
   // ---- Sandstorm Front
   s_worker:     { model: 'worker', name: 'Worker', faction: 'sandstorm', cost: 250, secs: 4, hp: 110, speed: 6.5, turn: 9, radius: 0.9, cls: 0, sight: 28, armor: 'inf', infantry: true, builder: true },
   s_truck:      { ...TRUCK, name: 'Supply Pickup', faction: 'sandstorm' },
@@ -146,6 +162,9 @@ export const BLDGS = {
 export const UPGRADES = {
   v_pdl:    { name: 'Point-Defense Lasers', cost: 1500, secs: 20, desc: 'Sentinel tanks shoot down incoming rockets and missiles.' },
   r_nuke:   { name: 'Nuclear Tanks', cost: 2000, secs: 25, desc: 'Battlemasters and Overlords: +25% damage, +15% speed.' },
+  v_stealthrotor: { name: 'Stealth Comanche', cost: 1500, secs: 20, desc: 'Comanches are hidden unless they have just fired or a detector is near.' },
+  v_tow:    { name: 'TOW Missiles', cost: 1200, secs: 18, desc: 'LAV-25s add a TOW launcher: heavy damage to tanks at long range.' },
+  s_anthrax: { name: 'Anthrax Beta', cost: 1500, secs: 20, desc: 'Every toxin cloud you make does 50% more damage.' },
   r_thermo: { name: 'Thermobaric Shells', cost: 1500, secs: 20, desc: 'Inferno Cannon and MiG firestorms are larger and last longer.' },
 };
 
@@ -158,6 +177,7 @@ export const POWERS = {
   fab:     { name: 'Fuel-Air Bomb', cd: 240, radius: 24, desc: 'Massive shockwave, then lingering heat that also empties garrisons.' },
   ambush:  { name: 'Ambush Squad', cd: 180, radius: 8, desc: '6 stealthed guerrillas appear at the target.' },
   toxinbomb: { name: 'Toxin Bomb', cd: 210, radius: 15, desc: 'Green cloud for 20 s: kills infantry and clears garrisons.' },
+  b2: { name: 'B-2 Carpet Bomb', cd: 240, radius: 14, line: 60, n: 10, dmg: 190, r: 8, desc: 'A B-2 Spirit lays ten bombs along a 60 m line.' },
   paradrop: { name: 'Paratrooper Drop', cd: 240, radius: 9, n: 5, unit: 'v_ranger', desc: 'A transport drops 5 Ranger squads at the target.' },
   cashhack: { name: 'Cash Hack', cd: 240, radius: 14, amount: 1500, aim: 'supply', desc: 'Steals up to $1,500 from the enemy. Aim at an enemy supply building you have scouted.' },
   sneaktunnel: { name: 'Sneak Attack', cd: 300, radius: 6, delay: 5, aim: 'site', desc: 'A Tunnel Network exit breaks ground at the target after 5 s. Needs clear, explored ground.' },
@@ -176,8 +196,8 @@ export const HORDE = { radius: 14, need: 4, bonus: 0.15, bonusPromo: 0.25 };
 // tree: tier = General rank required (1, 3, 5). req = parent node (branching).
 export const FACTIONS = {
   vanguard: {
-    id: 'vanguard', name: 'Vanguard Coalition', doctrine: 'High-tech and air superiority',
-    blurb: 'Point-defense lasers, Comanche gunships and stealth snipers. Everything leans on the power grid.',
+    id: 'vanguard', name: 'United States', doctrine: 'High-tech and air superiority',
+    blurb: 'Abrams tanks, F-22s, Comanche gunships and stealth snipers. Everything leans on the power grid.',
     hull: 0xc4b79a, dark: 0x8a8067, usesPower: true, radarNeedsPower: true,
     build: ['v_power', 'v_barracks', 'v_supply', 'v_factory', 'v_airfield', 'v_patriot', 'v_uplink', 'v_particle', 'v_cc'],
     roles: { cc: 'v_cc', power: 'v_power', supply: 'v_supply', barracks: 'v_barracks', factory: 'v_factory', airfield: 'v_airfield', defense: 'v_patriot', income: 'v_uplink', super: 'v_particle', builder: 'v_dozer', truck: 'v_truck', squad: 'v_ranger', scout: 'v_drone' },
@@ -193,8 +213,8 @@ export const FACTIONS = {
     ],
   },
   redhammer: {
-    id: 'redhammer', name: 'Red Hammer Pact', doctrine: 'Heavy armor and overwhelming firepower',
-    blurb: 'Overlords, Inferno Cannons and MiGs. Units fight 15% faster in a horde of five or more.',
+    id: 'redhammer', name: 'China', doctrine: 'Heavy armor and overwhelming firepower',
+    blurb: 'Heavy tanks, Inferno Cannons and J-11 fighters. Units fight 15% faster in a horde of five or more.',
     hull: 0x5d6a48, dark: 0x3d4631, usesPower: true, horde: true,
     build: ['r_power', 'r_barracks', 'r_supply', 'r_factory', 'r_airfield', 'r_gatling', 'r_silo', 'r_cc'],
     roles: { cc: 'r_cc', power: 'r_power', supply: 'r_supply', barracks: 'r_barracks', factory: 'r_factory', airfield: 'r_airfield', defense: 'r_gatling', super: 'r_silo', builder: 'r_dozer', truck: 'r_truck', squad: 'r_conscript', scout: 'r_scout' },
@@ -210,7 +230,7 @@ export const FACTIONS = {
     ],
   },
   sandstorm: {
-    id: 'sandstorm', name: 'Sandstorm Front', doctrine: 'Guerrilla, stealth and salvage',
+    id: 'sandstorm', name: 'ISIS', doctrine: 'Guerrilla, stealth and salvage',
     blurb: 'No power grid. Vehicles upgrade from enemy wrecks, and Tunnel Networks move units across the map instantly.',
     hull: 0x9a7848, dark: 0x5e4a30, usesPower: false, salvage: true, ambush: ['s_rpg', 's_rpg', 's_guerrilla'],
     build: ['s_barracks', 's_supply', 's_factory', 's_stinger', 's_tunnel', 's_market', 's_scud', 's_cc'],
@@ -238,3 +258,39 @@ export function trainerOf(type) {
   for (const k in BLDGS) if ((BLDGS[k].trains || []).includes(type)) return k;
   return null;
 }
+
+// ---------------------------------------------------------------- generals
+// Two per faction. A general adds units and upgrades to existing buildings, swaps a power, or changes a rule.
+//   trains / upgrades   { building: [ids] } added to that building's lists
+//   swap                { power: replacement } in the promotion tree
+//   amph                infantry and units flagged `amph` cross water
+//   spy                 metres of permanent vision around every enemy building
+//   grant               promotions owned from the start;  hack: overrides for Cash Hack
+//   discount            { infantry, tank } cost multipliers
+//   cloak               every infantry squad and light vehicle hides when it stands still
+//   toxin               damage multiplier for the side's toxin clouds;  superCd: superweapon countdown multiplier
+export const GENERALS = {
+  airforce: { faction: 'vanguard', name: 'General Drudgereport.com', title: 'Air Force General', desc: 'F-15E Strike Eagles with bunker-buster bombs, a Stealth Comanche upgrade, and a B-2 carpet bomb in place of the A-10 run.',
+    trains: { v_airfield: ['v_f15'] }, upgrades: { v_airfield: ['v_stealthrotor'] }, swap: { a10: 'b2' } },
+  marine: { faction: 'vanguard', name: 'General Maddox', title: 'Marine Corps General', desc: 'Infantry and LAV-25s cross water. The LAV-25 fighting vehicle can add TOW missiles that smash tanks.',
+    trains: { v_factory: ['v_lav'] }, upgrades: { v_factory: ['v_tow'] }, amph: true },
+  cyber: { faction: 'redhammer', name: "Secretary Yuec'an Tsie Mie", title: 'Cyber General', desc: 'Always sees every enemy building and what stands next to it. Starts with Cash Hack, which steals more and recharges faster.',
+    spy: 18, grant: ['r_hack'], hack: { amount: 2500, cd: 150 } },
+  mass: { faction: 'redhammer', name: 'General Tsao, Chicken', title: 'Mass Assault General', desc: 'Tanks and infantry cost 25% less.',
+    discount: { infantry: 0.75, tank: 0.75 } },
+  stealth: { faction: 'sandstorm', name: 'EWSAMA BEN ALLADIN', title: 'Stealth General', desc: 'Infantry and light vehicles vanish when they stand still. Adds Suicide Bombers and FPV Attack Drones.',
+    trains: { s_barracks: ['s_bomber', 's_fpv'] }, cloak: true },
+  wmd: { faction: 'sandstorm', name: 'Nuclear Nadal', title: 'WMD General', desc: 'Scud Launchers, stronger toxin clouds, the Anthrax Beta upgrade, and a faster Scud Storm.',
+    trains: { s_factory: ['s_scudtruck'] }, upgrades: { s_market: ['s_anthrax'] }, toxin: 1.25, superCd: 0.8 },
+};
+export const generalsOf = (faction) => Object.keys(GENERALS).filter(g => GENERALS[g].faction === faction);
+export const generalOf = (T) => (T && T.general && GENERALS[T.general]) || null;
+export function trainsOf(T, btype) { const base = BLDGS[btype].trains || [], g = generalOf(T); return g && g.trains && g.trains[btype] ? base.concat(g.trains[btype]) : base; }
+export function upgradesOf(T, btype) { const base = BLDGS[btype].upgrades || [], g = generalOf(T); return g && g.upgrades && g.upgrades[btype] ? base.concat(g.upgrades[btype]) : base; }
+export function unitCost(T, type) {
+  const d = UNITS[type], g = generalOf(T); let c = d.cost;
+  if (g && g.discount) { if (d.infantry && g.discount.infantry) c *= g.discount.infantry; else if (d.tank && g.discount.tank) c *= g.discount.tank; }
+  return Math.round(c / 10) * 10;
+}
+// The power a promotion node gives this team (a general may swap one, e.g. A-10 -> B-2).
+export function nodePower(T, n) { const g = generalOf(T); return n.power && g && g.swap && g.swap[n.power] ? g.swap[n.power] : n.power; }

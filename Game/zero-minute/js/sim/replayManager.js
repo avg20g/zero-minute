@@ -26,7 +26,7 @@ export class ReplayPlayer {
     if (!data || data.v !== REPLAY_VERSION) throw new Error('Unsupported replay');
     this.data = data; this.i = 0; this.m = 0; this.diverged = -1;
     const s = data.setup;
-    this.sim = new Sim({ factions: s.factions, money: s.money, difficulty: s.difficulty, seed: s.seed, treaty: s.treaty, noSuper: s.noSuper, koth: s.koth, noEnemy: s.noEnemy, map: s.map || undefined });
+    this.sim = new Sim({ factions: s.factions, money: s.money, difficulty: s.difficulty, seed: s.seed, treaty: s.treaty, noSuper: s.noSuper, koth: s.koth, noEnemy: s.noEnemy, map: s.map || undefined, generals: s.generals || undefined });
     this.feed = this.sim.issue.bind(this.sim);
     this.sim.issue = (cmd) => { if ((cmd.team ?? PLAYER) !== PLAYER) this.feed(cmd); }; // the observer cannot give orders; the AI still can
   }

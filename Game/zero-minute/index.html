@@ -295,6 +295,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--amber); out
       <h1>Zero Minute<small>Skirmish &middot; choose your doctrine</small></h1>
       <h2>Your faction</h2>
       <div id="setup-factions"><p class="note">Loading factions&hellip;</p></div>
+      <h2>Your general</h2>
+      <div id="setup-general" class="chips" role="radiogroup" aria-label="Your general"></div>
       <h2>Opponent</h2>
       <div id="setup-foes"></div>
       <h2>Opponent skill</h2>
@@ -326,7 +328,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--amber); out
         <canvas id="mb-canvas" width="512" height="512" aria-label="Top-down map. North is up."></canvas>
         <div class="mb-side">
           <div id="mb-tools" class="chips" role="radiogroup" aria-label="Tool"></div>
-          <div class="chips"><button type="button" class="tbtn sm" id="mb-undo">Undo</button><button type="button" class="tbtn sm" id="mb-canyon">Load Desert Canyon</button><button type="button" class="tbtn sm" id="mb-open">Load Open Desert</button><button type="button" class="tbtn sm" id="mb-clear">Clear all</button></div>
+          <div class="chips"><label class="tctl"><span class="lbl">Building type</span><select id="mb-kind"></select></label><label class="tctl"><span class="lbl">Ground</span><select id="mb-biome"><option value="desert">Desert</option><option value="woods">Woods (grass and trees)</option></select></label></div>
+          <div class="chips"><button type="button" class="tbtn sm" id="mb-undo">Undo</button><button type="button" class="tbtn sm" id="mb-canyon">Load Desert Canyon</button><button type="button" class="tbtn sm" id="mb-open">Load Open Desert</button><button type="button" class="tbtn sm" id="mb-forest">Load Forest River</button><button type="button" class="tbtn sm" id="mb-clear">Clear all</button></div>
           <ul id="mb-msgs" aria-live="polite"></ul>
           <div class="chips"><button type="button" class="tbtn" id="mb-use">Use this map</button><button type="button" class="tbtn" id="mb-cancel">Cancel</button></div>
         </div>

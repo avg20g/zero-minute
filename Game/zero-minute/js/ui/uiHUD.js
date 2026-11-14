@@ -3,7 +3,7 @@
 // toasts, and the 2D overlay (health bars, veterancy chevrons, drag box, pings).
 import { TEAM } from './teamColors.js';
 import { N, CELL, WORLD, PLAYER, ENEMY, NEUTRAL, ZONE_MULT, ZONE_NAME, TICK_HZ } from '../sim/defs.js';
-import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS, GENERAL, VET } from '../sim/factionRegistry.js';
+import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS, GENERAL, VET, GENERALS, trainsOf, upgradesOf, unitCost, nodePower } from '../sim/factionRegistry.js';
 import { heightAt } from '../sim/map.js';
 import { hasBldg, capacityOf } from '../sim/entities.js';
 import { strikeVisible, hasPower, superOf } from '../sim/powers.js';
@@ -61,8 +61,9 @@ export class Hud {
     ui.toast = (t, kind) => this.toast(t, kind);
     ui.togglePromo = () => { ui.promoOpen = !ui.promoOpen; $('promo').hidden = !ui.promoOpen; $('btn-gen').setAttribute('aria-expanded', String(ui.promoOpen)); this.promoSig = ''; this.renderPromo(); };
     const foeAI = sim.ais.find(a => a.team === ENEMY);
-    if (sim.noEnemy) $('brand-sub').textContent = this.F.name + ' · Sandbox (no enemy)'; else
-    $('brand-sub').textContent = this.F.name + ' vs ' + FACTIONS[sim.teams[ENEMY].faction].name + (foeAI ? ' (' + foeAI.cfg.label + ' AI)' : '');
+    const gen = sim.teams[PLAYER].general ? ' · ' + GENERALS[sim.teams[PLAYER].general].name : '';
+    if (sim.noEnemy) $('brand-sub').textContent = this.F.name + gen + ' · Sandbox (no enemy)'; else
+    $('brand-sub').textContent = this.F.name + gen + ' vs ' + FACTIONS[sim.teams[ENEMY].faction].name + (sim.teams[ENEMY].general ? ' · ' + GENERALS[sim.teams[ENEMY].general].name : '') + (foeAI ? ' (' + foeAI.cfg.label + ' AI)' : '');
     $('st-power').hidden = !this.F.usesPower;
     this.bind();
   }
@@ -82,9 +83,11 @@ export class Hud {
       const k = z * V + x, e = map.rock[k], i = (z * N + x) * 4;
       const lit = Math.max(0.55, Math.min(1.35, 1 + (H[k] - H[k + 1] + H[k] - H[k + V]) * 0.16));
       let r = 198, gg = 166, b = 114;
+      if (map.biome === 'woods') { r = 104; gg = 132; b = 78; }
       if (road[z * N + x] && e < 0.2) { r = 150; gg = 138; b = 118; }
       if (e > 0.6) { r = 158; gg = 120; b = 84; }
       if (map.blocked[z * N + x]) { r = 104; gg = 76; b = 56; }
+      if (map.water && map.water[z * N + x]) { r = 52; gg = 116; b = 146; }
       img.data[i] = r * lit; img.data[i + 1] = gg * lit; img.data[i + 2] = b * lit; img.data[i + 3] = 255;
     }
     g.putImageData(img, 0, 0);
@@ -155,7 +158,7 @@ export class Hud {
       if (act === 'build') ctl.startPlacing(arg);
       else if (act === 'train') {
         const up = arg.startsWith('up:') ? arg.slice(3) : null;
-        const bs = ctl.selectedOwn('bldg').filter(x => x.done && (up ? (BLDGS[x.type].upgrades || []).includes(up) : (BLDGS[x.type].trains || []).includes(arg))).sort((a, c) => a.queue.length - c.queue.length);
+        const bs = ctl.selectedOwn('bldg').filter(x => x.done && (up ? upgradesOf(sim.teams[PLAYER], x.type).includes(up) : trainsOf(sim.teams[PLAYER], x.type).includes(arg))).sort((a, c) => a.queue.length - c.queue.length);
         if (bs.length) sim.issue({ t: 'train', id: bs[0].id, type: arg });
       } else if (act === 'stop') { if (units.length) sim.issue({ t: 'stop', ids: units.map(u => u.id) }); }
       else if (act === 'amove') { ctl.cancelModes(); ui.amove = true; ui.guard = false; }
@@ -256,13 +259,13 @@ export class Hud {
       for (const b of bldgs) {
         if (!b.done) continue;
         const bd = BLDGS[b.type];
-        for (const t of bd.trains || []) {
+        for (const t of trainsOf(T, b.type)) {
           if (seen.has(t)) continue; seen.add(t);
           const d = UNITS[t]; let why = '';
-          if (d.promo && !T.promos.has(d.promo)) why = 'Needs promotion: ' + this.F.tree.find(n => n.id === d.promo).name; else if (T.money < d.cost) why = 'Insufficient funds';
-          out.push({ act: 'train:' + t, icon: iconFor(d, false), name: d.name, cost: d.cost, why });
+          if (d.promo && !T.promos.has(d.promo)) why = 'Needs promotion: ' + this.F.tree.find(n => n.id === d.promo).name; else if (T.money < unitCost(T, t)) why = 'Insufficient funds';
+          out.push({ act: 'train:' + t, icon: iconFor(d, false), name: d.name, cost: unitCost(T, t), why });
         }
-        for (const u of bd.upgrades || []) {
+        for (const u of upgradesOf(T, b.type)) {
           if (seen.has(u) || T.upgrades.has(u)) continue; seen.add(u);
           const q = sim.ents.some(e => e.kind === 'bldg' && e.team === PLAYER && e.queue.includes('up:' + u));
           out.push({ act: 'train:up:' + u, icon: ICON.up, name: UPGRADES[u].name, cost: UPGRADES[u].cost, why: q ? 'Already in production' : T.money < UPGRADES[u].cost ? 'Insufficient funds' : '', tip: UPGRADES[u].desc });
@@ -379,7 +382,7 @@ export class Hud {
   // ---------- support powers: radial cooldown buttons ----------
   renderPowers() {
     const sim = this.sim, T = sim.teams[PLAYER], box = $('pw');
-    const list = this.F.tree.filter(n => n.power && T.promos.has(n.id)).map(n => n.power), sp = superOf(sim, PLAYER);
+    const list = this.F.tree.filter(n => n.power && T.promos.has(n.id)).map(n => nodePower(T, n)), sp = superOf(sim, PLAYER);
     if (sp && hasPower(sim, PLAYER, sp)) list.push(sp);
     const sig = list.join();
     if (sig !== this.pwSig) {
@@ -405,7 +408,7 @@ export class Hud {
     $('promo-tree').innerHTML = [1, 3, 5].map(tier => `<section class="tier${T.rank >= tier ? '' : ' locked'}"><h3>Rank ${tier}${T.rank >= tier ? '' : ' <small>locked</small>'}</h3>` + F.tree.filter(n => n.tier === tier).map(n => {
       const has = T.promos.has(n.id), req = n.req ? F.tree.find(k => k.id === n.req) : null;
       const why = has ? '' : T.rank < tier ? `Reach Rank ${tier}` : req && !T.promos.has(req.id) ? `Needs ${req.name}` : T.points < 1 ? 'No points' : '';
-      return `<article class="node${has ? ' has' : why ? ' no' : ' can'}"><h4>${n.power ? ICON.jet : n.unlock ? ICON.man : ICON.star}${n.name}</h4><p>${n.desc}</p>${req ? `<p class="req">Branch: after ${req.name}</p>` : ''}` +
+      return `<article class="node${has ? ' has' : why ? ' no' : ' can'}"><h4>${n.power ? ICON.jet : n.unlock ? ICON.man : ICON.star}${n.power && nodePower(T, n) !== n.power ? POWERS[nodePower(T, n)].name : n.name}</h4><p>${n.power && nodePower(T, n) !== n.power ? POWERS[nodePower(T, n)].desc : n.desc}</p>${req ? `<p class="req">Branch: after ${req.name}</p>` : ''}` +
         (has ? '<span class="tag">Unlocked</span>' : why ? `<span class="tag">${why}</span>` : `<button type="button" class="tbtn" data-node="${n.id}">Spend 1 point</button>`) + '</article>';
     }).join('') + '</section>').join('');
   }

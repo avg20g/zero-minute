@@ -11,7 +11,10 @@ export class Nav {
     this.bld = new Uint8Array(N * N);     // cells covered by buildings
     this.dist = new Uint8Array(N * N);    // Chebyshev distance to nearest blocked cell (cap 6)
     this.soft = new Uint8Array(N * N);    // loading bays: passable, but through-traffic routes around them
-    this.comp = [new Int32Array(N * N), new Int32Array(N * N)];
+    this.hasWater = false; for (let i = 0; i < N * N; i++) if (staticBlocked[i] === 2) { this.hasWater = true; break; }
+    this.distW = this.hasWater ? new Uint8Array(N * N) : this.dist;   // clearance for amphibious units (same field when the map is dry)
+    const c0 = new Int32Array(N * N), c1 = new Int32Array(N * N);
+    this.comp = [c0, c1, this.hasWater ? new Int32Array(N * N) : c0, this.hasWater ? new Int32Array(N * N) : c1];
     this.g = new Float32Array(N * N);
     this.par = new Int32Array(N * N);
     this.open = new Uint32Array(N * N);
@@ -25,8 +28,16 @@ export class Nav {
     this.dirty = true;
   }
   rebuild() {
-    const d = this.dist, s = this.stat, b = this.bld;
-    for (let i = 0; i < N * N; i++) d[i] = (s[i] || b[i]) ? 0 : 6;
+    this._field(this.dist, this.comp[0], this.comp[1], false);
+    if (this.hasWater) this._field(this.distW, this.comp[2], this.comp[3], true);   // second field for amphibious units: water is open
+    this.dirty = false; this.version++;
+  }
+  // Clearance field (Chebyshev distance to the nearest blocked cell, cap 6) and connected components for
+  // infantry (clearance > 0) and vehicles (clearance > 1). Static cells: 1 = rock or map edge, 2 = water.
+  _field(d, comp0, comp1, amph) {
+    const s = this.stat, b = this.bld;
+    if (amph) for (let i = 0; i < N * N; i++) d[i] = (s[i] === 1 || b[i]) ? 0 : 6;
+    else for (let i = 0; i < N * N; i++) d[i] = (s[i] || b[i]) ? 0 : 6;
     for (let z = 0; z < N; z++) for (let x = 0; x < N; x++) {
       const i = z * N + x; let v = d[i]; if (!v) continue;
       if (x === 0 || z === 0 || x === N - 1 || z === N - 1) { d[i] = 1; continue; }
@@ -37,10 +48,9 @@ export class Nav {
       if (x === 0 || z === 0 || x === N - 1 || z === N - 1) continue;
       v = Math.min(v, d[i + 1] + 1, d[i + N] + 1, d[i + N + 1] + 1, d[i + N - 1] + 1); d[i] = v;
     }
-    // connected components per movement class (4-connectivity)
     const stack = this.stack || (this.stack = new Int32Array(N * N)); let sp = 0; // preallocated: no array growth, no garbage
     for (let cls = 0; cls < 2; cls++) {
-      const c = this.comp[cls]; c.fill(-1); let id = 0;
+      const c = cls ? comp1 : comp0; c.fill(-1); let id = 0;
       for (let i = 0; i < N * N; i++) {
         if (d[i] <= cls || c[i] >= 0) continue;
         c[i] = id; stack[sp++] = i;
@@ -54,18 +64,18 @@ export class Nav {
         id++;
       }
     }
-    this.dirty = false; this.version++;
   }
   cellOf(wx, wz) {
     const x = Math.min(N - 1, Math.max(0, (wx / CELL) | 0)), z = Math.min(N - 1, Math.max(0, (wz / CELL) | 0));
     return z * N + x;
   }
-  pass(c, cls) { return this.dist[c] > cls; }
-  passAt(wx, wz, cls) { return wx >= 0 && wz >= 0 && wx < N * CELL && wz < N * CELL && this.dist[this.cellOf(wx, wz)] > cls; }
+  // Movement classes: 0 infantry, 1 vehicles; +2 = amphibious (water does not block them).
+  pass(c, cls) { return (cls > 1 ? this.distW : this.dist)[c] > (cls & 1); }
+  passAt(wx, wz, cls) { return wx >= 0 && wz >= 0 && wx < N * CELL && wz < N * CELL && (cls > 1 ? this.distW : this.dist)[this.cellOf(wx, wz)] > (cls & 1); }
 
   // Nearest passable cell to (cx,cz), optionally restricted to a component. -1 if none within maxR.
-  nearest(cx, cz, cls, comp = -1, maxR = 30) {
-    const d = this.dist, cm = this.comp[cls];
+  nearest(cx, cz, cls0, comp = -1, maxR = 30) {
+    const d = cls0 > 1 ? this.distW : this.dist, cm = this.comp[cls0], cls = cls0 & 1;
     let best = -1, bd = 1e9;
     for (let r = 0; r <= maxR; r++) {
       if (best >= 0 && r * r > bd) break;
@@ -84,8 +94,8 @@ export class Nav {
     return best;
   }
 
-  lineClear(x0, z0, x1, z1, cls) { // cell coords (floats, cell-centre = +0.5)
-    const dx = x1 - x0, dz = z1 - z0, n = Math.ceil(Math.hypot(dx, dz) * 2.5) || 1, d = this.dist, sf = this.soft;
+  lineClear(x0, z0, x1, z1, cls0) { // cell coords (floats, cell-centre = +0.5)
+    const dx = x1 - x0, dz = z1 - z0, n = Math.ceil(Math.hypot(dx, dz) * 2.5) || 1, d = cls0 > 1 ? this.distW : this.dist, sf = this.soft, cls = cls0 & 1;
     for (let i = 1; i < n; i++) {
       const t = i / n, c = ((z0 + dz * t) | 0) * N + ((x0 + dx * t) | 0);
       if (d[c] <= cls || sf[c]) return false;
@@ -114,14 +124,14 @@ export class Nav {
   }
 
   // World-space path request. Returns { path:[x0,z0,x1,z1,...] | null, expanded }
-  findPath(sx, sz, gx, gz, cls) {
-    const d = this.dist, cm = this.comp[cls];
+  findPath(sx, sz, gx, gz, cls0) {
+    const d = cls0 > 1 ? this.distW : this.dist, cm = this.comp[cls0], cls = cls0 & 1;
     let sc = this.cellOf(sx, sz);
     let startFix = -1;
-    if (d[sc] <= cls) { startFix = this.nearest(sc % N, (sc / N) | 0, cls, -1, 12); if (startFix < 0) return { path: null, expanded: 1 }; sc = startFix; }
+    if (d[sc] <= cls) { startFix = this.nearest(sc % N, (sc / N) | 0, cls0, -1, 12); if (startFix < 0) return { path: null, expanded: 1 }; sc = startFix; }
     const comp = cm[sc];
     let gc = this.cellOf(gx, gz), exact = true;
-    if (d[gc] <= cls || cm[gc] !== comp) { gc = this.nearest(gc % N, (gc / N) | 0, cls, comp, 40); exact = false; if (gc < 0) return { path: null, expanded: 1 }; }
+    if (d[gc] <= cls || cm[gc] !== comp) { gc = this.nearest(gc % N, (gc / N) | 0, cls0, comp, 40); exact = false; if (gc < 0) return { path: null, expanded: 1 }; }
     const g = this.g, par = this.par, open = this.open, closed = this.closed, gen = ++this.gen, sf = this.soft;
     const gcx = gc % N, gcz = (gc / N) | 0;
     this.hk.length = 0; this.hv.length = 0;
@@ -158,7 +168,7 @@ export class Nav {
     while (i < last) {
       let j = Math.min(last, i + 48);
       const ax = (cells[i] % N) + 0.5, az = ((cells[i] / N) | 0) + 0.5;
-      while (j > i + 1 && !this.lineClear(ax, az, (cells[j] % N) + 0.5, ((cells[j] / N) | 0) + 0.5, cls)) j--;
+      while (j > i + 1 && !this.lineClear(ax, az, (cells[j] % N) + 0.5, ((cells[j] / N) | 0) + 0.5, cls0)) j--;
       out.push(((cells[j] % N) + 0.5) * CELL, (((cells[j] / N) | 0) + 0.5) * CELL);
       i = j;
     }

@@ -8,7 +8,7 @@
 // Difficulty changes behaviour caps only (actions per minute, reaction delay,
 // which tactics are allowed), never resources or vision.
 import { N, CELL, WORLD } from './defs.js';
-import { UNITS, BLDGS, FACTIONS, POWERS, UPGRADES, WEAPONS } from './factionRegistry.js';
+import { UNITS, BLDGS, FACTIONS, POWERS, UPGRADES, WEAPONS, trainsOf, upgradesOf, unitCost, nodePower } from './factionRegistry.js';
 import { hasBldg } from './entities.js';
 import { powerError, hasPower, superOf } from './powers.js';
 import { padCount } from './air.js';
@@ -72,7 +72,8 @@ export class AIController {
     this.pois.push({ x: WORLD - this.homeW.x, z: WORLD - this.homeW.z, k: 'start' });           // the other start position
     const es = this.pois[this.pois.length - 1]; this.hunt = this.pois.slice().sort((a, b) => dist(a, es) - dist(b, es));
     this.homeDock = m.docks.map(d => ({ x: d.x + 4, z: d.z + 3 })).sort((a, b) => Math.hypot(a.x - this.home.x, a.z - this.home.z) - Math.hypot(b.x - this.home.x, b.z - this.home.z))[0];
-    this.roster = Object.keys(UNITS).filter(k => UNITS[k].faction === this.F.id);
+    const Tm = sim.teams[team], can = new Set(this.F.build.flatMap(b => trainsOf(Tm, b)));   // what this side's general lets it build
+    this.roster = Object.keys(UNITS).filter(k => UNITS[k].faction === this.F.id && can.has(k));
     this.combat = this.roster.filter(k => UNITS[k].weapon && !UNITS[k].harvester && !UNITS[k].builder && !UNITS[k].scout);
     this.scout = { id: 0, route: null, i: 0, leg: 0, lastSweep: -1e9, asked: -1e9, lost: -1e9, sweeps: 0 };
     this.op = { mode: 'gather', ids: [], groups: null, wps: null, target: null, since: 0, strength0: 0, wave: 0, lastPush: 0, hunt: 0 };
@@ -191,7 +192,7 @@ export class AIController {
     const d = UNITS[type]; if (d.promo && !this.T.promos.has(d.promo)) return null;
     let best = null;
     for (const b of c.prod) {
-      if (!BLDGS[b.type].trains.includes(type) || b.queue.length >= 2) continue;
+      if (!trainsOf(this.sim.teams[this.team], b.type).includes(type) || b.queue.length >= 2) continue;
       if (d.based && padCount(this.sim, b) >= b.pads.length) continue;
       if (!best || b.queue.length < best.queue.length) best = b;
     }
@@ -262,7 +263,7 @@ export class AIController {
       const pre = !BLDGS[type].needs || hasBldg(sim, team, BLDGS[type].needs);
       add(name, score, BLDGS[type].cost, () => this.build(builder, type, anchor), !!builder && pre && tick >= this.buildHold && !c.undone.some(b => b.type === type), true);
     };
-    const train = (name, type, score) => { const b = this.trainer(c, type); add(name, score, UNITS[type].cost, () => { if (this.act({ t: 'train', id: b.id, type })) { this.stats.trained++; if (F.aiArmy[this.rot % F.aiArmy.length] === type) this.rot++; return true; } return false; }, !!b); };
+    const train = (name, type, score) => { const b = this.trainer(c, type); add(name, score, unitCost(T, type), () => { if (this.act({ t: 'train', id: b.id, type })) { this.stats.trained++; if (F.aiArmy[this.rot % F.aiArmy.length] === type) this.rot++; return true; } return false; }, !!b); };
 
     // --- housekeeping orders (cost actions, not money)
     for (const b of c.undone) if (builder && !c.builders.some(k => k.order && k.order.t === 'construct' && k.order.id === b.id)) { this.act({ t: 'construct', ids: [builder.id], target: b.id }); break; }
@@ -314,7 +315,7 @@ export class AIController {
     if (R.income && n('income') < 1 && nd('factory') && c.strength >= 3000) bld('income', R.income, 46, 'base');
     if (R.super && cfg.superweapon && !sim.noSuper && n('super') < 1 && nd('factory') && c.strength >= 3500) bld('super', R.super, 45, 'base');
     if (R.tunnel && cfg.retreat && n('tunnel') < 1 && nd('barracks') && c.strength >= 1500) bld('tunnel', R.tunnel, 42, 'front');
-    for (const b of c.prod) for (const id of BLDGS[b.type].upgrades || []) if (!T.upgrades.has(id) && !q('up:' + id) && b.queue.length < 2 && c.strength >= 3000) add('upgrade ' + id, 32, UPGRADES[id].cost + 1500, () => this.act({ t: 'train', id: b.id, type: 'up:' + id }));
+    for (const b of c.prod) for (const id of upgradesOf(T, b.type)) if (!T.upgrades.has(id) && !q('up:' + id) && b.queue.length < 2 && c.strength >= 3000) add('upgrade ' + id, 32, UPGRADES[id].cost + 1500, () => this.act({ t: 'train', id: b.id, type: 'up:' + id }));
     for (const type of this.roster) if (UNITS[type].deploy && c.deployers.length + q(type) < 2 && c.strength >= 2000) train(type, type, 31);
     // --- army: counter what has been seen
     let queuedArmy = 0; for (const type of this.combat) queuedArmy += q(type);
@@ -503,7 +504,7 @@ export class AIController {
   // Support powers are aimed only at enemies in view at this very tick, on a cell the vision grid marks visible.
   usePowers() {
     const sim = this.sim, tick = sim.tick, T = this.T, cfg = this.cfg, ready = [], soon = [];
-    for (const n of this.F.tree) if (n.power && T.promos.has(n.id)) { const left = (T.powerReady[n.power] || 0) - tick; if (left <= 0) ready.push(n.power); else if (left < 300) soon.push(n.power); }
+    for (const n of this.F.tree) if (n.power && T.promos.has(n.id)) { const pw = nodePower(T, n), left = (T.powerReady[pw] || 0) - tick; if (left <= 0) ready.push(pw); else if (left < 300) soon.push(pw); }
     const sp = superOf(sim, this.team), superReady = sp && hasPower(sim, this.team, sp) && (T.powerReady[sp] || 0) <= tick;
     if (!ready.length && !superReady) return;
     this.perceive();

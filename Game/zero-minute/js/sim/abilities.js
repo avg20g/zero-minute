@@ -2,11 +2,12 @@
 // horde bonus, veterancy self-repair, EMP, hardpoints, deployable hackers,
 // salvage crates, lingering hazards, passive income, tunnels, capture, sabotage.
 import { CELL, NEUTRAL } from './defs.js';
-import { UNITS, BLDGS, WEAPONS, FACTIONS, HORDE, VET } from './factionRegistry.js';
+import { UNITS, BLDGS, WEAPONS, FACTIONS, HORDE, VET, generalOf } from './factionRegistry.js';
 import { applyDamage, clearGarrison, addGeneralXp, rectDist, releaseSlot, stopUnit, freeSpot } from './entities.js';
 
 // ---------------- hazards (firestorm, thermal, toxin) ----------------
 export function addHazard(sim, kind, x, z, r, secs, dps, team, clears) {
+  if (kind === 'toxin' && team < 2) { const T = sim.teams[team], G = generalOf(T); dps *= (G && G.toxin || 1) * (T.upgrades.has('s_anthrax') ? 1.5 : 1); } // WMD General and Anthrax Beta
   sim.hazards.push({ id: sim.nextId++, kind, x, z, r, until: sim.tick + Math.round(secs * 20), dps, team, clears, born: sim.tick });
   sim.events.push({ t: 'hazard', kind, x, z, r, secs });
 }
@@ -131,7 +132,7 @@ export function teleport(sim, u, exit) {
   releaseSlot(sim, u);
   stopUnit(u);
   const dx = exit.rallyX - exit.x, dz = exit.rallyZ - exit.z, l = Math.hypot(dx, dz) || 1;
-  const s = freeSpot(sim, exit.x + dx / l * (exit.h * CELL * 0.5 + 3), exit.z + dz / l * (exit.h * CELL * 0.5 + 3), u.cls, u.radius, 16, u.id);
+  const s = freeSpot(sim, exit.x + dx / l * (exit.h * CELL * 0.5 + 3), exit.z + dz / l * (exit.h * CELL * 0.5 + 3), u.nc, u.radius, 16, u.id);
   if (!s) return false; // exit is boxed in: stay put, order is cancelled by the caller
   u.x = s[0]; u.z = s[1];
   u.px = u.x; u.pz = u.z; u.lx = u.x; u.lz = u.z; u.pfacing = u.facing; u.pturret = u.turret;

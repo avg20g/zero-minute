@@ -50,7 +50,8 @@ const P = MF.paint('vanguard', 0), PR = MF.paint('redhammer', 1), PS = MF.paint(
 // ---------------------------------------------------------------- 2. every assembly: profiles convex, faces outward, matte, no glow
 {
   const rigs = { abrams: MF.ASSEMBLY.abrams(P), overlord: MF.ASSEMBLY.overlord(PR), battlemaster: MF.ASSEMBLY.battlemaster(PR), technical: MF.ASSEMBLY.technical(PS), scoutcar: MF.ASSEMBLY.scoutcar(PR),
-    comanche: MF.ASSEMBLY.comanche(P), drone: MF.ASSEMBLY.drone(P), a10: MF.AIRCRAFT.a10(P), rocket: MF.createRocket(), raptor: MF.ASSEMBLY.raptor(P) };
+    comanche: MF.ASSEMBLY.comanche(P), drone: MF.ASSEMBLY.drone(P), a10: MF.AIRCRAFT.a10(P), rocket: MF.createRocket(), raptor: MF.ASSEMBLY.raptor(P),
+    f15e: MF.ASSEMBLY.f15e(P), j11: MF.ASSEMBLY.j11(PR), b2: MF.AIRCRAFT.b2(P), lav25: MF.ASSEMBLY.lav25(P), scudtel: MF.ASSEMBLY.scudtel(PS), fpv: MF.ASSEMBLY.fpv(PS) };
   let prisms = 0, meshes = 0;
   for (const [k, r] of Object.entries(rigs)) r.g.traverse((o) => {
     if (!o.isMesh) return; meshes++;

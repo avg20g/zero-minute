@@ -51,7 +51,7 @@ for (const [type, fieldType, cx, cz, team, side] of [['v_raptor', 'v_airfield', 
   ok(seq.join() === 'parked,taxi,backtaxi,lineup,roll,out,return,final,rollout,taxiin,park,parked', `${type}: full cycle ${seq.join(' > ')}`);
   ok(Rout && Rout.dir === (side === 'west' ? 1 : -1), `${side} base takes off toward the middle of the map`);
   ok(L.liftX !== null && L.liftX >= Rout.len * ROTATE - 0.01 && L.liftX <= Rout.len && L.earlyAlt === 0, `wheels leave the ground ${L.liftX && L.liftX.toFixed(1)} m down the ${Rout.len} m runway, never before the ${(ROTATE * 100).toFixed(0)}% mark`);
-  ok(L.offLine < 0.01 && L.liftSpd > 12, `rolls dead on the centreline and rotates at ${L.liftSpd.toFixed(1)} m/s`);
+  ok(L.offLine < 0.01 && L.liftSpd > 15, `rolls dead on the centreline and rotates at ${L.liftSpd.toFixed(1)} m/s`);
   ok(L.maxSpdGround <= TAXI + 0.01, `taxi speed never exceeds ${TAXI} m/s (${L.maxSpdGround.toFixed(1)})`);
   ok(L.fired === d.ammo && L.hurt > 0 && u.ammo === d.ammo, `spent its ${L.fired} missile salvos (${Math.round(L.hurt)} damage) and was re-armed on the pad`);
   const tdRun = L.td ? (L.td.x - Rin.ax) * Rin.dir : -1;
@@ -59,7 +59,7 @@ for (const [type, fieldType, cx, cz, team, side] of [['v_raptor', 'v_airfield', 
   ok(L.finalUp === 0, 'height only ever falls on final approach');
   ok(Math.hypot(u.x - parkedAt.x, u.z - parkedAt.z) < 0.01 && u.altK === 0 && u.landed && b.rws.every(r => r.by === 0), 'parks back on its own pad and frees the runway');
   const up = (L.tAir - L.tOrder) / 20, down = (L.tPark - L.tFix) / 20;
-  ok(up >= (side === 'west' ? 7.5 : 14) && down >= 13, `ground handling is slower than before: ${up.toFixed(1)} s from order to wheels-up (was ${side === 'west' ? 4.1 : 8.8} s), ${down.toFixed(1)} s from approach fix to parked`);
+  ok(up <= (side === 'west' ? 4 : 7) && down <= 10, `ground handling is quick: ${up.toFixed(1)} s from order to wheels-up, ${down.toFixed(1)} s from approach fix to parked`);
   console.log(`${type.padEnd(9)}: order -> wheels-up ${up.toFixed(1)} s | lift-off at ${L.liftX.toFixed(1)} m / ${L.liftSpd.toFixed(1)} m/s | approach fix -> touchdown ${((L.tDown - L.tFix) / 20).toFixed(1)} s -> parked ${((L.tPark - L.tDown) / 20).toFixed(1)} s | touchdown ${Math.abs(L.td.z - Rin.z).toFixed(2)} m off centreline`);
 }
 

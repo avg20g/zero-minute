@@ -3,7 +3,7 @@
 import { THREE } from './stub-three.mjs';
 globalThis.THREE = THREE;
 const MF = await import('../js/render/modelFactory.js');
-const key = process.argv[2] || 'raptor', rig = MF.ASSEMBLY[key](MF.paint('vanguard', 0));
+const key = process.argv[2] || 'raptor', rig = (MF.ASSEMBLY[key] || MF.AIRCRAFT[key])(MF.paint('vanguard', 0));
 const rot = (p, r) => { let [x, y, z] = p; let c = Math.cos(r.x), s = Math.sin(r.x); [y, z] = [y * c - z * s, y * s + z * c]; c = Math.cos(r.y); s = Math.sin(r.y); [x, z] = [x * c + z * s, -x * s + z * c]; c = Math.cos(r.z); s = Math.sin(r.z); [x, y] = [x * c - y * s, x * s + y * c]; return [x, y, z]; };
 const local = (g) => { const out = [];
   if (g.kind === 'buffer') { const a = g.attributes.position.array; for (let i = 0; i < a.length; i += 3) out.push([a[i], a[i + 1], a[i + 2]]); return out; }

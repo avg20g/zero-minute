@@ -3,10 +3,11 @@
 // faction registry; nothing here knows about specific units.
 import { DT, NEUTRAL, GARRISON_RANGE_BONUS, angDiff } from './defs.js';
 import { UNITS, BLDGS, WEAPONS, VET, HORDE, armorOf } from './factionRegistry.js';
-import { applyDamage, splashDamage, moveTo, stopUnit, isMoving } from './entities.js';
+import { applyDamage, splashDamage, moveTo, stopUnit, isMoving, kill } from './entities.js';
 import { addHazard } from './abilities.js';
 
 const NONE = [];
+let _sim = null; // the simulation being stepped (slotsOf needs the team's upgrades)
 export function slotsOf(e) {
   if (e.wslots) return e.wslots;
   let out = NONE;
@@ -15,6 +16,7 @@ export function slotsOf(e) {
     const d = UNITS[e.type]; out = [];
     if (d.weapon) out.push(d.salvageWeapons ? d.salvageWeapons[e.tier] : d.weapon);
     if (d.weapon2) out.push(d.weapon2);
+    if (d.upWeapon && e.team < 2) for (const up in d.upWeapon) if (_sim.teams[e.team].upgrades.has(up)) out.push(d.upWeapon[up]); // weapon unlocked by an upgrade (LAV-25 TOW)
     if (e.addon && d.hardpoints[e.addon].weapon) out.push(d.hardpoints[e.addon].weapon);
   }
   return (e.wslots = out);
@@ -138,6 +140,9 @@ function unitCombat(sim, u, d, slots) {
   const lead = leadSlot(slots, t), W = WEAPONS[slots[lead >= 100 ? lead - 100 : lead]];
   const dist = edgeDist(u.x, u.z, t), a = Math.atan2(t.z - u.z, t.x - u.x);
   if (dist <= W.range) {
+    if (d.suicide) { // suicide units: reaching the target is the attack
+      splashDamage(sim, u.x, u.z, d.suicide.r, d.suicide.dmg, 'fab', { team: u.team }); sim.events.push({ t: 'suicide', x: u.x, z: u.z, r: d.suicide.r, team: u.team, air: !!u.air }); kill(sim, u); return;
+    }
     const holdGround = forced || !o || o.t === 'amove';
     if (holdGround && !d.based && isMoving(u) && dist <= W.range * 0.92) stopUnit(u);
     let aimed;
@@ -208,6 +213,7 @@ function stepProjectiles(sim) {
 }
 
 export function stepCombat(sim) {
+  _sim = sim;
   const pdl = sim.pdlUnits; pdl.length = 0;
   for (const e of sim.ents) {
     if (e.dead) continue;

@@ -37,8 +37,9 @@ function init() {
     grey: std(0x80868c, 0.6, 0.5), jet: std(0x8a9096, 0.5, 0.6),
     civ: null,
   };
-  const pal = ['#cdb48c', '#d9d2c2', '#b98f6a', '#a9b3b0'];
-  M.civ = pal.map((c, i) => std(0xffffff, 0.9, 0, { map: makeFacadeTexture(c, [3, 2, 4, 3][i], [5, 6, 4, 5][i], 11 + i * 7) }));
+  // one wall colour per building kind, in the order of CIV_KINDS (sim/map.js); every kind gets its own window texture
+  const pal = ['#cdb48c', '#d9d2c2', '#b98f6a', '#a9b3b0', '#8f9aa3', '#e3dccb', '#7a5a3a', '#8a2f24', '#d8d8d2', '#9aa3a8'];
+  M.civ = pal.map((c, i) => std(0xffffff, 0.9, 0, { map: makeFacadeTexture(c, [3, 2, 4, 3, 1, 2, 1, 1, 1, 1][i], [5, 6, 4, 5, 6, 4, 3, 4, 3, 2][i], 11 + i * 7) }));
   M.civRoof = pal.map(c => std(new THREE.Color(c).multiplyScalar(0.8).getHex(), 0.95, 0));
 }
 // Material set for a faction's hull colours with a team's accent.
@@ -345,16 +346,25 @@ function derrick() {
   const flags = [0, 1].map(t => { const f = box(pole, M.glow[t], 1.6, 0.95, 0.06, 0.85, 3.4, 0); f.visible = false; return f; });
   return { g, pump, flags, top: 10 };
 }
-function civ(variant) {
+function civ(kind) {
+  const variant = ((kind | 0) % M.civ.length + M.civ.length) % M.civ.length;   // never an unknown kind: that is what left custom buildings white
   const g = new THREE.Group(), main = grp(g), rub = grp(g);
   const W = M.civ[variant], R = M.civRoof[variant];
   slab(main, 12, 12, M.concrete, 0.3);
   const block = (w, h, d, x, z) => { box(main, W, w, h, d, x, h / 2 + 0.2, z); box(main, R, w + 0.4, 0.35, d + 0.4, x, h + 0.35, z); };
+  const walls = (w, h, d, x, z) => box(main, W, w, h, d, x, h / 2 + 0.2, z);
+  const gable = (w, d, y, x, z, mat = R, pitch = 0.62) => { for (const k of [-1, 1]) box(main, mat, w + 0.5, 0.22, d * 0.5 / Math.cos(pitch) + 0.3, x, y + d * 0.25 * Math.tan(pitch), z + k * d * 0.25).rotation.x = k * pitch; };
   let top = 9;
-  if (variant === 0) { block(9.6, 9, 9.6, 0, 0); box(main, M.concrete, 2, 1.4, 2, 2.5, 10.2, -2); cyl(main, M.steel, 0.9, 1.2, -2.5, 10.1, 2.5); top = 9.6; }
-  else if (variant === 1) { block(10.6, 6, 8.6, 0, -0.8); box(main, M.wood, 10.6, 0.15, 2.2, 0, 3.1, 4.4).rotation.x = 0.18; for (const x of [-4.8, 4.8]) cyl(main, M.wood, 0.1, 3, x, 1.6, 5.3); top = 6.6; }
-  else if (variant === 2) { block(7, 12, 7, -1.6, -1.6); block(5, 4.5, 9.6, 3.2, 0.6); cyl(main, M.gun, 0.06, 3.5, -1.6, 14.2, -1.6); top = 12.6; }
-  else { block(9.6, 7, 9.6, 0, 0); add(main, G.dome, M.white, 3.2, 3.2, 3.2, 0, 7.5, 0); cyl(main, M.white, 0.7, 10, 4.2, 5.2, -4.2); add(main, G.cone, M.civRoof[2], 0.9, 1.6, 0.9, 4.2, 11, -4.2); top = 10.8; }
+  if (variant === 0) { block(9.6, 9, 9.6, 0, 0); box(main, M.concrete, 2, 1.4, 2, 2.5, 10.2, -2); cyl(main, M.steel, 0.9, 1.2, -2.5, 10.1, 2.5); top = 9.6; }                         // apartment block
+  else if (variant === 1) { block(10.6, 6, 8.6, 0, -0.8); box(main, M.wood, 10.6, 0.15, 2.2, 0, 3.1, 4.4).rotation.x = 0.18; for (const x of [-4.8, 4.8]) cyl(main, M.wood, 0.1, 3, x, 1.6, 5.3); top = 6.6; } // market hall
+  else if (variant === 2) { block(7, 12, 7, -1.6, -1.6); block(5, 4.5, 9.6, 3.2, 0.6); cyl(main, M.gun, 0.06, 3.5, -1.6, 14.2, -1.6); top = 12.6; }                                      // office tower
+  else if (variant === 3) { block(9.6, 7, 9.6, 0, 0); add(main, G.dome, M.white, 3.2, 3.2, 3.2, 0, 7.5, 0); cyl(main, M.white, 0.7, 10, 4.2, 5.2, -4.2); add(main, G.cone, M.civRoof[2], 0.9, 1.6, 0.9, 4.2, 11, -4.2); top = 10.8; } // mosque
+  else if (variant === 4) { walls(10.6, 5, 9, 0, 0); gable(10.6, 9, 5.2, 0, 0, M.steel, 0.32); box(main, M.dark, 3.4, 3.4, 0.12, -2.4, 1.9, 4.56); box(main, M.dark, 3.4, 3.4, 0.12, 2.4, 1.9, 4.56); top = 7; }      // warehouse: low steel roof, two roller doors
+  else if (variant === 5) { walls(7, 4.4, 6, -1.4, -0.6); gable(7, 6, 4.6, -1.4, -0.6); box(main, M.rubble, 0.8, 2.2, 0.8, -3.8, 6.4, -1.6); block(3.2, 2.6, 4, 3.6, 1.6); top = 7.4; }                         // farmhouse with chimney and shed
+  else if (variant === 6) { walls(6.4, 2.9, 5.4, 0, -0.4); gable(6.4, 5.4, 3.1, 0, -0.4, M.wood, 0.78); box(main, M.wood, 6.4, 0.15, 1.8, 0, 2.7, 3.2).rotation.x = 0.2; for (const x of [-2.9, 2.9]) cyl(main, M.wood, 0.12, 2.6, x, 1.5, 3.9); box(main, M.rubble, 0.9, 5.2, 0.9, 2.2, 2.8, -2.6); top = 6; } // log cabin: steep roof, porch, stone chimney
+  else if (variant === 7) { walls(7.6, 5, 10, 0, 0); gable(7.6, 10, 5.2, 0, 0, M.civRoof[2], 0.5); box(main, M.white, 2.6, 3.4, 0.12, 0, 1.9, 5.06); box(main, M.white, 0.2, 5, 0.2, -3.8, 2.7, 5.02); box(main, M.white, 0.2, 5, 0.2, 3.8, 2.7, 5.02); top = 8; } // red barn, white door and trim
+  else if (variant === 8) { block(4.2, 3, 3.6, -2.6, -3.4); box(main, R, 9.4, 0.4, 6.2, 1, 4.4, 1.6); for (const [x, z] of [[-3, -1], [5, -1], [-3, 4.2], [5, 4.2]]) cyl(main, M.steel, 0.16, 4.2, x, 2.3, z); for (const x of [-0.6, 2.6]) box(main, M.red, 0.6, 1.5, 0.9, x, 0.95, 1.6); top = 4.8; } // fuel station: canopy, kiosk, pumps
+  else { for (const [x, z] of [[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]]) cyl(main, M.steel, 0.16, 7, x, 3.7, z); cyl(main, W, 2.7, 3.2, 0, 8.6, 0); add(main, G.cone, R, 2.9, 1.4, 2.9, 0, 10.9, 0); box(main, M.steel, 0.08, 7, 0.5, 1.8, 3.7, 0); top = 11.4; } // water tower
   let s = 77 + variant * 13; const rnd = () => (s = (Math.imul(s, 1103515245) + 12345) >>> 0) / 4294967296;
   for (let i = 0; i < 16; i++) { const m = box(rub, i % 3 ? M.rubble : W, 1.5 + rnd() * 3.5, 0.6 + rnd() * 2.2, 1.5 + rnd() * 3, (rnd() - 0.5) * 9.5, 0.4 + rnd() * 1.2, (rnd() - 0.5) * 9.5); m.rotation.set(rnd() * 0.9, rnd() * 3, rnd() * 0.9); }
   rub.visible = false;
@@ -381,6 +391,7 @@ const UNIT = {
   avenger, inferno, scorpion, buggy, tractor, dozer, truck, // tanks, technical, helicopter and scouts are built in modelFactory.js
   mig: (T) => jet(T, false), hind, // the Raptor is built in modelFactory.js
   rifle: (T) => squad(T, FOUR, { gun: 'rifle' }),
+  bomber: (T) => { const r = squad(T, ONE, { gun: 'rifle', cloth: M.cloth, hat: M.dark }); box(r.body, M.crateC, 0.46, 0.34, 0.5, 0, 1.12, 0); for (const z of [-0.2, 0, 0.2]) cyl(r.body, M.gun, 0.05, 0.3, 0.26, 1.12, z); return r; }, // explosive vest over plain clothes
   rpg: (T) => squad(T, TWO, { gun: 'rpg', cloth: M.cloth, hat: M.red }),
   sniper: (T) => squad(T, ONE, { gun: 'long', cloth: M.ghillie, legs: M.ghillie, hat: M.ghillie }),
   hacker: (T) => squad(T, TWO, { gun: 'laptop', cloth: M.dark, hat: M.dark }),

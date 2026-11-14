@@ -1,14 +1,14 @@
 // Entity construction and the helpers every sim system shares: damage, XP,
 // kills, garrisons, reservations, spawn placement.
 import { N, CELL, NEUTRAL, ZONE_MULT, angDiff } from './defs.js';
-import { UNITS, BLDGS, WEAPONS, FACTIONS, GENERAL, VET, armorOf, promoNode } from './factionRegistry.js';
+import { UNITS, BLDGS, WEAPONS, FACTIONS, GENERAL, VET, armorOf, promoNode, generalOf } from './factionRegistry.js';
 
 export function makeUnit(sim, type, team, x, z, facing = 0) {
   const d = UNITS[type];
   const u = {
     id: sim.nextId++, kind: 'unit', type, team, x, z, px: x, pz: z,
     facing, pfacing: facing, turret: facing, pturret: facing,
-    hp: d.hp, maxHp: d.hp, radius: d.radius, cls: d.cls, air: !!d.air, dead: false,
+    hp: d.hp, maxHp: d.hp, radius: d.radius, cls: d.cls, nc: d.cls, air: !!d.air, dead: false, // nc = navigation class: cls, +2 when amphibious
     vx: 0, vz: 0, spd: 0, ms: d.speed, path: null, pi: 0, pathReq: null, queued: false, arrived: false, goal: null,
     order: null, guardX: x, guardZ: z, target: 0, cds: [0, 0, 0], bursts: [0, 0, 0], burstCd: [0, 0, 0], wslots: null,
     stuck: 0, lx: x, lz: z, noPath: 0, inB: 0, working: false, still: false,
@@ -18,7 +18,7 @@ export function makeUnit(sim, type, team, x, z, facing = 0) {
     xp: 0, vet: 0, tier: 0, addon: null, addonQ: null, garrison: null,
     stealthMode: d.stealth || null, cloaked: false, detected: false, revealUntil: 0, stillT: 0,
     empUntil: 0, emp: false, deployed: false, cashAcc: 0, horde: false, pdlCd: 0, capT: 0,
-    ammo: d.ammo || 0, as: d.based ? 'parked' : null, home: 0, pad: -1, rw: -1, loiterT: 0, loiterO: null, extend: 0, landed: false, reloadT: 0,
+    ammo: d.ammo || 0, as: d.based ? 'parked' : null, home: 0, pad: -1, rw: -1, loiterT: 0, loiterO: null, extend: 0, appr: 0, landed: false, reloadT: 0,
     altK: d.air && !d.based ? 1 : 0, paltK: d.air && !d.based ? 1 : 0, // height as a fraction of cruise altitude (see air.js)
   };
   sim.ents.push(u); sim.byId.set(u.id, u);
@@ -30,6 +30,10 @@ export function makeUnit(sim, type, team, x, z, facing = 0) {
 function outfit(sim, u, d) {
   const T = sim.teams[team_(u)];
   if (d.nuke && T.upgrades.has('r_nuke')) u.ms = d.speed * 1.15;
+  const G = generalOf(T);
+  if (!d.air && (d.amph || d.infantry) && G && G.amph) u.nc = d.cls + 2;                       // Marine Corps: these units cross water
+  if (G && G.cloak && !u.stealthMode && !d.air && (d.infantry || d.armor === 'light')) u.stealthMode = 'still'; // Stealth General: hidden when standing still
+  if (u.type === 'v_comanche' && T.upgrades.has('v_stealthrotor')) u.stealthMode = 'always';
   if (d.salvage && T.flags.scrap) { u.tier = 1; }
   for (const id of T.promos) {
     const v = promoNode(T.faction, id).vetBuild; if (!v) continue;

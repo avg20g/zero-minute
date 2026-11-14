@@ -27,12 +27,13 @@ async def main():
         # ---- A. lobby + map builder
         lob = await pg.evaluate("({ maps: [...document.querySelectorAll('#setup-map .fchip b')].map(e => e.textContent), customDisabled: document.getElementById('map-custom').disabled, levels: [...document.querySelectorAll('#setup-levels .fchip b')].map(e => e.textContent) })")
         print('lobby          : maps', lob['maps'], '| custom disabled until built:', lob['customDisabled'], '| opponent', lob['levels'])
-        if lob['maps'] != ['Desert Canyon', 'Open Desert', 'Custom map'] or not lob['customDisabled'] or lob['levels'][-1] != 'No enemy': fail('lobby map / opponent options')
+        if lob['maps'] != ['Desert Canyon', 'Open Desert', 'Forest River', 'Custom map'] or not lob['customDisabled'] or lob['levels'][-1] != 'No enemy': fail('lobby map / opponent options')
         await pg.click('#setup-mapbuild'); await pg.wait_for_timeout(500)
         box = await pg.evaluate("(() => { const r = document.getElementById('mb-canvas').getBoundingClientRect(); return [r.left, r.top, r.width]; })()")
         P = lambda cx, cz: (box[0] + cx / 256 * box[2], box[1] + cz / 256 * box[2])
         st = lambda: pg.evaluate("(() => { const m = [...document.querySelectorAll('#mb-msgs li')].map(l => l.className + ': ' + l.textContent); return { msgs: m, use: !document.getElementById('mb-use').disabled, shown: !document.getElementById('mapbuilder').hidden, setupHidden: document.getElementById('setup').hidden }; })()")
         s0 = await st()
+        mb = await pg.evaluate("({ tools: [...document.querySelectorAll('#mb-tools input')].map(i => i.value), kinds: [...document.querySelectorAll('#mb-kind option')].map(o => o.textContent), biomes: [...document.querySelectorAll('#mb-biome option')].map(o => o.value) })")
         await pg.screenshot(path=OUT + '/p5_builder_default.png')
         await pg.click('#mb-clear'); s1 = await st()
         await pg.click('#mb-open'); s2 = await st()
@@ -41,6 +42,7 @@ async def main():
         await dragm((150, 160), (180, 235))                                  # rock plateau (tool is Rock by default)
         await pg.click('#mb-tools input[value="ramp"] + span'); await dragm((165, 160), (165, 142))
         await pg.click('#mb-tools input[value="derrick"] + span'); x, y = P(150, 120); await pg.mouse.click(x, y); await pg.wait_for_timeout(250)
+        await pg.select_option('#mb-kind', '7'); await pg.click('#mb-tools input[value="civ"] + span'); x, y = P(120, 150); await pg.mouse.click(x, y); await pg.wait_for_timeout(250)   # a building of a chosen type
         await pg.click('#mb-tools input[value="rock"] + span'); await dragm((0, 120), (256, 136)); s3 = await st()      # a wall across the whole map: must be refused
         await pg.click('#mb-undo'); s4 = await st()
         await pg.screenshot(path=OUT + '/p5_builder_custom.png')
@@ -60,6 +62,12 @@ async def main():
         if not (len(col0['you']) == 6 and col0['foe'] == 6 and col0['picked'] == ['blue', 'red'] and clash == ['gold', 'red', True] and col1['ids'] == ['green', 'purple'] and col1['css'][0] == '#5fd16f' and col1['cssVar'] == '#5fd16f'): fail('team colours')
         g1 = await pg.evaluate("(() => { const s = window.__rts.sim; return { custom: s.map.custom, mesas: s.setup.map.mesas.length, ramps: s.setup.map.ramps.length, derricks: s.map.derricks.length, ai: s.ais.length, ents: s.ents.length, tick: s.tick }; })()")
         await pg.wait_for_timeout(4000); g1b = await pg.evaluate("window.__rts.sim.tick")
+        civ = await pg.evaluate("""(() => { const g = window.__rts, s = g.sim, out = { spec: s.setup.map.civs.filter(c => c[2] === 7).length, ents: 0, white: 0, noMap: 0, kinds: [] };
+            for (const e of s.ents) { if (e.type !== 'civ') continue; out.ents++; if (!out.kinds.includes(e.variant)) out.kinds.push(e.variant); if (!g.view.views.get(e.id)) out.noMap++; }
+            return out; })()""")
+        print('builder tools  :', len(mb['tools']), mb['tools'], '|', len(mb['kinds']), 'building types', mb['kinds'], '| ground', mb['biomes'])
+        print('custom building: type 7 in the map', civ['spec'], '| civilian buildings in match', civ['ents'], 'kinds', sorted(civ['kinds']), '| buildings the view failed to build', civ['noMap'])
+        if not (len(mb['tools']) == 10 and 'water' in mb['tools'] and 'bridge' in mb['tools'] and len(mb['kinds']) == 10 and 'woods' in mb['biomes'] and civ['spec'] == 1 and 7 in civ['kinds'] and civ['noMap'] == 0): fail('map builder building types / white buildings')
         print('custom match   : back in lobby', back, '| in match', g1, '| sim running', g1b > g1['tick'])
         if not (back['setup'] and back['builder'] and back['custom'] and back['saved'] and g1['custom'] and g1['mesas'] == 1 and g1['ramps'] == 1 and g1['derricks'] == 4 and g1['ai'] == 1 and g1b > g1['tick']): fail('custom map did not reach the match')
         # ---- B. sandbox
@@ -95,11 +103,59 @@ async def main():
         want = ['taxi', 'backtaxi', 'lineup', 'roll', 'out', 'return', 'final', 'rollout', 'taxiin', 'park', 'parked']
         if not (air.get('done') and all(w in air['states'] for w in want) and air['parkedAlt'] < 2 and air['taxiAlt'] < 2 and abs(air['maxAlt'] - air['cruise']) < 0.5 and air['endAlt'] < 2 and air['gearDown'] and air['gearUp']): fail('jet take-off / landing in the page')
         if not (air.get('heli') and air['heliStart']['as'] == 'spool' and air['heliStart']['altK'] == 0 and air['heliStart']['onPad'] and air['heliUp']['altK'] == 1 and abs(air['heliUp']['viewAlt'] - air['heliUp']['cruise']) < 0.5): fail('helicopter lift-off in the page')
+        # ---- D. batch 5: renamed factions, generals, Forest River
+        await grab(); await pg.goto(URL); await pg.wait_for_timeout(900)
+        names = await pg.evaluate("({ cards: [...document.querySelectorAll('#setup-factions .fcard b')].map(e => e.textContent), foes: [...document.querySelectorAll('#setup-foes span')].map(e => e.textContent), text: document.getElementById('setup').textContent })")
+        gens = {}
+        for fac in ['vanguard', 'redhammer', 'sandstorm']:
+            await pg.click('#fac-' + fac + ' + span'); await pg.wait_for_timeout(150)
+            gens[fac] = await pg.evaluate("[...document.querySelectorAll('#setup-general b')].map(e => e.textContent)")
+        print('factions       :', names['cards'][:3], '| opponents', names['foes'], '| old names left in the lobby:', [n for n in ['Vanguard', 'Red Hammer', 'Sandstorm'] if n in names['text']])
+        print('generals       :', gens)
+        if not (gens['vanguard'] == ['General Drudgereport.com', 'General Maddox'] and gens['redhammer'] == ["Secretary Yuec'an Tsie Mie", 'General Tsao, Chicken'] and gens['sandstorm'] == ['EWSAMA BEN ALLADIN', 'Nuclear Nadal']): fail('general chooser')
+        if any(n in names['text'] for n in ['Vanguard', 'Red Hammer', 'Sandstorm']) or 'United States' not in names['text'] or 'China' not in names['foes'] or 'ISIS' not in names['foes']: fail('faction names')
+        async def match(fac, gen, level='none'):
+            await grab(); await pg.goto(URL); await pg.wait_for_timeout(900)
+            await pg.click('#fac-' + fac + ' + span'); await pg.wait_for_timeout(150); await pg.click('#setup-general input[value="' + gen + '"] + span')
+            await pg.click('#setup-map input[value="forest"] + span'); await pg.click('#setup-levels input[value="' + level + '"] + span'); await pg.click('#setup-start'); await pg.wait_for_timeout(2500)
+        await match('vanguard', 'airforce')
+        fr = await pg.evaluate("""async () => { const g = window.__rts, s = g.sim, E = await import('./js/sim/entities.js'), EC = await import('./js/sim/econ.js'), R = await import('./js/sim/factionRegistry.js');
+            const out = { name: s.map.name, biome: s.map.biome, water: s.map.hasWater, bridges: s.map.bridges.length, trees: s.map.trees.length / 3, general: s.teams[0].general, sub: document.getElementById('brand-sub').textContent };
+            const made = window.__made || {}; out.instanced = made.InstancedMesh || 0;
+            const hq = s.ents.find(e => e.kind === 'bldg' && e.team === 0 && R.BLDGS[e.type].role === 'cc'); s.teams[0].money = 30000; s.fog.exp[0].fill(1);
+            const put = (type, done) => { for (let r = 8; r <= 56; r += 4) for (let dz = -r; dz <= r; dz += 4) for (let dx = -r; dx <= r; dx += 4) { if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue; if (E.canPlace(s, type, hq.cx + dx, hq.cz + dz, 0)) { const b = E.makeBldg(s, type, 0, hq.cx + dx, hq.cz + dz, done); s.nav.rebuild(); return b; } } return null; };
+            put('v_power', true); put('v_power', true); put('v_factory', true); const f = put('v_airfield', false);
+            out.site = !!f; if (!f) return out; EC.completeBldg(s, f);
+            g.rig.focus(f.x, f.z); g.ui.selection.clear(); g.ui.selection.add(f.id); await new Promise(r => setTimeout(r, 500));
+            out.menu = [...document.querySelectorAll('#cmd button')].map(x => x.textContent.trim().slice(0, 26));
+            out.powers = [...document.querySelectorAll('#powers button, #pw button')].map(x => x.textContent.trim().slice(0, 24));
+            s.issue({ t: 'train', id: f.id, type: 'v_f15' });
+            const t0 = performance.now(); while (!s.ents.find(e => e.type === 'v_f15') && performance.now() - t0 < 40000) await new Promise(r => setTimeout(r, 100));
+            const jet = s.ents.find(e => e.type === 'v_f15'); out.f15 = !!jet; if (jet) { await new Promise(r => setTimeout(r, 300)); out.f15parts = g.view.views.get(jet.id) ? 1 : 0; out.f15ammo = jet.ammo; }
+            return out; }""")
+        b2 = await pg.evaluate("""async () => { const g = window.__rts, s = g.sim, P = await import('./js/sim/powers.js'), E = await import('./js/sim/entities.js');
+            const hq = s.ents.find(e => e.kind === 'bldg' && e.team === 0); const tx = hq.x + 40, tz = hq.z; s.teams[0].promos.add('v_a10'); g.rig.focus(tx, tz);
+            const out = { a10: P.hasPower(s, 0, 'a10'), b2: P.hasPower(s, 0, 'b2'), cast: P.usePower(s, 0, 'b2', tx, tz), kinds: [] }; const seen = new Set(); let ev = 0;
+            const h = g.view.handleEvents.bind(g.view); g.view.handleEvents = (list) => { for (const e of list) if (e.t === 'explosion' || e.t === 'bomblet' || e.t === 'carpet' || e.t === 'blast') ev++; return h(list); };
+            const t0 = performance.now(); while (performance.now() - t0 < 14000) { for (const k of s.strikes) seen.add(k.kind); await new Promise(r => setTimeout(r, 100)); }
+            out.kinds = [...seen]; out.events = ev; out.left = s.strikes.length; return out; }""")
+        print('B-2 carpet bomb: A-10 available', b2['a10'], '| B-2 available', b2['b2'], '| cast', b2['cast'], '| strike stages seen', b2['kinds'], '| blast events drawn', b2['events'], '| strikes left', b2['left'])
+        if not (b2['b2'] and not b2['a10'] and b2['cast'] and 'carpet' in b2['kinds'] and b2['left'] == 0): fail('B-2 carpet bomb in the page')
+        await pg.screenshot(path=OUT + '/p5_forest.png')
+        print('forest river   :', {k: fr[k] for k in ['name', 'biome', 'water', 'bridges', 'trees', 'general', 'sub', 'instanced', 'site']})
+        print('air force gen. : airfield menu', fr.get('menu'), '| F-15E built', fr.get('f15'), 'view built', fr.get('f15parts'), 'bombs', fr.get('f15ammo'))
+        if not (fr['biome'] == 'woods' and fr['water'] and fr['bridges'] >= 2 and fr['trees'] > 1500 and fr['general'] == 'airforce' and 'United States' in fr['sub'] and 'Drudgereport' in fr['sub']): fail('Forest River match with a general')
+        if not (fr.get('site') and any('F-15E' in m for m in fr.get('menu', [])) and any('Stealth' in m or 'stealth' in m for m in fr.get('menu', [])) and fr.get('f15') and fr.get('f15parts', 0) == 1 and fr.get('f15ammo') == 2): fail('Air Force general: F-15E at the airfield')
+        await match('sandstorm', 'wmd', 'medium')
+        wm = await pg.evaluate("""async () => { const g = window.__rts, s = g.sim, R = await import('./js/sim/factionRegistry.js'); const t0 = s.tick; await new Promise(r => setTimeout(r, 5000));
+            return { general: s.teams[0].general, foe: R.FACTIONS[s.teams[1].faction].name, foeGeneral: s.teams[1].general, sub: document.getElementById('brand-sub').textContent, ticks: s.tick - t0, scudtruck: R.trainsOf(s.teams[0], 's_factory').includes('s_scudtruck') }; }""")
+        print('WMD general    :', wm)
+        if not (wm['general'] == 'wmd' and 'ISIS' in wm['sub'] and 'Nuclear Nadal' in wm['sub'] and wm['ticks'] > 40 and wm['scudtruck']): fail('ISIS WMD general vs AI on Forest River')
         await grab()
         print('three.js API   : properties the game read that the real r158 classes do not have:', len(reads)); [print('    ', k, '<-', v) for k, v in sorted(reads.items())]
         print('console errors :', len(errs)); [print('   ', e[:400]) for e in errs[:10]]
         bad += len(errs) + len(reads)
         await b.close()
-    print('BATCH 3 CLIENT:', 'all checks passed' if not bad else f'{bad} FAILURES')
+    print('BATCH 3-5 CLIENT:', 'all checks passed' if not bad else f'{bad} FAILURES')
 try: asyncio.run(main())
 finally: srv.terminate()

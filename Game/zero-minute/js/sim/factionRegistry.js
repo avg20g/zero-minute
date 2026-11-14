@@ -103,8 +103,8 @@ const SUPPLY  = { model: 'supply', role: 'supply', cost: 1500, secs: 10, hp: 150
 const BARRACKS= { model: 'barracks', role: 'barracks', cost: 500, secs: 8, hp: 1000, w: 6, h: 6, power: 0, sight: 28 };
 // repair: vehicles within this many metres of the footprint are repaired while out of combat
 const FACTORY = { model: 'factory', role: 'factory', cost: 2000, secs: 14, hp: 2000, w: 8, h: 8, power: -1, sight: 28, repair: 12 };
-// 36 m x 20 m: four parking pads and a helipad on the apron, a 32 m runway along the south side.
-const AIRFIELD= { model: 'airfield', role: 'airfield', cost: 1800, secs: 14, hp: 1800, w: 18, h: 10, power: -1, sight: 30, pads: 4, runway: true };
+// 40 m x 28 m: four parking pads and a helipad down the middle, a 36 m runway on each side.
+const AIRFIELD= { model: 'airfield', role: 'airfield', cost: 1800, secs: 14, hp: 2000, w: 20, h: 14, power: -1, sight: 30, pads: 4, runway: true };
 
 export const BLDGS = {
   v_cc:       { ...CC, name: 'Command Center', faction: 'vanguard', trains: ['v_dozer', 'v_drone'] },

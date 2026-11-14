@@ -3,13 +3,14 @@
 // The registry's `model` key picks the builder; hull colours come from the
 // faction, accent colour from the team. Convention: model forward is +X, so
 // group.rotation.y = -facing.
+import { TEAM } from '../ui/teamColors.js';
 import THREE from '../lib/three.js';
 import { CELL } from '../sim/defs.js';
 import { UNITS, BLDGS, FACTIONS } from '../sim/factionRegistry.js';
 import { std, makeFacadeTexture } from './gfx.js';
 
 let G = null, M = null;
-const ACCENT = [0x2f7fe0, 0xd23a2e, 0xaaaaaa];
+const ACCENT = TEAM.paint; // [you, enemy, neutral], chosen in the lobby (ui/teamColors.js)
 function init() {
   if (G) return;
   G = {
@@ -161,22 +162,6 @@ function landingGear(b, mainX, mainZ, noseX, belly) {
   cyl(w, M.steel, 0.05, 0.6, noseX, -belly - 0.25, 0); cyl(w, M.rubber, 0.17, 0.12, noseX, -belly - 0.62, 0, 'z');
   return w;
 }
-// Raptor: flat chined fuselage, clipped diamond wing, twin canted fins, side intakes, twin exhausts.
-function raptor(T) {
-  const g = new THREE.Group(), b = grp(g);
-  box(b, T.hull, 5.0, 0.6, 1.3, -0.2, 0, 0);
-  add(b, G.cone, T.hull, 0.5, 2.2, 0.34, 3.3, 0.02, 0).rotation.z = -Math.PI / 2;
-  box(b, M.glass, 1.3, 0.34, 0.5, 1.5, 0.42, 0);
-  for (const k of [-1, 1]) {
-    box(b, T.dark, 2.6, 0.1, 2.6, -0.6, 0, k * 1.7).rotation.y = k * 0.62;
-    box(b, T.hull, 1.4, 0.5, 0.5, 1.0, -0.1, k * 0.85);
-    box(b, T.dark, 1.3, 1.2, 0.08, -2.2, 0.7, k * 0.75).rotation.x = k * 0.42;
-    box(b, T.dark, 1.2, 0.07, 1.2, -2.7, 0, k * 1.2).rotation.y = k * 0.5;
-    cyl(b, M.gun, 0.26, 0.5, -2.9, 0, k * 0.36, 'x');
-  }
-  box(b, T.accent, 0.5, 0.25, 0.1, -2.3, 1.0, 0.95);
-  return { g, body: b, gear: landingGear(b, -0.9, 0.9, 2.0, 0.3), ground: 1.3, muzzle: 3.4, muzzleY: -0.3 };
-}
 // Hind: armoured gunship with stepped "double bubble" canopies, troop cabin, drooped stub wings with
 // rocket pods, 5-blade main rotor, 3-blade tail rotor, chin gun, fixed wheels.
 function hind(T) {
@@ -275,25 +260,26 @@ function factory(T) {
   box(g, M.concrete, 7, 0.3, 3.5, -1.2, 0.55, 5.8);
   return { g, top: 8.5 };
 }
-// Airfield (36 m x 20 m). Must match the layout in sim/entities.js: runway centreline at z = +5,
-// four parking pads at x = -13 + 6.2 i, z = -5, helipad at (12.6, -4.6).
+// Airfield (40 m x 28 m). Must match the layout in sim/entities.js: runway centrelines at z = -10 and z = +10,
+// four parking pads at x = -14 + 7 i on the centre line, helipad at (15.5, 0).
 function airfield(T) {
-  const g = new THREE.Group(); slab(g, 35.6, 19.6, M.tarmac, 0.4);
-  for (const z of [1.9, 8.1]) box(g, M.white, 32, 0.05, 0.16, 0, 0.38, z);                                   // runway edge lines
-  for (let i = -5; i <= 5; i++) box(g, M.white, 1.5, 0.05, 0.22, i * 2.7, 0.38, 5);                          // centreline dashes
-  for (const x of [-15.2, 15.2]) for (let k = -3; k <= 3; k++) box(g, M.white, 1.5, 0.05, 0.3, x, 0.38, 5 + k * 0.78); // threshold bars
-  for (let i = 0; i < 4; i++) {
-    const x = -13 + i * 6.2;
-    box(g, M.yellow, 0.14, 0.05, 6.6, x, 0.38, -1.5);                                                         // taxi line to the runway
-    box(g, T.wall, 5.2, 1.5, 0.4, x, 1.1, -8.4); for (const s of [-1, 1]) box(g, T.wall, 0.4, 1.5, 4.4, x + s * 2.6, 1.1, -6.4); // blast walls, open toward the runway
-    box(g, T.accent, 5.2, 0.2, 0.42, x, 1.9, -8.4);
+  const g = new THREE.Group(); slab(g, 39.6, 27.6, M.tarmac, 0.4);
+  for (const rz of [-10, 10]) {
+    for (const z of [rz - 3.1, rz + 3.1]) box(g, M.white, 36, 0.05, 0.16, 0, 0.38, z);                              // runway edge lines
+    for (let i = -6; i <= 6; i++) box(g, M.white, 1.5, 0.05, 0.22, i * 2.6, 0.38, rz);                              // centreline dashes
+    for (const x of [-17.2, 17.2]) for (let k = -3; k <= 3; k++) box(g, M.white, 1.5, 0.05, 0.3, x, 0.38, rz + k * 0.78); // threshold bars
   }
-  cyl(g, M.yellow, 3.0, 0.05, 12.6, 0.38, -4.6); cyl(g, M.tarmac, 2.7, 0.06, 12.6, 0.39, -4.6);               // helipad ring
-  for (const s of [-1, 1]) box(g, M.white, 0.3, 0.05, 2.0, 12.6 + s * 0.7, 0.42, -4.6); box(g, M.white, 1.4, 0.05, 0.3, 12.6, 0.42, -4.6); // "H"
-  box(g, T.wall, 2.4, 2.4, 2.4, 16.2, 1.5, -8.4); cyl(g, T.wall, 0.8, 5, 16.2, 4.4, -8.4); cyl(g, M.glass, 1.3, 1.1, 16.2, 7.2, -8.4); cyl(g, T.roof, 1.5, 0.25, 16.2, 7.9, -8.4); // control tower
-  box(g, T.accent, 2.45, 0.3, 2.45, 16.2, 2.5, -8.4);
-  const spin = grp(g, 16.2, 8.1, -8.4); box(spin, M.steel, 2.2, 0.5, 0.12, 0, 0.5, 0); cyl(spin, M.steel, 0.07, 0.5, 0, 0.2, 0);
-  cyl(g, M.steel, 0.06, 2.4, -17, 1.5, 9.2); box(g, M.red, 1.0, 0.45, 0.05, -16.4, 2.5, 9.2);                 // windsock
+  for (let i = 0; i < 4; i++) {
+    const x = -14 + i * 7;
+    box(g, M.yellow, 0.14, 0.05, 13.6, x, 0.38, 0);                                                                 // taxi line to both runways
+    for (const s of [-1, 1]) { box(g, T.wall, 0.4, 1.5, 5.2, x + s * 3.1, 1.1, 0); box(g, T.accent, 0.42, 0.2, 5.2, x + s * 3.1, 1.9, 0); } // blast walls either side, open to both runways
+  }
+  cyl(g, M.yellow, 3.0, 0.05, 15.5, 0.38, 0); cyl(g, M.tarmac, 2.7, 0.06, 15.5, 0.39, 0);                           // helipad ring
+  for (const s of [-1, 1]) box(g, M.white, 0.3, 0.05, 2.0, 15.5 + s * 0.7, 0.42, 0); box(g, M.white, 1.4, 0.05, 0.3, 15.5, 0.42, 0); // "H"
+  box(g, T.wall, 2.0, 2.4, 2.4, -18.6, 1.5, 0); cyl(g, T.wall, 0.75, 5, -18.6, 4.4, 0); cyl(g, M.glass, 1.25, 1.1, -18.6, 7.2, 0); cyl(g, T.roof, 1.45, 0.25, -18.6, 7.9, 0); // control tower at the west end of the apron
+  box(g, T.accent, 2.05, 0.3, 2.45, -18.6, 2.5, 0);
+  const spin = grp(g, -18.6, 8.1, 0); box(spin, M.steel, 2.2, 0.5, 0.12, 0, 0.5, 0); cyl(spin, M.steel, 0.07, 0.5, 0, 0.2, 0);
+  cyl(g, M.steel, 0.06, 2.4, 11.4, 1.5, 5.2); box(g, M.red, 1.0, 0.45, 0.05, 12.0, 2.5, 5.2);                       // windsock
   return { g, spin, top: 9 };
 }
 function patriot(T) {
@@ -393,7 +379,7 @@ function dock() {
 
 const UNIT = {
   avenger, inferno, scorpion, buggy, tractor, dozer, truck, // tanks, technical, helicopter and scouts are built in modelFactory.js
-  mig: (T) => jet(T, false), raptor, hind,
+  mig: (T) => jet(T, false), hind, // the Raptor is built in modelFactory.js
   rifle: (T) => squad(T, FOUR, { gun: 'rifle' }),
   rpg: (T) => squad(T, TWO, { gun: 'rpg', cloth: M.cloth, hat: M.red }),
   sniper: (T) => squad(T, ONE, { gun: 'long', cloth: M.ghillie, legs: M.ghillie, hat: M.ghillie }),

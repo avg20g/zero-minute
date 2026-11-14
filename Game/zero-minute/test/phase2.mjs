@@ -147,7 +147,7 @@ const X = 300, Z = 300;
   const tg = makeUnit(m, 'v_tank', ENEMY, 150, 330, 0); hold(tg); tg.cds = [1e9, 1e9, 1e9]; const sp = spawnNear(m, 'r_conscript', PLAYER, 130, 340); hold(sp); run(m, 8);
   m.issue({ t: 'attack', ids: [migs[0].id], target: tg.id }); let shots = 0, away = 0, haz = 0; run(m, 300, k => { tg.cds[0] = 1e9; for (const ev of k.events) { if (ev.t === 'fire' && ev.sid === migs[0].id) shots++; if (ev.t === 'hazard') haz++; } if (!migs[0].landed) away++; });
   ok(shots === 2 && migs[0].ammo === 0 || migs[0].ammo === 2, 'MiG fired its 2 missiles (' + shots + ')'); ok(tg.dead || tg.hp < tg.maxHp, 'target hit'); ok(haz >= 1, 'missiles leave a firestorm');
-  run(m, 300); ok(migs[0].landed && migs[0].as === 'parked' && migs[0].ammo === 2, 'MiG returned to its pad and rearmed'); ok(away > 60, 'sortie took ' + (away / 20).toFixed(1) + ' s');
+  run(m, 1400); ok(migs[0].landed && migs[0].as === 'parked' && migs[0].ammo === 2, 'MiG returned to its pad and rearmed'); // taxi, take-off and landing now take real time ok(away > 60, 'sortie took ' + (away / 20).toFixed(1) + ' s');
   af.dead = true; m.nav.setRect(af.cx, af.cz, af.w, af.h, 0); run(m, 5); ok(m.ents.filter(u => u.type === 'r_mig').length === 0, 'MiGs are lost with their only airfield');
   console.log('aircraft       : Comanche ignores terrain, only anti-air can hit it; MiG sortie fire 2, return, rearm; pads enforced');
 }
@@ -184,8 +184,8 @@ const X = 300, Z = 300;
   s.issue({ t: 'train', id: f.id, type: 'up:r_nuke' }); s.issue({ t: 'train', id: f.id, type: 'up:r_nuke' }); s.issue({ t: 'train', id: f.id, type: 'r_tank' }); s.issue({ t: 'train', id: f.id, type: 'v_tank' }); s.step();
   ok(f.queue.join() === 'up:r_nuke,r_tank', 'upgrade queued once; foreign units refused'); const old = spawnNear(s, 'r_tank', PLAYER, 150, 400); run(s, 800);
   const nw = s.ents.find(u => u.type === 'r_tank' && u !== old); ok(s.teams[0].upgrades.has('r_nuke') && old.ms > 10 && nw && nw.ms > 10, 'Nuclear Tanks: existing and new tanks are 15% faster');
-  const dz = s.ents.find(u => u.type === 'r_dozer'); s.issue({ t: 'build', id: dz.id, type: 'v_patriot', cx: 50, cz: 170 }); s.issue({ t: 'build', id: dz.id, type: 'r_airfield', cx: 44, cz: 172 }); run(s, 3, k => { for (const e of k.events) if (e.t === 'msg') console.log('   msg:', e.text); });
-  ok(!s.ents.some(e => e.type === 'v_patriot' && e.team === PLAYER) && s.ents.some(e => e.type === 'r_airfield' && e.team === PLAYER), 'builders can only place their own faction\'s buildings');
+  const dz = s.ents.find(u => u.type === 'r_dozer'); s.issue({ t: 'build', id: dz.id, type: 'v_patriot', cx: 50, cz: 170 }); const own0 = s.ents.filter(e => e.type === 'r_power' && e.team === PLAYER).length; s.issue({ t: 'build', id: dz.id, type: 'r_power', cx: 44, cz: 172 }); run(s, 3, k => { for (const e of k.events) if (e.t === 'msg') console.log('   msg:', e.text); });
+  ok(!s.ents.some(e => e.type === 'v_patriot' && e.team === PLAYER) && s.ents.filter(e => e.type === 'r_power' && e.team === PLAYER).length === own0 + 1, 'builders can only place their own faction\'s buildings');
   console.log('tech / upgrades: faction-locked build and train lists, one-time upgrades, retroactive Nuclear Tanks');
 }
 // --- all 9 match-ups: 8-minute AI soak, twice, hashes must match

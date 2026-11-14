@@ -102,6 +102,16 @@ guard and promotions, so attack-move is F and guard is V.
 - **Speed**: fog rows use native fills, the navigation flood fill allocates nothing, path search uses a
   1.12 heuristic weight and an 18,000-node budget per tick. `node test/bench.mjs` prints the numbers.
 
+## Batch 4: colours, twin runways, loiter, F-22
+- **Team colours**: six choices per side in the lobby (`ui/teamColors.js`). Cosmetic only; stored in replays.
+- **Airfield** is now 40 m x 28 m with a 36 m runway on each side of the apron, so two aircraft can take off
+  or land at once. Ground handling is slower (taxi 4 m/s, gentler acceleration and braking, longer approach).
+- **Loiter**: a jet sent to a point holds a circle over it for 30 s and engages what appears, then goes home.
+  After an attack order whose target is already dead it does the same. With **Guard** (V) it holds until its
+  missiles are gone, lands, re-arms and returns to the guard point until you press Stop (Z).
+- **Raptor** rebuilt from F-22A proportions (`RAPTOR` in `render/modelFactory.js`); `node test/shape.mjs raptor`
+  dumps the model for drawing silhouettes.
+
 ## Replays
 A replay is the match setup plus the player's commands with their tick numbers
 (a 20-minute match is a few kilobytes). The AI runs inside the simulation, so

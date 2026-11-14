@@ -181,7 +181,7 @@ export class Controls {
       if (ui.place) { this.confirmPlace(e.shiftKey); return; }
       if (ui.amove) {
         const g = this.ground(this.mouse.x, this.mouse.y), ids = this.selectedOwn('unit').map(u => u.id);
-        if (g && ids.length) { this.sim.issue({ t: 'move', ids, x: g.x, z: g.z, attack: true }); this.ping(g.x, g.z, '#ff5a4d'); }
+        if (g && ids.length) { this.sim.issue({ t: 'move', ids, x: g.x, z: g.z, attack: true, guard: !!this.ui.guard }); this.ping(g.x, g.z, this.ui.guard ? '#7dffa0' : '#ff5a4d'); }
         ui.amove = false; return;
       }
       this.drag = { x0: this.mouse.x, y0: this.mouse.y, x1: this.mouse.x, y1: this.mouse.y, box: false, add: e.shiftKey };

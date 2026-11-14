@@ -1,6 +1,7 @@
 // HUD: command bar (minimap with Fog of War, resources, selection, orders),
 // General's Promotions modal, support-power buttons with radial cooldowns,
 // toasts, and the 2D overlay (health bars, veterancy chevrons, drag box, pings).
+import { TEAM } from './teamColors.js';
 import { N, CELL, WORLD, PLAYER, ENEMY, NEUTRAL, ZONE_MULT, ZONE_NAME, TICK_HZ } from '../sim/defs.js';
 import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS, GENERAL, VET } from '../sim/factionRegistry.js';
 import { heightAt } from '../sim/map.js';
@@ -43,7 +44,7 @@ const iconFor = (d, isBldg) => {
   if (d.infantry) return ICON[d.model] || (d.model === 'rifle' ? ICON.rifle : ICON.man);
   return ICON[d.model] || (d.builder ? ICON.dozer : d.harvester ? ICON.truck : d.speed > 15 ? ICON.buggy : ICON.tank);
 };
-const TEAM_CSS = ['#4aa3ff', '#ff5a4d', '#cfc7b8'];
+const TEAM_CSS = TEAM.css; // lobby colours: [you, enemy, neutral]
 const VET_CSS = ['', '#ffcf3a', '#5ac8ff', '#ff5a4d'];
 
 export class Hud {
@@ -491,13 +492,13 @@ export class Hud {
       const w = (isU ? 30 : 64) * k, h = 4, x = p.x - w / 2, y = p.y - 8, f = Math.max(0, e.hp / e.maxHp);
       if (!d.indestructible && (sel || hov || hurt || building)) {
         g.fillStyle = 'rgba(8,10,12,0.75)'; g.fillRect(x - 1, y - 1, w + 2, h + 2);
-        g.fillStyle = e.team === ENEMY ? '#ff5a4d' : f > 0.6 ? '#7bd88f' : f > 0.3 ? '#f2a93b' : '#ff5a4d'; g.fillRect(x, y, w * f, h);
+        g.fillStyle = e.team === ENEMY ? TEAM_CSS[ENEMY] : f > 0.6 ? '#7bd88f' : f > 0.3 ? '#f2a93b' : '#ff5a4d'; g.fillRect(x, y, w * f, h);
       }
       let bar = -1, col = '#f2a93b';
-      if (building) bar = e.progress; else if (!isU && mine && e.queue.length) { bar = e.prod; col = '#4aa3ff'; }
+      if (building) bar = e.progress; else if (!isU && mine && e.queue.length) { bar = e.prod; col = TEAM_CSS[PLAYER]; }
       else if (isU && mine && e.capT) bar = e.capT / 100; else if (isU && mine && e.addonQ) bar = e.addonQ.t / (d.hardpoints[e.addonQ.type].secs * 20);
       if (bar >= 0) { g.fillStyle = 'rgba(8,10,12,0.75)'; g.fillRect(x - 1, y + 6, w + 2, 5); g.fillStyle = col; g.fillRect(x, y + 7, w * bar, 3); }
-      if (e.garrison && e.garrison.length && mine) { g.fillStyle = '#4aa3ff'; for (let i = 0; i < e.garrison.length; i++) g.fillRect(x + i * 9, y - 9, 7, 5); }
+      if (e.garrison && e.garrison.length && mine) { g.fillStyle = TEAM_CSS[PLAYER]; for (let i = 0; i < e.garrison.length; i++) g.fillRect(x + i * 9, y - 9, 7, 5); }
       if (isU) {
         // veterancy chevrons float above selected or hovered units
         if (e.vet && (sel || hov)) this.chevrons(g, p.x, y - 7, e.vet, k);

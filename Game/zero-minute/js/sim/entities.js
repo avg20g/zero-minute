@@ -18,7 +18,7 @@ export function makeUnit(sim, type, team, x, z, facing = 0) {
     xp: 0, vet: 0, tier: 0, addon: null, addonQ: null, garrison: null,
     stealthMode: d.stealth || null, cloaked: false, detected: false, revealUntil: 0, stillT: 0,
     empUntil: 0, emp: false, deployed: false, cashAcc: 0, horde: false, pdlCd: 0, capT: 0,
-    ammo: d.ammo || 0, as: d.based ? 'parked' : null, home: 0, pad: -1, landed: false, reloadT: 0,
+    ammo: d.ammo || 0, as: d.based ? 'parked' : null, home: 0, pad: -1, rw: -1, loiterT: 0, loiterO: null, extend: 0, landed: false, reloadT: 0,
     altK: d.air && !d.based ? 1 : 0, paltK: d.air && !d.based ? 1 : 0, // height as a fraction of cruise altitude (see air.js)
   };
   sim.ents.push(u); sim.byId.set(u.id, u);
@@ -69,9 +69,9 @@ export function makeBldg(sim, type, team, cx, cz, done = true) {
     const R = Math.hypot(d.w, d.h) * CELL * 0.5 + 9;
     for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6 + 0.26; b.holds.push({ x: b.x + Math.cos(a) * R, z: b.z + Math.sin(a) * R, by: 0 }); }
   }
-  if (d.pads) { // airfield layout (metres from the centre): parking pads along the north apron, helipad at its east end, runway along the south side
-    b.pads = []; for (let i = 0; i < d.pads; i++) b.pads.push({ x: b.x - 13 + i * 6.2, z: b.z - 5, by: 0 });
-    b.rw = { x0: b.x - 16, x1: b.x + 16, z: b.z + 5, by: 0 }; b.heli = { x: b.x + 12.6, z: b.z - 4.6 };
+  if (d.pads) { // airfield layout (metres from the centre): parking pads in a row down the middle, helipad at the east end, one runway north and one south
+    b.pads = []; for (let i = 0; i < d.pads; i++) b.pads.push({ x: b.x - 14 + i * 7, z: b.z, by: 0 });
+    b.rws = [-10, 10].map(oz => ({ x0: b.x - 18, x1: b.x + 18, z: b.z + oz, by: 0 })); b.heli = { x: b.x + 15.5, z: b.z };
   }
   sim.nav.setRect(cx, cz, d.w, d.h, 1);
   sim.ents.push(b); sim.byId.set(b.id, b);
@@ -225,7 +225,7 @@ export function kill(sim, e) {
     releaseSlot(sim, e);
     if (e.garrison) ejectGarrison(sim, e, 0.5);
     if (e.inB) { const b = sim.byId.get(e.inB); if (b) { b.garrison = b.garrison.filter(i => i !== e.id); if (!b.garrison.length && b.type === 'civ') b.team = NEUTRAL; } }
-    if (e.home) { const b = sim.byId.get(e.home); if (b && b.pads && b.pads[e.pad] && b.pads[e.pad].by === e.id) b.pads[e.pad].by = 0; if (b && b.rw && b.rw.by === e.id) b.rw.by = 0; }
+    if (e.home) { const b = sim.byId.get(e.home); if (b && b.pads && b.pads[e.pad] && b.pads[e.pad].by === e.id) b.pads[e.pad].by = 0; if (b && b.rws) for (const r of b.rws) if (r.by === e.id) r.by = 0; }
     // wrecks of ground vehicles become salvage when the other side can use it
     if (e.cls === 1 && !e.air && e.team < 2 && FACTIONS[sim.teams[1 - e.team].faction].salvage)
       sim.crates.push({ id: sim.nextId++, x: e.x, z: e.z, until: sim.tick + 1800, team: 1 - e.team });

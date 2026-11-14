@@ -1,6 +1,7 @@
 // The Three.js view. Reads sim state, never writes it. Interpolates between
 // the previous and current sim tick so motion is smooth at any frame rate.
 // Everything the player is shown goes through the sim's fog helpers.
+import { TEAM } from '../ui/teamColors.js';
 import THREE from '../lib/three.js';
 import { N, CELL, PLAYER, NEUTRAL, angDiff } from '../sim/defs.js';
 import { UNITS, BLDGS, WEAPONS, POWERS } from '../sim/factionRegistry.js';
@@ -13,7 +14,7 @@ import { createModel, createPlane, createRocket, buildGhost, buildCrate, buildBo
 import { VFX, VET_TRACER } from './vfxManager.js';
 
 const AIR_Y = 13, LASER = [0.4, 0.9, 1], PDL = [0.6, 1, 1];
-const TEAM_HEX = [0x4aa3ff, 0xff5a4d];
+const TEAM_HEX = TEAM.light; // lobby colours
 
 export class View {
   constructor(canvas, sim, opts = {}) {
@@ -51,7 +52,7 @@ export class View {
     this.sqGeo = new THREE.RingGeometry(0.93, 1, 4, 1, Math.PI / 4); this.sqGeo.rotateX(-Math.PI / 2);
     this.thinGeo = new THREE.RingGeometry(0.965, 1, 64); this.thinGeo.rotateX(-Math.PI / 2);
     this.ringMat = new THREE.MeshBasicMaterial({ color: 0x7dffa0, transparent: true, opacity: 0.9, depthWrite: false, fog: false });
-    this.ringMatE = new THREE.MeshBasicMaterial({ color: 0xff5a4d, transparent: true, opacity: 0.9, depthWrite: false, fog: false });
+    this.ringMatE = new THREE.MeshBasicMaterial({ color: TEAM.light[1], transparent: true, opacity: 0.9, depthWrite: false, fog: false });
     this.ringMatP = new THREE.MeshBasicMaterial({ color: 0xf2a93b, transparent: true, opacity: 0.95, depthWrite: false, fog: false });
     this.ghost = buildGhost(); scene.add(this.ghost);
     this.vis = 0; this.shown = { units: 0, hiddenEnemies: 0 };

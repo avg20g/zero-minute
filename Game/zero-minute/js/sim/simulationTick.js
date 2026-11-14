@@ -189,7 +189,7 @@ function applyCommand(sim, c) {
       }
       for (let i = 0; i < air.length; i++) {
         const u = air[i], ox = ((i % 3) - (Math.min(air.length, 3) - 1) / 2) * 7, oz = ((i / 3) | 0) * 7;
-        freeUnit(sim, u); u.order = { t: c.attack ? 'amove' : 'move', x: c.x + ox, z: c.z + oz };
+        freeUnit(sim, u); u.order = { t: c.attack ? 'amove' : 'move', x: c.x + ox, z: c.z + oz, guard: !!c.guard }; // guard: strike aircraft hold over the point until out of missiles (air.js)
         if (!UNITS[u.type].based) moveTo(sim, u, c.x + ox, c.z + oz);
       }
       break;

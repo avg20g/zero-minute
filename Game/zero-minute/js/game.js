@@ -13,6 +13,7 @@ import { Hud } from './ui/uiHUD.js';
 import { showSetup } from './ui/setup.js';
 import { loadExternalModels } from './render/modelFactory.js';
 import { AudioEngine } from './audio/audioEngine.js';
+import { TEAM, setTeamColors } from './ui/teamColors.js';
 
 const REPLAY_KEY = 'cz-replay';
 const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { /* storage unavailable */ } return null; };
@@ -64,9 +65,11 @@ function start(o) {
       location.reload();
     } : null,
   };
+  const col = o.replay ? (o.replay.colors || []) : (o.colors || []); setTeamColors(col[0], col[1]);   // before any model or HUD element is built
+  document.documentElement.style.setProperty('--blue', TEAM.css[0]);
   const lighting = o.replay ? (o.replay.lighting || 'noon') : (o.lighting || 'noon');
   const view = new View(canvas, sim, { lighting });
-  if (rec) { const exp = rec.export.bind(rec); rec.export = () => ({ ...exp(), lighting: view.lighting }); } // cosmetic only: not part of the simulation
+  if (rec) { const exp = rec.export.bind(rec); rec.export = () => ({ ...exp(), lighting: view.lighting, colors: TEAM.ids.slice() }); } // cosmetic only: not part of the simulation
   const rig = new CameraRig(sim.map);
   const hq = sim.ents.find(e => e.kind === 'bldg' && e.team === PLAYER && BLDGS[e.type].role === 'cc');
   if (hq) rig.focus(hq.x + 14, hq.z + 6);

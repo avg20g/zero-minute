@@ -8,27 +8,39 @@ import { DT, WORLD, angDiff } from './defs.js';
 import { UNITS } from './factionRegistry.js';
 import { kill } from './entities.js';
 
-export const TAXI = 7;            // m/s on the ground
-export const ROTATE = 0.55;       // fraction of the runway used before the nose comes up
-export const CLIMB_TICKS = 44;    // ticks from lift-off to cruise altitude
-export const FINAL = 60;          // metres from the approach fix to the runway threshold
-export const SPOOL = 30, LIFT = 50; // helicopter: ticks of rotor spool-up, then ticks to climb
+export const TAXI = 4;            // m/s on the ground
+export const GROUND_TURN = 1.8;   // rad/s while taxiing and lining up
+export const ACCEL = 7;           // m/s^2 on the take-off roll
+export const BRAKE = 7;           // m/s^2 on the landing roll
+export const ROTATE = 0.6;        // fraction of the runway used before the nose comes up
+export const CLIMB_TICKS = 70;    // ticks from lift-off to cruise altitude
+export const FINAL = 90;          // metres from the approach fix to the runway threshold
+export const APPROACH = 0.42;     // approach speed as a fraction of cruise speed
+export const SPOOL = 50, LIFT = 70; // helicopter: ticks of rotor spool-up, then ticks to climb
+export const LOITER = 600;        // ticks an aircraft holds over its destination before going home (30 s)
+export const ORBIT = 22;          // metres: radius of the holding circle
 const ON_RUNWAY = { taxi: 1, backtaxi: 1, lineup: 1, roll: 1, final: 1, rollout: 1, taxiin: 1, park: 1 };
 const clampW = (v) => Math.min(WORLD - 6, Math.max(6, v));
 
-// Runway of an airfield. `cx` is the end nearer the middle of the map: aircraft take off toward it and land
-// from it, so climb-out and approach happen over the battlefield and never off the edge of the map.
-export function runway(b) {
-  const dir = b.x < WORLD / 2 ? 1 : -1, r = b.rw;
+// Runway i of an airfield (each field has two, one either side of the apron). `cx` is the end nearer the
+// middle of the map: aircraft take off toward it and land from it, so climb-out and approach happen over
+// the battlefield and never off the edge of the map.
+export function runway(b, i) {
+  const dir = b.x < WORLD / 2 ? 1 : -1, r = b.rws[i];
   return { z: r.z, dir, ax: dir > 0 ? r.x0 : r.x1, cx: dir > 0 ? r.x1 : r.x0, len: r.x1 - r.x0 };
 }
-// One aircraft on the runway at a time. A lock held by a dead, re-homed or airborne aircraft is stale.
+// One aircraft per runway at a time, so two can move at once. A lock held by a dead, re-homed or airborne
+// aircraft is stale. Tries the runway on the aircraft's side of the apron first.
 function lockRunway(sim, b, u) {
-  const by = b.rw.by;
-  if (by && by !== u.id) { const o = sim.byId.get(by); if (o && !o.dead && o.home === b.id && ON_RUNWAY[o.as]) return false; }
-  b.rw.by = u.id; return true;
+  const first = u.rw >= 0 ? u.rw : u.pad % b.rws.length;
+  for (let k = 0; k < b.rws.length; k++) {
+    const i = (first + k) % b.rws.length, by = b.rws[i].by;
+    if (by && by !== u.id) { const o = sim.byId.get(by); if (o && !o.dead && o.home === b.id && o.rw === i && ON_RUNWAY[o.as]) continue; }
+    b.rws[i].by = u.id; u.rw = i; return true;
+  }
+  return false;
 }
-function freeRunway(b, u) { if (b.rw && b.rw.by === u.id) b.rw.by = 0; }
+function freeRunway(b, u) { if (b.rws) for (const r of b.rws) if (r.by === u.id) r.by = 0; u.rw = -1; }
 
 export function claimPad(sim, u) { // find an airfield of our team with a free pad
   for (const b of sim.ents) {
@@ -52,7 +64,7 @@ export function padCount(sim, b) { // pads in use, including aircraft still in t
 function drive(u, tx, tz, speed) {
   const dx = tx - u.x, dz = tz - u.z, dist = Math.hypot(dx, dz);
   if (dist < 0.6) { u.x = tx; u.z = tz; u.vx = u.vz = 0; u.spd = 0; return true; }
-  const df = angDiff(Math.atan2(dz, dx), u.facing), ma = 2.8 * DT;
+  const df = angDiff(Math.atan2(dz, dx), u.facing), ma = GROUND_TURN * DT;
   u.facing += Math.max(-ma, Math.min(ma, df));
   const sp = Math.abs(df) > 0.45 ? 0 : Math.min(speed, dist / DT);
   u.spd = sp; u.vx = Math.cos(u.facing) * sp; u.vz = Math.sin(u.facing) * sp; u.x += u.vx * DT; u.z += u.vz * DT;
@@ -64,12 +76,12 @@ function fighter(sim, u, d) {
   let home = sim.byId.get(u.home);
   if (!home || home.dead) {
     const caught = u.home !== 0 && u.altK <= 0;                 // on the ground when its airfield was destroyed
-    u.home = 0; u.pad = -1;
+    u.home = 0; u.pad = -1; u.rw = -1;
     if (caught || !claimPad(sim, u)) { kill(sim, u); return true; } // nowhere to land
     home = sim.byId.get(u.home);
     u.as = u.altK > 0 ? 'return' : 'parked';
   }
-  const pad = home.pads[u.pad], R = runway(home), out = R.dir > 0 ? 0 : Math.PI; // take-off heading
+  const pad = home.pads[u.pad], R = runway(home, u.rw >= 0 ? u.rw : 0), out = R.dir > 0 ? 0 : Math.PI; // its runway (once locked) and the take-off heading
   switch (u.as) {
     case 'parked': {
       u.landed = true; u.altK = 0; u.goal = null; u.spd = 0; u.vx = u.vz = 0; u.x = pad.x; u.z = pad.z;
@@ -82,12 +94,12 @@ function fighter(sim, u, d) {
     case 'taxi': u.landed = true; if (drive(u, pad.x, R.z, TAXI)) u.as = 'backtaxi'; return true;                 // pad -> runway centreline
     case 'backtaxi': if (drive(u, R.ax + R.dir * 2.5, R.z, TAXI)) u.as = 'lineup'; return true;                     // down to the far end
     case 'lineup': {
-      const df = angDiff(out, u.facing), ma = 2.8 * DT; u.facing += Math.max(-ma, Math.min(ma, df)); u.spd = 0; u.vx = u.vz = 0;
+      const df = angDiff(out, u.facing), ma = GROUND_TURN * DT; u.facing += Math.max(-ma, Math.min(ma, df)); u.spd = 0; u.vx = u.vz = 0;
       if (Math.abs(df) < 0.03) { u.facing = out; u.as = 'roll'; }
       return true;
     }
     case 'roll': { // full power down the centreline; rotate past the ROTATE mark; climb straight ahead
-      u.facing = out; u.spd = Math.min(u.ms, u.spd + 13 * DT); u.vx = R.dir * u.spd; u.vz = 0;
+      u.facing = out; u.spd = Math.min(u.ms, u.spd + ACCEL * DT); u.vx = R.dir * u.spd; u.vz = 0;
       u.x = clampW(u.x + u.vx * DT); u.z = R.z;
       const run = (u.x - R.ax) * R.dir;
       if (run > R.len * ROTATE) { u.altK = Math.min(1, u.altK + 1 / CLIMB_TICKS); u.landed = false; }
@@ -96,25 +108,40 @@ function fighter(sim, u, d) {
     }
     case 'out': {
       const o = u.order;
-      if (!o || u.ammo <= 0) { u.as = 'return'; u.order = null; u.target = 0; break; }
+      if (!o || u.ammo <= 0) { u.as = 'return'; if (!(o && o.guard)) u.order = null; u.target = 0; u.loiterT = 0; break; } // a guard order survives the trip home to re-arm
+      if (u.loiterO !== o) { u.loiterO = o; u.loiterT = 0; }
       const t = sim.byId.get(o.t === 'attack' ? o.id : u.target);
-      if (t && !t.dead) u.goal = { x: t.x, z: t.z };
-      else if (o.t === 'attack') { u.as = 'return'; u.order = null; }
-      else { u.goal = { x: o.x, z: o.z }; if (Math.hypot(o.x - u.x, o.z - u.z) < 10) { u.as = 'return'; u.order = null; u.target = 0; } }
+      if (t && !t.dead) { // attack run. A jet cannot turn inside its own turning circle: if the target is close and
+        // off the nose, it flies straight out for a moment, then turns back in with room to line up.
+        const dx = t.x - u.x, dz = t.z - u.z;
+        if (u.extend > 0) u.extend--;
+        else if (Math.hypot(dx, dz) < 30 && Math.abs(angDiff(Math.atan2(dz, dx), u.facing)) > 0.6) { u.extend = 30; u.goal = { x: clampW(u.x + Math.cos(u.facing) * 70), z: clampW(u.z + Math.sin(u.facing) * 70) }; }
+        else u.goal = { x: t.x, z: t.z };
+        break;
+      }
+      u.extend = 0;
+      if (o.t === 'attack') { const g = u.goal || u; u.order = { t: 'amove', x: g.x, z: g.z }; break; } // target gone, missiles left: hold over the spot
+      // On station: fly a holding circle and engage whatever comes into range. A plain order holds for
+      // LOITER ticks; a guard order holds until the missiles are gone.
+      const dx = u.x - o.x, dz = u.z - o.z;
+      if (Math.hypot(dx, dz) > ORBIT + 14) { u.goal = { x: o.x, z: o.z }; break; }               // still on the way
+      o.t = 'amove';
+      const a = Math.atan2(dz, dx) + 0.55; u.goal = { x: clampW(o.x + Math.cos(a) * ORBIT), z: clampW(o.z + Math.sin(a) * ORBIT) };
+      if (!o.guard && ++u.loiterT >= LOITER) { u.as = 'return'; u.order = null; u.target = 0; u.loiterT = 0; }
       break;
     }
-    case 'return': { // fly to the approach fix on the extended centreline; orbit there while the runway is busy
-      if (u.order) { if (u.ammo > 0) { u.as = 'out'; break; } u.order = null; }
+    case 'return': { // fly to the approach fix off the end of the field; orbit there while both runways are busy
+      if (u.order) { if (u.ammo > 0) { u.as = 'out'; break; } if (!u.order.guard) u.order = null; }
       const fx = clampW(R.cx + R.dir * FINAL);
-      u.goal = { x: fx, z: R.z };
-      if (Math.hypot(fx - u.x, R.z - u.z) < 14 && lockRunway(sim, home, u)) u.as = 'final';
+      u.goal = { x: fx, z: home.z };
+      if (Math.hypot(fx - u.x, home.z - u.z) < 22 && lockRunway(sim, home, u)) u.as = 'final';
       break;
     }
     case 'final': { // capture the centreline, slow down, and descend on a straight glide slope to the threshold
       const td = R.cx - R.dir * 3, togo = (u.x - td) * R.dir;
       const df = angDiff(Math.atan2(R.z - u.z, -R.dir * 16), u.facing), ma = d.turn * DT;
       u.facing += Math.max(-ma, Math.min(ma, df));
-      u.spd += Math.max(-9 * DT, Math.min(9 * DT, u.ms * 0.5 - u.spd));
+      u.spd += Math.max(-9 * DT, Math.min(9 * DT, u.ms * APPROACH - u.spd));
       u.vx = Math.cos(u.facing) * u.spd; u.vz = Math.sin(u.facing) * u.spd; u.x = clampW(u.x + u.vx * DT); u.z = clampW(u.z + u.vz * DT);
       u.altK = Math.max(0, Math.min(u.altK, togo / FINAL));
       if (togo < 14 && Math.abs(u.z - R.z) > 3.5) { freeRunway(home, u); u.as = 'return'; break; }    // not lined up: go around
@@ -123,7 +150,7 @@ function fighter(sim, u, d) {
     }
     case 'rollout': { // brake along the centreline toward the far end, then turn off for the pad
       const land = R.dir > 0 ? Math.PI : 0, df = angDiff(land, u.facing); u.facing += Math.max(-0.2, Math.min(0.2, df));
-      u.spd = Math.max(TAXI, u.spd - 16 * DT); u.vx = -R.dir * u.spd; u.vz = 0; u.x += u.vx * DT; u.z += (R.z - u.z) * 0.25;
+      u.spd = Math.max(TAXI, u.spd - BRAKE * DT); u.vx = -R.dir * u.spd; u.vz = 0; u.x += u.vx * DT; u.z += (R.z - u.z) * 0.25;
       const passed = (u.x - pad.x) * R.dir <= 0.5, end = (u.x - R.ax) * R.dir < 3;
       if (end || (passed && u.spd <= TAXI + 0.01)) u.as = 'taxiin';
       return true;

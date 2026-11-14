@@ -177,6 +177,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--amber); out
 .tbtn[aria-pressed="true"] { border-color: var(--amber); color: var(--amber); }
 .tbtn.sm { padding: 4px 9px; font-size: 12px; }
 #replay-bar { display: flex; align-items: center; gap: 6px; }
+.colrow { display: flex; align-items: center; gap: 12px; margin: 6px 0; flex-wrap: wrap; } .colrow > .lbl { width: 56px; }
+.fchip.sw span { display: flex; align-items: center; gap: 8px; } .fchip.sw i { width: 16px; height: 16px; border-radius: 50%; border: 1px solid #0008; display: inline-block; }
+.fchip.sw input:disabled + span { opacity: 0.35; text-decoration: line-through; }
 #mapbuilder { position: absolute; inset: 0; z-index: 30; background: var(--ink); overflow: auto; padding: 20px max(16px, env(safe-area-inset-left, 0px)); }
 .mb-wrap { max-width: 1040px; margin: 0 auto; } .mb-wrap h2 { font-family: var(--font-d); font-size: 26px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 4px; }
 .mb-body { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; margin-top: 12px; }
@@ -304,6 +307,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--amber); out
       <div id="setup-foes"></div>
       <h2>Opponent skill</h2>
       <div id="setup-levels"></div>
+      <h2>Team colours</h2>
+      <div class="colrow"><span class="lbl">You</span><div id="setup-color-you" class="chips" role="radiogroup" aria-label="Your colour"></div></div>
+      <div class="colrow"><span class="lbl">Enemy</span><div id="setup-color-foe" class="chips" role="radiogroup" aria-label="Enemy colour"></div></div>
       <h2>Map</h2>
       <div id="setup-map" class="chips"></div>
       <p class="note" id="setup-map-note"></p>

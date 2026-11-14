@@ -49,22 +49,30 @@ async def main():
         if not s4['use']: print('   builder messages:', s4['msgs'])
         await pg.click('#mb-use', timeout=3000); await pg.wait_for_timeout(400)
         back = await pg.evaluate("({ setup: !document.getElementById('setup').hidden, builder: document.getElementById('mapbuilder').hidden, custom: document.getElementById('map-custom').checked, saved: !!localStorage.getItem('cz-map') })")
+        # team colours: six swatches a side; the enemy can never share yours
+        col0 = await pg.evaluate("({ you: [...document.querySelectorAll('#setup-color-you input')].map(i => i.value), foe: document.querySelectorAll('#setup-color-foe input').length, picked: [document.querySelector('#setup-color-you input:checked').value, document.querySelector('#setup-color-foe input:checked').value] })")
+        await pg.click('#setup-color-foe input[value="gold"] + span'); await pg.click('#setup-color-you input[value="gold"] + span')
+        clash = await pg.evaluate("[document.querySelector('#setup-color-you input:checked').value, document.querySelector('#setup-color-foe input:checked').value, document.querySelector('#setup-color-foe input[value=gold]').disabled]")
+        await pg.click('#setup-color-you input[value="green"] + span'); await pg.click('#setup-color-foe input[value="purple"] + span')
         await pg.click('#setup-levels input[value="hard"] + span'); await pg.click('#setup-start'); await pg.wait_for_timeout(2500)
+        col1 = await pg.evaluate("""async () => { const C = await import('./js/ui/teamColors.js'); return { ids: C.TEAM.ids, css: C.TEAM.css, cssVar: getComputedStyle(document.documentElement).getPropertyValue('--blue').trim(), ring: typeof window.__rts.view.ringMatE }; }""")
+        print('team colours   : choices', col0['you'], '| default', col0['picked'], '| you pick the enemy colour ->', clash, '| in match', col1['ids'], col1['css'][:2], 'HUD accent', col1['cssVar'])
+        if not (len(col0['you']) == 6 and col0['foe'] == 6 and col0['picked'] == ['blue', 'red'] and clash == ['gold', 'red', True] and col1['ids'] == ['green', 'purple'] and col1['css'][0] == '#5fd16f' and col1['cssVar'] == '#5fd16f'): fail('team colours')
         g1 = await pg.evaluate("(() => { const s = window.__rts.sim; return { custom: s.map.custom, mesas: s.setup.map.mesas.length, ramps: s.setup.map.ramps.length, derricks: s.map.derricks.length, ai: s.ais.length, ents: s.ents.length, tick: s.tick }; })()")
         await pg.wait_for_timeout(4000); g1b = await pg.evaluate("window.__rts.sim.tick")
         print('custom match   : back in lobby', back, '| in match', g1, '| sim running', g1b > g1['tick'])
         if not (back['setup'] and back['builder'] and back['custom'] and back['saved'] and g1['custom'] and g1['mesas'] == 1 and g1['ramps'] == 1 and g1['derricks'] == 4 and g1['ai'] == 1 and g1b > g1['tick']): fail('custom map did not reach the match')
         # ---- B. sandbox
         await grab(); await pg.goto(URL); await pg.wait_for_timeout(900)
-        keep = await pg.evaluate("({ custom: document.getElementById('map-custom').checked, enabled: !document.getElementById('map-custom').disabled })")
+        keep = await pg.evaluate("({ custom: document.getElementById('map-custom').checked, enabled: !document.getElementById('map-custom').disabled, colours: [document.querySelector('#setup-color-you input:checked').value, document.querySelector('#setup-color-foe input:checked').value] })")
         await pg.click('#setup-map input[value="canyon"] + span'); await pg.click('#setup-levels input[value="none"] + span'); await pg.click('#setup-start'); await pg.wait_for_timeout(2500)
         g2 = await pg.evaluate("(() => { const s = window.__rts.sim; return { noEnemy: s.noEnemy, ai: s.ais.length, enemyEnts: s.ents.filter(e => e.team === 1).length, sub: document.getElementById('brand-sub').textContent, custom: s.map.custom }; })()")
         print('sandbox        : saved map remembered', keep, '|', g2)
-        if not (keep['custom'] and keep['enabled'] and g2['noEnemy'] and g2['ai'] == 0 and g2['enemyEnts'] == 0 and 'Sandbox' in g2['sub'] and not g2['custom']): fail('No-enemy sandbox')
+        if not (keep['custom'] and keep['enabled'] and keep['colours'] == ['green', 'purple'] and g2['noEnemy'] and g2['ai'] == 0 and g2['enemyEnts'] == 0 and 'Sandbox' in g2['sub'] and not g2['custom']): fail('No-enemy sandbox')
         # ---- C. airfield in the running page (sandbox match, Vanguard)
         air = await pg.evaluate("""async () => { const g = window.__rts, s = g.sim, E = await import('./js/sim/entities.js'), EC = await import('./js/sim/econ.js'), R = await import('./js/sim/factionRegistry.js'), A = await import('./js/sim/air.js');
             const hq = s.ents.find(e => e.kind === 'bldg' && e.team === 0 && R.BLDGS[e.type].role === 'cc'); s.teams[0].money = 30000; s.fog.exp[0].fill(1);
-            E.makeBldg(s, 'v_factory', 0, hq.cx + 16, hq.cz - 2); E.makeBldg(s, 'v_power', 0, hq.cx + 28, hq.cz - 2); E.makeBldg(s, 'v_power', 0, hq.cx + 28, hq.cz + 6); const f = E.makeBldg(s, 'v_airfield', 0, hq.cx + 12, hq.cz - 30, false); s.nav.rebuild(); EC.completeBldg(s, f);
+            E.makeBldg(s, 'v_factory', 0, hq.cx + 16, hq.cz - 2); E.makeBldg(s, 'v_power', 0, hq.cx + 28, hq.cz - 2); E.makeBldg(s, 'v_power', 0, hq.cx + 28, hq.cz + 6); const f = E.makeBldg(s, 'v_airfield', 0, hq.cx + 12, hq.cz - 34, false); s.nav.rebuild(); EC.completeBldg(s, f);
             g.rig.focus(f.x, f.z); g.ui.selection.clear(); g.ui.selection.add(f.id); await new Promise(r => setTimeout(r, 500));
             const menu = [...document.querySelectorAll('#cmd button')].map(x => x.textContent.trim().slice(0, 22));
             s.issue({ t: 'train', id: f.id, type: 'v_raptor' });
@@ -75,11 +83,11 @@ async def main():
             await new Promise(r => setTimeout(r, 300)); out.parkedAlt = +view().alt.toFixed(2); out.gearDown = view().gear.visible !== false;
             s.issue({ t: 'move', ids: [jet.id], x: f.x + 150, z: f.z + 60 });
             const seen = new Set(); let maxAlt = 0, gearUp = false, rollAlt = 99;
-            const done = await wait(() => { seen.add(jet.as); const v = view(); if (v) { if (jet.as === 'backtaxi') rollAlt = Math.min(rollAlt, v.alt); maxAlt = Math.max(maxAlt, v.alt); if (jet.altK >= 1 && v.gear.visible === false) gearUp = true; } return jet.as === 'parked' && seen.has('rollout'); }, 60000);
+            const done = await wait(() => { seen.add(jet.as); const v = view(); if (v) { if (jet.as === 'backtaxi') rollAlt = Math.min(rollAlt, v.alt); maxAlt = Math.max(maxAlt, v.alt); if (jet.altK >= 1 && v.gear.visible === false) gearUp = true; } return jet.as === 'parked' && seen.has('rollout'); }, 110000);
             out.states = [...seen]; out.done = !!done; out.maxAlt = +maxAlt.toFixed(1); out.cruise = d.alt; out.gearUp = gearUp; out.taxiAlt = +rollAlt.toFixed(2); out.endAlt = +view().alt.toFixed(2);
             s.issue({ t: 'train', id: f.id, type: 'v_comanche' });
             const heli = await wait(() => s.ents.find(e => e.type === 'v_comanche'), 30000); out.heli = !!heli;
-            if (heli) { out.heliStart = { as: heli.as, altK: heli.altK, onPad: Math.hypot(heli.x - f.heli.x, heli.z - f.heli.z) < 0.01 }; await wait(() => heli.altK >= 1, 8000); await new Promise(r => setTimeout(r, 200)); out.heliUp = { altK: heli.altK, viewAlt: +g.view.views.get(heli.id).alt.toFixed(1), cruise: R.UNITS.v_comanche.alt }; }
+            if (heli) { out.heliStart = { as: heli.as, altK: heli.altK, onPad: Math.hypot(heli.x - f.heli.x, heli.z - f.heli.z) < 0.01 }; await wait(() => heli.altK >= 1, 12000); await new Promise(r => setTimeout(r, 200)); out.heliUp = { altK: heli.altK, viewAlt: +g.view.views.get(heli.id).alt.toFixed(1), cruise: R.UNITS.v_comanche.alt }; }
             return out; }""")
         await pg.screenshot(path=OUT + '/p5_airfield.png')
         print('airfield       : build menu', [m for m in air['menu'] if 'Raptor' in m or 'Comanche' in m], '| jet states', air.get('states'), '| view height parked', air.get('parkedAlt'), 'taxi', air.get('taxiAlt'), 'peak', air.get('maxAlt'), 'of cruise', air.get('cruise'), 'after landing', air.get('endAlt'), '| gear down on pad', air.get('gearDown'), 'up in flight', air.get('gearUp'))

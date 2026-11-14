@@ -11,6 +11,7 @@
 // Convention: model forward is +X, up is +Y, ground at y = 0. Each builder
 // returns a "rig": { g, body, turret?, turretX?, rotor?, rotorTail?, prop?,
 // tiers?, addons?, muzzle, muzzleY } which is all the view animates.
+import { TEAM } from '../ui/teamColors.js';
 import THREE from '../lib/three.js';
 import { FACTIONS, UNITS } from '../sim/factionRegistry.js';
 import { std } from './gfx.js';
@@ -20,7 +21,7 @@ import { buildModel as legacyModel, buildPlane as legacyPlane, buildCrate, build
 export { buildCrate, buildBomb, buildGhost };
 
 // ---------------------------------------------------------------- paint and primitives
-const ID_PANEL = [0x2f6fc4, 0xb8382c, 0x9a9a9a]; // matte recognition panels (blue = you, red = enemy)
+const ID_PANEL = TEAM.paint; // matte recognition panels in each side's lobby colour
 let S = null;
 function shared() {
   if (S) return S;
@@ -259,6 +260,40 @@ function a10(P) {
   box(b, s.grey, 1.3, 0.08, 3.7, -4.6, 0.14, 0, 'tailplane');
   return { g, body: b, gun: [5.95, -0.2, 0.06], pylons: [2.5, 3.3, 4.1], muzzle: 5.95, muzzleY: -0.2 };
 }
+// ---------------------------------------------------------------- F-22A Raptor
+// Proportions from the real aircraft: 18.9 m long, 13.56 m span, 5.08 m high, 8.84 m tailplane span.
+// Clipped-diamond wing (42 degree leading edge, trailing edge swept forward 17 degrees), twin fins canted 28 degrees
+// outward, big all-moving tailplanes that reach past the nozzles, chined nose, caret intakes beside the
+// cockpit, one-piece canopy, flat 2D thrust-vectoring nozzles. `m` are metres aft of the nose tip.
+export const RAPTOR = { scale: 0.413, length: 18.9, span: 13.56, tailSpan: 8.84, sweep: 42, cant: 28 };
+function raptor(P) {
+  const s = shared(), g = new THREE.Group(), b = grp(g), K = RAPTOR.scale, X = (m) => +((9.0 - m) * K).toFixed(3), W = (m) => +(m * K).toFixed(3);
+  const t42 = Math.tan(RAPTOR.sweep * Math.PI / 180), cant = RAPTOR.cant * Math.PI / 180;
+  // fuselage: thin wide chine deck over a deeper, narrower body
+  prism(b, s.grey, [[X(0), 0], [X(2.2), W(0.75)], [X(6.2), W(1.35)], [X(6.2), -W(1.35)], [X(2.2), -W(0.75)]], 0.14, 'plan', 0, 0.02, 0, 'chine');
+  prism(b, s.grey, [[X(0.3), -0.02], [X(2.6), 0.3], [X(6.2), 0.36], [X(6.2), -0.4], [X(2.2), -0.3]], W(1.5), 'side', 0, 0, 0, 'forebody');
+  prism(b, s.grey, [[X(5.6), W(2.1)], [X(16.6), W(1.95)], [X(16.6), -W(1.95)], [X(5.6), -W(2.1)]], 0.66, 'plan', 0, -0.03, 0, 'fuselage');
+  prism(b, s.grey, [[X(6.2), 0.3], [X(7.4), 0.5], [X(11.5), 0.42], [X(14.5), 0.3]], W(1.5), 'side', 0, 0, 0, 'spine');
+  ball(b, s.glass, W(1.9), 0.3, W(0.62), X(4.55), 0.36, 0, 'canopy');                                   // one-piece bubble canopy
+  for (const k of [-1, 1]) {
+    // wing: root leading edge 7.0 m aft at the fuselage side, 42 degree sweep out to the clipped tip
+    const tipLE = 7.0 + (RAPTOR.span / 2 - 2.1) * t42;
+    prism(b, s.grey, [[X(7.0), k * W(2.1)], [X(tipLE), k * W(RAPTOR.span / 2)], [X(tipLE + 1.7), k * W(RAPTOR.span / 2)], [X(14.3), k * W(2.1)]], 0.09, 'plan', 0, 0.02, 0, 'wing');
+    // all-moving tailplane: same sweep, set just outboard of the nozzles, tip reaching the full length of the aircraft
+    const tailLE = 14.0 + (RAPTOR.tailSpan / 2 - 1.9) * t42;
+    prism(b, s.grey, [[X(14.0), k * W(1.9)], [X(tailLE), k * W(RAPTOR.tailSpan / 2)], [X(18.9), k * W(RAPTOR.tailSpan / 2)], [X(18.2), k * W(1.9)]], 0.07, 'plan', 0, -0.02, 0, 'tailplane');
+    // fin: trapezoid, canted outward
+    const fin = prism(b, s.greyDark, [[X(12.2), 0], [X(14.7), W(2.7)], [X(16.2), W(2.7)], [X(16.6), 0]], 0.06, 'side', 0, 0.28, k * W(1.9), 'fin'); fin.rotation.x = k * cant;
+    box(b, P.id, 0.42, 0.3, 0.07, X(15.2), 0.28 + W(1.5) * Math.cos(cant), k * (W(1.9) + W(1.5) * Math.sin(cant)), 'idpanel').rotation.x = k * cant;
+    // caret intake: dark mouth raked back beside the cockpit
+    box(b, s.gunmetal, 0.16, 0.5, W(0.85), X(5.75), -0.08, k * W(1.62), 'intake').rotation.y = k * 0.35;
+    // flat thrust-vectoring nozzle
+    box(b, s.gunmetal, W(1.3), 0.3, W(1.25), X(17.1), 0.0, k * W(0.8), 'nozzle'); box(b, s.greyDark, W(0.5), 0.1, W(1.25), X(17.85), 0.1, k * W(0.8), 'nozzleflap').rotation.z = 0.25;
+  }
+  const gear = grp(b, 0, 0, 0, 'gear');                                                                    // tricycle gear, hidden in flight by the view
+  for (const [m, z, r] of [[5.4, 0, 0.16], [11.4, W(1.6), 0.19], [11.4, -W(1.6), 0.19]]) { cyl(gear, s.steel, 0.045, 0.5, X(m), -0.6, z, 'y', 'strut'); cyl(gear, s.rubber, r, 0.13, X(m), -0.86, z, 'z', 'wheel'); }
+  return { g, body: b, gear, ground: 1.4, muzzle: 3.4, muzzleY: -0.3 };
+}
 // A loose rocket in flight.
 export function createRocket() { return fromTemplate('rocket', buildRocket); }
 function buildRocket() {
@@ -268,7 +303,7 @@ function buildRocket() {
   return { g, body: b };
 }
 
-export const ASSEMBLY = { abrams, battlemaster, overlord: (P) => sovietTank(P, true), technical, scoutcar: scoutCar, comanche, drone };
+export const ASSEMBLY = { abrams, battlemaster, overlord: (P) => sovietTank(P, true), technical, scoutcar: scoutCar, comanche, drone, raptor };
 export const AIRCRAFT = { a10 };
 
 // ---------------------------------------------------------------- external .glb models

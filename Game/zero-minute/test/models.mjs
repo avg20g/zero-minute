@@ -50,7 +50,7 @@ const P = MF.paint('vanguard', 0), PR = MF.paint('redhammer', 1), PS = MF.paint(
 // ---------------------------------------------------------------- 2. every assembly: profiles convex, faces outward, matte, no glow
 {
   const rigs = { abrams: MF.ASSEMBLY.abrams(P), overlord: MF.ASSEMBLY.overlord(PR), battlemaster: MF.ASSEMBLY.battlemaster(PR), technical: MF.ASSEMBLY.technical(PS), scoutcar: MF.ASSEMBLY.scoutcar(PR),
-    comanche: MF.ASSEMBLY.comanche(P), drone: MF.ASSEMBLY.drone(P), a10: MF.AIRCRAFT.a10(P), rocket: MF.createRocket() };
+    comanche: MF.ASSEMBLY.comanche(P), drone: MF.ASSEMBLY.drone(P), a10: MF.AIRCRAFT.a10(P), rocket: MF.createRocket(), raptor: MF.ASSEMBLY.raptor(P) };
   let prisms = 0, meshes = 0;
   for (const [k, r] of Object.entries(rigs)) r.g.traverse((o) => {
     if (!o.isMesh) return; meshes++;
@@ -192,5 +192,25 @@ const R = globalThis.__rigs;
   globalThis.fetch = async () => ({ ok: false, status: 404 });
   const none = await MF.loadExternalModels('nowhere/'); ok(none.loaded.length === 0 && none.failed.length === 0, 'GLB: no manifest means no external models and no errors');
   console.log('external .glb  : parse, bounds, materials, auto-fit, orientation, turret node, fallback on bad or missing files');
+}
+// ---------------------------------------------------------------- F-22 Raptor: proportions and defining features
+{
+  const r = MF.ASSEMBLY.raptor(P), F = MF.RAPTOR, pts = (m) => { const a = m.geometry.attributes.position.array, o = []; for (let i = 0; i < a.length; i += 3) o.push([a[i] + m.position.x, a[i + 1] + m.position.y, a[i + 2] + m.position.z]); return o; };
+  const by = (n) => r.body.children.filter(c => c.name === n), all = (n) => by(n).flatMap(pts);
+  const wing = all('wing'), tail = all('tailplane'), fus = all('fuselage').concat(all('chine'), all('forebody'), tail);
+  const len = ext(fus, 0)[1] - ext(fus, 0)[0], span = ext(wing, 2)[1] - ext(wing, 2)[0], tspan = ext(tail, 2)[1] - ext(tail, 2)[0];
+  ok(near(span / len, F.span / F.length, 0.02), `wingspan / length ${(span / len).toFixed(3)} matches the real F-22 (${(F.span / F.length).toFixed(3)})`);
+  ok(near(tspan / span, F.tailSpan / F.span, 0.02), `tailplane span / wingspan ${(tspan / span).toFixed(3)} matches (${(F.tailSpan / F.span).toFixed(3)})`);
+  // leading-edge sweep of one wing: the two foremost corners
+  const w1 = pts(by('wing')[1]).filter(p => p[1] > 0), le = [...new Map(w1.map(p => [p[0].toFixed(3) + p[2].toFixed(3), p])).values()].sort((a, b) => b[0] - a[0]).slice(0, 2);
+  const sweep = Math.atan2(Math.abs(le[0][0] - le[1][0]), Math.abs(le[0][2] - le[1][2])) * 180 / Math.PI;
+  ok(near(sweep, 42, 1), `wing leading edge swept ${sweep.toFixed(1)} degrees (real: 42)`);
+  const fins = by('fin'); ok(fins.length === 2 && near(Math.abs(fins[0].rotation.x) * 180 / Math.PI, 28, 0.5) && fins[0].rotation.x === -fins[1].rotation.x && Math.sign(fins[1].rotation.x) === Math.sign(fins[1].position.z), 'twin fins canted 28 degrees outward');
+  ok(ext(tail, 0)[0] < Math.min(...by('nozzle').map(n => n.position.x - n.scale.x / 2)) && ext(tail, 0)[0] === ext(fus, 0)[0], 'tailplanes reach aft of the nozzles: they are the rearmost point');
+  ok(by('canopy').length === 1 && by('intake').length === 2 && by('nozzle').length === 2 && by('idpanel').length === 2, 'one-piece canopy, two side intakes, two flat nozzles, team panels on both fins');
+  ok(by('intake').every(i => i.position.x < by('canopy')[0].position.x + 0.9 && i.position.x > by('wing')[0].position.x && Math.abs(i.position.z) > 0.5), 'intakes sit beside the cockpit, ahead of the wing');
+  ok(r.gear && r.gear.children.filter(c => c.name === 'wheel').length === 3 && r.ground > 1, 'tricycle landing gear in its own group so it can retract');
+  ok(UNITS.v_raptor.model === 'raptor' && MF.createModel({ kind: 'unit', type: 'v_raptor', team: 0 }).source === 'assembly', 'the Raptor unit uses this model');
+  console.log(`F-22 Raptor    : span/length ${(span / len).toFixed(3)} (real ${(F.span / F.length).toFixed(3)}) | tail/wing span ${(tspan / span).toFixed(3)} (real ${(F.tailSpan / F.span).toFixed(3)}) | sweep ${sweep.toFixed(1)} deg | fins canted 28 deg | gear retracts`);
 }
 console.log(fails ? `MODELS: ${fails} FAILURES of ${checks}` : `MODELS: all ${checks} checks passed`);

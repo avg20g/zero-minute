@@ -1,8 +1,19 @@
 // Balance harness core: one headless AI-versus-AI match and the telemetry taken from it.
 // Reads the simulation from outside only (sim.events, sim.teams); it never changes sim state.
 import { Sim } from '../js/sim/simulationTick.js';
-import { UNITS, BLDGS, FACTIONS, GENERALS, POWERS } from '../js/sim/factionRegistry.js';
+import { UNITS, BLDGS, WEAPONS, FACTIONS, GENERALS, POWERS, UPGRADES, HORDE } from '../js/sim/factionRegistry.js';
 import { MAPS } from '../js/sim/map.js';
+
+// Trial changes without editing the game: ZM_TWEAK='{"UNITS.s_guerrilla.hp":280,"GENERALS.cyber.spy":0}' node balance/run.mjs
+// Each key is a path into the registry. Worker threads inherit the variable. Never set in the game itself.
+if (process.env.ZM_TWEAK) {
+  const root = { UNITS, BLDGS, WEAPONS, FACTIONS, GENERALS, POWERS, UPGRADES, HORDE };
+  for (const [path, value] of Object.entries(JSON.parse(process.env.ZM_TWEAK))) {
+    const keys = path.split('.'), last = keys.pop(); let o = root;
+    for (const k of keys) { if (o[k] === undefined) throw new Error('ZM_TWEAK: no such path ' + path); o = o[k]; }
+    o[last] = value;
+  }
+}
 
 export const MAX_TICKS = 30000;   // 25 minutes at 20 Hz; a match still running then is a draw
 export const SAMPLE = 200;        // ticks between money samples (10 s)

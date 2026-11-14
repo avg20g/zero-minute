@@ -120,6 +120,7 @@ guard and promotions, so attack-move is F and guard is V.
     *General Maddox*, Marine Corps (every ground unit crosses water, LAV-25 with a TOW missile upgrade).
   - China: *Secretary Yuec'an Tsie Mie*, Cyber (permanent watch on enemy buildings, Cash Hack from the start,
     $2,500 per use, 150 s recharge); *General Tsao, Chicken*, Mass Assault (tanks and infantry cost 25% less).
+    (Both retuned in batch 8.)
   - ISIS: *EWSAMA BEN ALLADIN*, Stealth (units are hidden while they stand still, suicide bomber, FPV attack
     drone); *Nuclear Nadal*, WMD (Scud Launcher vehicle, Anthrax upgrade, toxin damage x1.25, Scud Storm
     recharges 20% faster).
@@ -172,6 +173,17 @@ guard and promotions, so attack-move is F and guard is V.
   and `bakeRig` skips hidden parts.
 - Tests: `node test/batch7.mjs` (26 checks) and section F of `python3 test/browser5.py <outdir>`.
 
+## Batch 8: first balance pass
+- **Balance harness** (`balance/`): `node balance/run.mjs` plays every pairing of the nine loadouts (three factions
+  plus six generals) AI against AI on worker threads; `node balance/report.mjs` writes `balance/report.md` with win
+  rates, pairings, start-position bias, match lengths and per-unit figures. `balance/try.sh name '{"UNITS.x.hp":300}'`
+  trials a registry change without editing the game (`ZM_TWEAK`).
+- **Result** (Hard v Hard, 1,215 matches): loadout win rates went from 19-99% to 37-61%. Numbers and reasons are in
+  `balance/CHANGELOG.md`, with what is still uneven.
+- **Rule change**: a power a general starts with begins the match on its full recharge (Cyber's Cash Hack is first
+  usable at 3:00). Cyber now pays 12% more for infantry and tanks; Mass Assault's discount is 8%.
+- Tests: `node test/balance.mjs` (46 checks).
+
 ## Replays
 A replay is the match setup plus the player's commands with their tick numbers
 (a 20-minute match is a few kilobytes). The AI runs inside the simulation, so
@@ -198,6 +210,7 @@ Node (simulation only):
     node test/batch6.mjs      force attack, move markers, cancel build, Chinooks, helipad repair,
                               new maps and brushes
     node test/batch7.mjs      garrison size and exit, powers light fog and wreck buildings
+    node test/balance.mjs     balance harness: six fixed matches repeat exactly, report is well formed
     node test/bench.mjs       simulation speed benchmark
     node test/addon.mjs       superweapons, No-Superweapons rule, new powers,
                               King of the Hill, AI use of all of them

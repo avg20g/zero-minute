@@ -2,7 +2,7 @@
 // Nothing in here touches the DOM, the clock, or Math.random. All three
 // factions run through this one loop; their differences are registry data.
 import { N, CELL, WORLD, PLAYER, ENEMY, NEUTRAL } from './defs.js';
-import { UNITS, BLDGS, FACTIONS, UPGRADES, GENERALS, GENERAL, trainsOf, upgradesOf, unitCost } from './factionRegistry.js';
+import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS, GENERALS, GENERAL, trainsOf, upgradesOf, unitCost } from './factionRegistry.js';
 import { generateMap } from './map.js';
 import { Nav } from './pathfinding.js';
 import { Fog } from './fog.js';
@@ -33,7 +33,11 @@ export class Sim {
     const money = opts.money ?? 8000;
     this.teams = [mkTeam(f[0], money), mkTeam(f[1], money)]; // equal starting cash; the AI never receives a bonus
     const gens = (opts.generals || []).map((g, i) => (g && GENERALS[g] && GENERALS[g].faction === f[i]) ? g : null);
-    this.teams.forEach((T, i) => { T.general = gens[i] || null; const G = T.general && GENERALS[T.general]; if (G && G.grant) for (const id of G.grant) T.promos.add(id); });
+    this.teams.forEach((T, i) => { T.general = gens[i] || null; const G = T.general && GENERALS[T.general];
+      if (G && G.grant) for (const id of G.grant) { // a power a general starts with begins the match on its full recharge
+        T.promos.add(id); const n = FACTIONS[f[i]].tree.find(x => x.id === id);
+        if (n && n.power) T.powerReady[n.power] = Math.round((n.power === 'cashhack' && G.hack ? G.hack.cd : POWERS[n.power].cd) * 20);
+      } });
     if (opts.noEnemy) { // sandbox: the player starts at full rank with every General's promotion and power unlocked
       const T = this.teams[PLAYER]; T.rank = GENERAL.rankXp.length; T.xp = GENERAL.rankXp[GENERAL.rankXp.length - 1]; T.points = 0;
       for (const n of FACTIONS[T.faction].tree) { T.promos.add(n.id); if (n.flag) T.flags[n.flag] = true; if (n.power) T.powerReady[n.power] = 0; }

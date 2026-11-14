@@ -1,46 +1,23 @@
 # Zero Minute balance report
 
-486 matches, hard v hard AI, maps: canyon, forest. Draw = no winner after 25 minutes. Win rates leave out mirror matches and draws.
+1215 matches, hard v hard AI, maps: canyon, open, forest, urban, arctic. Draw = no winner after 25 minutes. Win rates leave out mirror matches and draws.
 
 ## Outliers
 
-- **ISIS (no general)** wins 16% of decided games (target 40-60%).
-- **China: Cyber General** wins 99% of decided games (target 40-60%).
-- **China: Mass Assault General** wins 83% of decided games (target 40-60%).
-- **ISIS: Stealth General** wins 21% of decided games (target 40-60%).
-- **ISIS: WMD General** wins 17% of decided games (target 40-60%).
-- US base beats wmd 12-0 (target no worse than about 70/30).
-- US base beats I base 12-0 (target no worse than about 70/30).
-- airforce beats I base 12-0 (target no worse than about 70/30).
-- cyber beats airforce 12-0 (target no worse than about 70/30).
-- mass beats airforce 12-0 (target no worse than about 70/30).
-- airforce beats stealth 12-0 (target no worse than about 70/30).
-- airforce beats wmd 12-0 (target no worse than about 70/30).
-- marine beats I base 12-0 (target no worse than about 70/30).
-- mass beats marine 11-1 (target no worse than about 70/30).
-- marine beats wmd 12-0 (target no worse than about 70/30).
-- cyber beats US base 12-0 (target no worse than about 70/30).
-- cyber beats C base 12-0 (target no worse than about 70/30).
-- cyber beats I base 12-0 (target no worse than about 70/30).
-- cyber beats marine 12-0 (target no worse than about 70/30).
-- cyber beats mass 11-1 (target no worse than about 70/30).
-- cyber beats stealth 8-0 (target no worse than about 70/30).
-- cyber beats wmd 12-0 (target no worse than about 70/30).
-- mass beats US base 12-0 (target no worse than about 70/30).
-- mass beats I base 12-0 (target no worse than about 70/30).
-- mass beats stealth 11-0 (target no worse than about 70/30).
-- mass beats wmd 12-0 (target no worse than about 70/30).
-- US base beats stealth 12-0 (target no worse than about 70/30).
-- US base: the AI never built F-22 Raptor, Comanche Gunship.
+- **China: Mass Assault General** wins 61% of decided games (target 40-60%).
+- **ISIS: Stealth General** wins 37% of decided games (target 40-60%).
+- airforce beats stealth 24-6 (target no worse than about 70/30).
+- marine beats wmd 24-6 (target no worse than about 70/30).
+- mass beats US base 24-6 (target no worse than about 70/30).
+- Map **canyon** favours start 1: 56% of decided games (target within 5 points of even).
+- Map **open** favours start 2: 58% of decided games (target within 5 points of even).
+- Map **forest** favours start 2: 60% of decided games (target within 5 points of even).
+- Map **urban** favours start 1: 64% of decided games (target within 5 points of even).
 - US base: never used Particle Cannon.
 - C base: never used Nuclear Missile.
 - I base: the AI never built Saboteur.
-- I base: never used Scud Storm, Sneak Attack.
-- airforce: the AI never built F-22 Raptor, Comanche Gunship.
+- I base: never used Sneak Attack.
 - airforce: never used Particle Cannon.
-- marine: the AI never built F-22 Raptor, Comanche Gunship.
-- marine: never used Particle Cannon.
-- cyber: the AI never built J-11 Fighter.
 - cyber: never used Nuclear Missile.
 - mass: never used Nuclear Missile.
 - stealth: the AI never built Saboteur.
@@ -53,15 +30,15 @@
 
 | Loadout | Games | Win rate | W | L | Draws | Avg win (min) | Value killed / lost | Earned | Idle money |
 |---|---|---|---|---|---|---|---|---|---|
-| China: Cyber General | 96 | 99% | 91 | 1 | 4 | 5.3 | 3.52 | 13607 | 2909 |
-| China: Mass Assault General | 96 | 83% | 79 | 16 | 1 | 6.5 | 1.85 | 14409 | 1294 |
-| United States (no general) | 96 | 59% | 57 | 39 | 0 | 5.9 | 1.17 | 16917 | 1103 |
-| United States: Air Force General | 96 | 56% | 54 | 42 | 0 | 5.7 | 1.10 | 16963 | 1085 |
-| United States: Marine Corps General | 96 | 51% | 49 | 47 | 0 | 6.7 | 0.93 | 18680 | 1029 |
-| China (no general) | 96 | 46% | 44 | 51 | 1 | 8.6 | 1.17 | 17487 | 1199 |
-| ISIS: Stealth General | 96 | 21% | 18 | 69 | 9 | 10.2 | 0.68 | 17785 | 832 |
-| ISIS: WMD General | 96 | 17% | 16 | 77 | 3 | 10.3 | 0.68 | 17474 | 1462 |
-| ISIS (no general) | 96 | 16% | 15 | 81 | 0 | 12.1 | 0.63 | 16381 | 863 |
+| China: Mass Assault General | 240 | 61% | 143 | 91 | 6 | 9.1 | 1.23 | 20087 | 1623 |
+| United States: Marine Corps General | 240 | 56% | 131 | 102 | 7 | 7.9 | 0.98 | 24974 | 2015 |
+| China: Cyber General | 240 | 54% | 126 | 107 | 7 | 8.1 | 1.18 | 18291 | 1590 |
+| United States: Air Force General | 240 | 53% | 128 | 112 | 0 | 6.5 | 0.97 | 20536 | 1041 |
+| China (no general) | 240 | 50% | 118 | 120 | 2 | 9.0 | 1.14 | 19149 | 1020 |
+| United States (no general) | 240 | 47% | 112 | 127 | 1 | 6.6 | 0.92 | 22213 | 1120 |
+| ISIS: WMD General | 240 | 46% | 111 | 129 | 0 | 9.5 | 0.97 | 18701 | 1264 |
+| ISIS (no general) | 240 | 45% | 107 | 133 | 0 | 9.4 | 0.90 | 19588 | 1304 |
+| ISIS: Stealth General | 240 | 37% | 81 | 136 | 23 | 9.6 | 0.80 | 18537 | 953 |
 
 ## Pairings
 
@@ -69,26 +46,29 @@ Row loadout's win rate against the column loadout (both start positions combined
 
 |  | US base | C base | I base | airforce | marine | cyber | mass | stealth | wmd |
 |---|---|---|---|---|---|---|---|---|---|
-| US base | · | 75% | 100% | 50% | 50% | 0% | 0% | 100% | 100% |
-| C base | 25% | · | 75% | 50% | 50% | 0% | 33% | 73% /1d | 67% |
-| I base | 0% | 25% | · | 0% | 0% | 0% | 0% | 50% | 50% |
-| airforce | 50% | 50% | 100% | · | 50% | 0% | 0% | 100% | 100% |
-| marine | 50% | 50% | 100% | 50% | · | 0% | 8% | 50% | 100% |
-| cyber | 100% | 100% | 100% | 100% | 100% | · | 92% | 100% /4d | 100% |
-| mass | 100% | 67% | 100% | 100% | 92% | 8% | · | 100% /1d | 100% |
-| stealth | 0% | 27% /1d | 50% | 0% | 50% | 0% /4d | 0% /1d | · | 33% /3d |
-| wmd | 0% | 33% | 50% | 0% | 0% | 0% | 0% | 67% /3d | · |
+| US base | · | 50% | 60% | 50% | 50% | 40% | 20% | 52% /1d | 53% |
+| C base | 50% | · | 57% | 60% | 47% | 37% | 43% | 43% /2d | 60% |
+| I base | 40% | 43% | · | 40% | 30% | 63% | 40% | 60% | 40% |
+| airforce | 50% | 40% | 60% | · | 47% | 40% | 40% | 80% | 70% |
+| marine | 50% | 53% | 70% | 53% | · | 43% | 27% | 78% /7d | 80% |
+| cyber | 60% | 63% | 37% | 60% | 57% | · | 53% | 70% /7d | 37% |
+| mass | 80% | 57% | 60% | 60% | 73% | 47% | · | 63% /6d | 50% |
+| stealth | 48% /1d | 57% /2d | 40% | 20% | 22% /7d | 30% /7d | 38% /6d | · | 40% |
+| wmd | 47% | 40% | 60% | 30% | 20% | 63% | 50% | 60% | · |
 
 ## Maps and start positions
 
 | Map | Games | Start 1 wins | Start 2 wins | Draws | Mirror matches: start 1 / start 2 |
 |---|---|---|---|---|---|
-| canyon | 243 | 54% | 46% | 0 | 19 / 8 of 27 |
-| forest | 243 | 50% | 50% | 9 | 14 / 13 of 27 |
+| canyon | 243 | 56% | 44% | 3 | 24 / 3 of 27 |
+| open | 243 | 42% | 58% | 7 | 14 / 13 of 27 |
+| forest | 243 | 40% | 60% | 7 | 16 / 11 of 27 |
+| urban | 243 | 64% | 36% | 4 | 15 / 12 of 27 |
+| arctic | 243 | 46% | 54% | 5 | 13 / 11 of 27 |
 
 ## Match length
 
-Decided matches: shortest 4.2 min, quarter 5.0, median 5.8, three-quarter 7.6, longest 20.3. Draws: 9 of 486 (2%).
+Decided matches: shortest 4.1 min, quarter 5.7, median 7.3, three-quarter 10.0, longest 23.4. Draws: 26 of 1215 (2%).
 
 ## Units
 
@@ -98,151 +78,151 @@ Per loadout: how many of each unit the AI built per game, the share that died, a
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Flashbang Ranger | 300 | 22.5 | 87% | 21.6 / 23.9 |
-| Pathfinder Sniper | 600 | 9.7 | 58% | 10.1 / 9.0 |
-| Sentinel Battle Tank | 900 | 2.2 | 40% | 2.7 / 1.5 |
-| Chinook | 800 | 2.1 | 20% | 2.1 / 2.0 |
-| Recon Drone | 400 | 1.6 | 62% | 1.5 / 1.8 |
-| Avenger Laser Tank | 1200 | 1.1 | 30% | 1.6 / 0.5 |
-| Dozer | 1000 | 0.6 | 100% | 0.1 / 1.4 |
-| F-22 Raptor | 1400 | 0.0 | - | 0.0 / 0.0 |
-| Comanche Gunship | 1500 | 0.0 | - | 0.0 / 0.0 |
+| Flashbang Ranger | 300 | 36.5 | 100% | 31.1 / 41.1 |
+| Pathfinder Sniper | 650 | 10.3 | 75% | 10.2 / 10.4 |
+| Sentinel Battle Tank | 900 | 4.3 | 66% | 5.0 / 3.7 |
+| Chinook | 800 | 2.3 | 27% | 2.3 / 2.3 |
+| Avenger Laser Tank | 1200 | 2.3 | 52% | 3.3 / 1.3 |
+| Recon Drone | 400 | 1.7 | 72% | 1.5 / 1.9 |
+| Dozer | 1000 | 1.0 | 100% | 0.1 / 1.8 |
+| Comanche Gunship | 1500 | 0.6 | 76% | 1.3 / 0.0 |
+| F-22 Raptor | 1400 | 0.0 | 0% | 0.0 / 0.0 |
 
-Powers used per game: Particle Cannon 0.0, A-10 Strafing Run 1.3, Paratrooper Drop 0.9, EMP Pulse Bomb 0.8. Superweapon launches per game: 0.00.
+Powers used per game: Particle Cannon 0.0, A-10 Strafing Run 2.0, Paratrooper Drop 1.3, EMP Pulse Bomb 1.2. Superweapon launches per game: 0.00.
 
 ### China (no general)
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Conscript Squad | 250 | 41.1 | 85% | 47.8 / 35.4 |
-| Inferno Cannon | 900 | 7.3 | 77% | 7.9 / 6.8 |
-| Battlemaster Tank | 800 | 4.3 | 61% | 5.4 / 3.3 |
-| Supply Truck | 600 | 2.5 | 55% | 2.3 / 2.7 |
-| Scout Car | 450 | 1.6 | 74% | 1.7 / 1.6 |
-| Hacker Squad | 600 | 1.2 | 28% | 1.9 / 0.5 |
-| Overlord Heavy Tank | 2000 | 0.6 | 36% | 1.0 / 0.3 |
-| Dozer | 1000 | 0.3 | 100% | 0.0 / 0.5 |
-| Hind Gunship | 1500 | 0.1 | 55% | 0.2 / 0.0 |
-| J-11 Fighter | 1200 | 0.0 | 0% | 0.0 / 0.0 |
+| Conscript Squad | 250 | 49.0 | 88% | 50.9 / 46.8 |
+| Inferno Cannon | 850 | 9.5 | 74% | 10.8 / 8.2 |
+| Battlemaster Tank | 750 | 6.2 | 69% | 6.9 / 5.4 |
+| Supply Truck | 600 | 3.4 | 69% | 2.8 / 4.0 |
+| Scout Car | 450 | 1.5 | 75% | 1.3 / 1.6 |
+| Hacker Squad | 600 | 1.2 | 28% | 2.0 / 0.4 |
+| Overlord Heavy Tank | 2000 | 0.7 | 41% | 1.0 / 0.3 |
+| Hind Gunship | 1500 | 0.5 | 66% | 0.5 / 0.6 |
+| Dozer | 1000 | 0.5 | 100% | 0.1 / 0.8 |
+| J-11 Fighter | 1200 | 0.1 | 30% | 0.1 / 0.1 |
 
-Powers used per game: Nuclear Missile 0.0, Artillery Barrage 2.3, Cash Hack 0.4, Fuel-Air Bomb 0.4. Superweapon launches per game: 0.00.
+Powers used per game: Nuclear Missile 0.0, Artillery Barrage 2.6, Cash Hack 0.5, Fuel-Air Bomb 0.5. Superweapon launches per game: 0.00.
 
 ### ISIS (no general)
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Guerrilla Squad | 250 | 17.5 | 100% | 23.0 / 16.2 |
-| Toxin Tractor | 600 | 15.0 | 92% | 23.7 / 12.9 |
-| RPG Trooper | 350 | 12.2 | 100% | 19.0 / 10.5 |
-| Technical Pickup | 500 | 4.0 | 91% | 8.2 / 2.9 |
-| Scorpion Light Tank | 700 | 2.6 | 77% | 7.1 / 1.5 |
-| Supply Pickup | 600 | 2.5 | 63% | 3.0 / 2.3 |
-| Worker | 250 | 1.7 | 100% | 0.0 / 2.1 |
-| Rocket Buggy | 900 | 1.5 | 92% | 2.5 / 1.2 |
+| RPG Trooper | 300 | 20.8 | 100% | 19.1 / 18.5 |
+| Guerrilla Squad | 225 | 19.7 | 100% | 19.6 / 16.6 |
+| Toxin Tractor | 600 | 18.9 | 82% | 20.7 / 15.4 |
+| Technical Pickup | 450 | 6.6 | 85% | 7.5 / 5.2 |
+| Scorpion Light Tank | 700 | 4.6 | 74% | 4.7 / 2.6 |
+| Supply Pickup | 600 | 3.8 | 74% | 2.9 / 3.9 |
+| Rocket Buggy | 900 | 2.3 | 85% | 1.9 / 1.8 |
+| Worker | 250 | 1.6 | 100% | 0.3 / 2.5 |
 | Saboteur | 700 | 0.0 | - | 0.0 / 0.0 |
 
-Powers used per game: Scud Storm 0.0, Ambush Squad 1.8, Toxin Bomb 0.9, Sneak Attack 0.0. Superweapon launches per game: 0.00.
+Powers used per game: Scud Storm 0.1, Ambush Squad 2.2, Toxin Bomb 1.4, Sneak Attack 0.0. Superweapon launches per game: 0.07.
 
 ### United States: Air Force General
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Flashbang Ranger | 300 | 22.0 | 89% | 20.3 / 24.1 |
-| Pathfinder Sniper | 600 | 9.5 | 60% | 9.7 / 9.3 |
-| Sentinel Battle Tank | 900 | 2.4 | 40% | 2.9 / 1.9 |
-| Chinook | 800 | 2.0 | 22% | 2.1 / 2.0 |
-| Recon Drone | 400 | 1.6 | 62% | 1.5 / 1.8 |
-| Avenger Laser Tank | 1200 | 1.3 | 31% | 1.9 / 0.5 |
-| Dozer | 1000 | 0.8 | 100% | 0.0 / 1.9 |
-| F-15E Strike Eagle | 1600 | 0.0 | 0% | 0.1 / 0.0 |
-| F-22 Raptor | 1400 | 0.0 | - | 0.0 / 0.0 |
-| Comanche Gunship | 1500 | 0.0 | - | 0.0 / 0.0 |
+| Flashbang Ranger | 300 | 33.7 | 100% | 29.4 / 38.7 |
+| Pathfinder Sniper | 650 | 10.0 | 70% | 10.3 / 9.6 |
+| Sentinel Battle Tank | 900 | 3.7 | 52% | 4.0 / 3.3 |
+| Chinook | 800 | 2.3 | 28% | 2.2 / 2.4 |
+| Avenger Laser Tank | 1200 | 1.8 | 44% | 2.4 / 1.1 |
+| Recon Drone | 400 | 1.7 | 68% | 1.5 / 1.9 |
+| Dozer | 1000 | 0.8 | 100% | 0.0 / 1.6 |
+| F-15E Strike Eagle | 1600 | 0.2 | 71% | 0.1 / 0.3 |
+| Comanche Gunship | 1500 | 0.1 | 34% | 0.2 / 0.0 |
+| F-22 Raptor | 1400 | 0.0 | 0% | 0.0 / 0.0 |
 
-Powers used per game: Particle Cannon 0.0, B-2 Carpet Bomb 1.1, Paratrooper Drop 0.9, EMP Pulse Bomb 0.8. Superweapon launches per game: 0.00.
+Powers used per game: Particle Cannon 0.0, B-2 Carpet Bomb 1.4, Paratrooper Drop 1.2, EMP Pulse Bomb 1.1. Superweapon launches per game: 0.00.
 
 ### United States: Marine Corps General
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Flashbang Ranger | 300 | 19.5 | 100% | 21.7 / 17.1 |
-| LAV-25 | 900 | 10.1 | 73% | 11.6 / 8.7 |
-| Pathfinder Sniper | 600 | 5.8 | 64% | 7.1 / 4.4 |
-| Sentinel Battle Tank | 900 | 2.3 | 38% | 3.5 / 1.0 |
-| Chinook | 800 | 2.2 | 25% | 2.2 / 2.1 |
-| Recon Drone | 400 | 1.6 | 61% | 1.5 / 1.7 |
-| Dozer | 1000 | 0.5 | 100% | 0.0 / 1.1 |
-| Avenger Laser Tank | 1200 | 0.2 | 19% | 0.3 / 0.1 |
-| F-22 Raptor | 1400 | 0.0 | - | 0.0 / 0.0 |
-| Comanche Gunship | 1500 | 0.0 | - | 0.0 / 0.0 |
+| Flashbang Ranger | 300 | 27.2 | 100% | 26.8 / 27.8 |
+| LAV-25 | 850 | 14.8 | 73% | 16.0 / 13.2 |
+| Pathfinder Sniper | 650 | 5.6 | 69% | 6.1 / 5.0 |
+| Chinook | 800 | 2.5 | 27% | 2.4 / 2.4 |
+| Sentinel Battle Tank | 900 | 2.1 | 46% | 2.6 / 1.4 |
+| Recon Drone | 400 | 1.7 | 66% | 1.6 / 1.8 |
+| Dozer | 1000 | 0.9 | 100% | 0.2 / 1.7 |
+| Avenger Laser Tank | 1200 | 0.6 | 52% | 0.8 / 0.4 |
+| Comanche Gunship | 1500 | 0.2 | 64% | 0.2 / 0.2 |
+| F-22 Raptor | 1400 | 0.0 | 80% | 0.0 / 0.0 |
 
-Powers used per game: Particle Cannon 0.0, A-10 Strafing Run 1.6, Paratrooper Drop 1.0, EMP Pulse Bomb 0.9. Superweapon launches per game: 0.00.
+Powers used per game: Particle Cannon 0.0, A-10 Strafing Run 2.2, Paratrooper Drop 1.4, EMP Pulse Bomb 1.3. Superweapon launches per game: 0.00.
 
 ### China: Cyber General
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Conscript Squad | 250 | 24.4 | 44% | 23.0 / 46.0 |
-| Inferno Cannon | 900 | 7.4 | 14% | 7.7 / 4.1 |
-| Supply Truck | 600 | 2.1 | 5% | 2.1 / 2.3 |
-| Hacker Squad | 600 | 1.9 | 4% | 1.9 / 0.9 |
-| Battlemaster Tank | 800 | 1.8 | 21% | 1.7 / 3.6 |
-| Scout Car | 450 | 1.5 | 43% | 1.5 / 1.9 |
-| Overlord Heavy Tank | 2000 | 0.6 | 2% | 0.6 / 0.0 |
-| Dozer | 1000 | 0.2 | 100% | 0.0 / 3.4 |
-| Hind Gunship | 1500 | 0.2 | 0% | 0.2 / 0.0 |
-| J-11 Fighter | 1200 | 0.0 | - | 0.0 / 0.0 |
+| Conscript Squad | 250 | 49.3 | 86% | 47.3 / 50.7 |
+| Inferno Cannon | 850 | 8.0 | 61% | 9.6 / 6.1 |
+| Battlemaster Tank | 750 | 3.8 | 61% | 4.3 / 3.3 |
+| Supply Truck | 600 | 3.0 | 55% | 2.5 / 3.4 |
+| Scout Car | 450 | 1.5 | 67% | 1.4 / 1.5 |
+| Hacker Squad | 600 | 1.2 | 20% | 1.8 / 0.4 |
+| Dozer | 1000 | 0.6 | 100% | 0.0 / 1.4 |
+| Overlord Heavy Tank | 2000 | 0.3 | 16% | 0.5 / 0.1 |
+| Hind Gunship | 1500 | 0.3 | 51% | 0.4 / 0.1 |
+| J-11 Fighter | 1200 | 0.1 | 6% | 0.1 / 0.0 |
 
-Powers used per game: Nuclear Missile 0.0, Artillery Barrage 1.2, Cash Hack 2.3, Fuel-Air Bomb 1.0. Superweapon launches per game: 0.00.
+Powers used per game: Nuclear Missile 0.0, Artillery Barrage 2.4, Cash Hack 2.0, Fuel-Air Bomb 1.2. Superweapon launches per game: 0.00.
 
 ### China: Mass Assault General
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Conscript Squad | 250 | 31.3 | 67% | 32.3 / 27.8 |
-| Inferno Cannon | 900 | 7.0 | 53% | 7.5 / 5.0 |
-| Battlemaster Tank | 800 | 6.8 | 32% | 7.6 / 3.9 |
-| Supply Truck | 600 | 2.1 | 27% | 2.1 / 2.4 |
-| Scout Car | 450 | 1.6 | 54% | 1.6 / 1.7 |
-| Hacker Squad | 600 | 1.6 | 6% | 1.9 / 0.5 |
-| Overlord Heavy Tank | 2000 | 0.5 | 24% | 0.5 / 0.5 |
-| Dozer | 1000 | 0.2 | 100% | 0.0 / 0.9 |
-| J-11 Fighter | 1200 | 0.0 | 0% | 0.0 / 0.0 |
-| Hind Gunship | 1500 | 0.0 | 0% | 0.0 / 0.0 |
+| Conscript Squad | 250 | 49.1 | 86% | 51.4 / 45.3 |
+| Inferno Cannon | 850 | 10.1 | 70% | 11.7 / 7.6 |
+| Battlemaster Tank | 750 | 8.0 | 66% | 9.3 / 6.0 |
+| Supply Truck | 600 | 3.1 | 58% | 2.9 / 3.4 |
+| Scout Car | 450 | 1.5 | 71% | 1.3 / 1.7 |
+| Hacker Squad | 600 | 1.4 | 23% | 2.0 / 0.5 |
+| Hind Gunship | 1500 | 0.9 | 68% | 1.3 / 0.3 |
+| Overlord Heavy Tank | 2000 | 0.9 | 36% | 1.1 / 0.4 |
+| Dozer | 1000 | 0.4 | 100% | 0.1 / 0.8 |
+| J-11 Fighter | 1200 | 0.2 | 35% | 0.3 / 0.0 |
 
-Powers used per game: Nuclear Missile 0.0, Artillery Barrage 1.6, Cash Hack 0.4, Fuel-Air Bomb 0.4. Superweapon launches per game: 0.00.
+Powers used per game: Nuclear Missile 0.0, Artillery Barrage 2.5, Cash Hack 0.5, Fuel-Air Bomb 0.5. Superweapon launches per game: 0.00.
 
 ### ISIS: Stealth General
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Guerrilla Squad | 250 | 16.6 | 100% | 20.0 / 15.7 |
-| Toxin Tractor | 600 | 16.6 | 91% | 26.4 / 13.8 |
-| RPG Trooper | 350 | 11.8 | 100% | 14.4 / 11.2 |
-| Suicide Bomber | 300 | 3.6 | 93% | 6.0 / 3.1 |
-| Technical Pickup | 500 | 3.6 | 88% | 5.3 / 3.2 |
-| Supply Pickup | 600 | 2.6 | 70% | 3.0 / 2.5 |
-| Scorpion Light Tank | 700 | 2.6 | 80% | 4.8 / 2.1 |
-| FPV Attack Drone | 350 | 1.7 | 93% | 4.0 / 1.1 |
-| Rocket Buggy | 900 | 1.4 | 92% | 2.1 / 1.3 |
-| Worker | 250 | 1.0 | 100% | 0.0 / 1.5 |
+| Toxin Tractor | 600 | 18.2 | 86% | 21.3 / 16.5 |
+| RPG Trooper | 300 | 16.6 | 100% | 18.8 / 15.8 |
+| Guerrilla Squad | 225 | 15.9 | 100% | 17.2 / 15.5 |
+| Technical Pickup | 450 | 5.6 | 85% | 7.0 / 5.0 |
+| Suicide Bomber | 300 | 3.7 | 87% | 6.0 / 2.6 |
+| Supply Pickup | 600 | 3.6 | 77% | 2.8 / 4.0 |
+| Scorpion Light Tank | 700 | 2.9 | 67% | 4.7 / 2.1 |
+| FPV Attack Drone | 350 | 2.4 | 95% | 3.9 / 1.6 |
+| Rocket Buggy | 900 | 1.8 | 82% | 2.3 / 1.6 |
+| Worker | 250 | 1.3 | 100% | 0.2 / 2.1 |
 | Saboteur | 700 | 0.0 | - | 0.0 / 0.0 |
 
-Powers used per game: Scud Storm 0.0, Ambush Squad 2.0, Toxin Bomb 1.0, Sneak Attack 0.0. Superweapon launches per game: 0.00.
+Powers used per game: Scud Storm 0.0, Ambush Squad 2.2, Toxin Bomb 1.4, Sneak Attack 0.0. Superweapon launches per game: 0.00.
 
 ### ISIS: WMD General
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Guerrilla Squad | 250 | 17.4 | 100% | 25.2 / 15.1 |
-| Toxin Tractor | 600 | 15.1 | 91% | 26.9 / 11.6 |
-| RPG Trooper | 350 | 12.8 | 100% | 18.1 / 11.2 |
-| Technical Pickup | 500 | 4.2 | 92% | 7.4 / 3.3 |
-| Supply Pickup | 600 | 2.5 | 61% | 2.1 / 2.6 |
-| Scorpion Light Tank | 700 | 2.4 | 79% | 4.8 / 1.6 |
-| Worker | 250 | 1.7 | 100% | 0.0 / 2.2 |
-| Rocket Buggy | 900 | 1.6 | 91% | 2.2 / 1.4 |
-| Scud Launcher | 1500 | 0.2 | 13% | 0.4 / 0.0 |
+| RPG Trooper | 300 | 18.7 | 100% | 20.5 / 17.2 |
+| Toxin Tractor | 600 | 17.7 | 82% | 19.9 / 15.7 |
+| Guerrilla Squad | 225 | 17.6 | 100% | 19.7 / 15.7 |
+| Technical Pickup | 450 | 6.1 | 83% | 7.4 / 4.9 |
+| Scorpion Light Tank | 700 | 3.6 | 61% | 5.5 / 1.9 |
+| Supply Pickup | 600 | 3.4 | 68% | 3.0 / 3.7 |
+| Rocket Buggy | 900 | 2.0 | 80% | 2.4 / 1.6 |
+| Worker | 250 | 1.5 | 100% | 0.3 / 2.6 |
+| Scud Launcher | 1500 | 0.3 | 6% | 0.7 / 0.0 |
 | Saboteur | 700 | 0.0 | - | 0.0 / 0.0 |
 
-Powers used per game: Scud Storm 0.0, Ambush Squad 1.9, Toxin Bomb 0.9, Sneak Attack 0.0. Superweapon launches per game: 0.03.
+Powers used per game: Scud Storm 0.0, Ambush Squad 2.2, Toxin Bomb 1.4, Sneak Attack 0.0. Superweapon launches per game: 0.03.
 

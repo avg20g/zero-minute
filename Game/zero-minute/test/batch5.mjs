@@ -104,15 +104,18 @@ const hold = (u) => { u.order = { t: 'hold' }; return u; };
   run(s, 8); ok(s.fog.canSee(PLAYER, ecc) && s.fog.visAt(PLAYER, ecc.x + 14, ecc.z), 'sees the enemy Command Center and the ground beside it from the first second');
   const far = makeUnit(s, 'v_tank', ENEMY, ecc.x - 120, ecc.z + 40, 0); run(s, 8); ok(!s.fog.canSee(PLAYER, far), 'but not enemy units away from their buildings');
   const n = new Sim({ ai: false, factions: ['redhammer', 'vanguard'] }); run(n, 8); ok(!n.fog.canSee(PLAYER, n.ents.find(e => e.kind === 'bldg' && e.team === ENEMY)), 'other generals see nothing of the enemy base');
-  const sup = makeBldg(s, 'v_supply', ENEMY, ecc.cx - 14, ecc.cz + 2); s.nav.rebuild(); run(s, 8); E.money = 9000; const m0 = T.money;
-  ok(T.promos.has('r_hack') && hasPower(s, PLAYER, 'cashhack') && powerError(s, PLAYER, 'cashhack', sup.x, sup.z) === null, 'starts with Cash Hack, and can aim it at once because it already sees the enemy supply building');
+  const sup = makeBldg(s, 'v_supply', ENEMY, ecc.cx - 14, ecc.cz + 2); s.nav.rebuild(); run(s, 8);
+  ok(T.promos.has('r_hack') && hasPower(s, PLAYER, 'cashhack') && powerError(s, PLAYER, 'cashhack', sup.x, sup.z) !== null && Math.abs(T.powerReady.cashhack / 20 - 180) < 1, 'starts with Cash Hack, which begins the match on its 180 s recharge');
+  run(s, 180 * 20); E.money = 9000; const m0 = T.money;
+  ok(powerError(s, PLAYER, 'cashhack', sup.x, sup.z) === null, 'after 3:00 it can aim at once because it already sees the enemy supply building');
   s.issue({ t: 'power', id: 'cashhack', x: sup.x, z: sup.z }); run(s, 2);
-  ok(T.money === m0 + 2500 && E.money === 6500 && T.powerReady.cashhack === s.tick - 1 + 150 * 20 - 1 + 1 || T.money === m0 + 2500, 'Cash Hack takes $2,500 (others take $1,500)');
-  ok(Math.abs((T.powerReady.cashhack - s.tick) / 20 - 150) < 1, 'and recharges in 150 s (others: 240 s)');
+  ok(T.money === m0 + 2000 && E.money === 7000, 'Cash Hack takes $2,000 (others take $1,500)');
+  ok(Math.abs((T.powerReady.cashhack - s.tick) / 20 - 180) < 1, 'and recharges in 180 s (others: 240 s)');
+  ok(unitCost(T, 'r_tank') === 840 && unitCost(T, 'r_conscript') === 280 && unitCost(T, 'r_mig') === UNITS.r_mig.cost, 'Cyber pays 12% more for tanks and infantry; aircraft are unchanged');
   const M = new Sim({ ai: false, factions: ['redhammer', 'vanguard'], generals: ['mass', null] }), TM = M.teams[0], TN = n.teams[0];
-  ok(unitCost(TM, 'r_tank') === 600 && unitCost(TN, 'r_tank') === 800 && unitCost(TM, 'r_overlord') === 1500 && unitCost(TM, 'r_conscript') < unitCost(TN, 'r_conscript') && unitCost(TM, 'r_mig') === UNITS.r_mig.cost, 'tanks and infantry cost 25% less; aircraft do not');
+  ok(unitCost(TM, 'r_tank') === 690 && unitCost(TN, 'r_tank') === 750 && unitCost(TM, 'r_overlord') === 1840 && unitCost(TM, 'r_conscript') < unitCost(TN, 'r_conscript') && unitCost(TM, 'r_mig') === UNITS.r_mig.cost, 'tanks and infantry cost 8% less; aircraft do not');
   const fac = makeBldg(M, 'r_factory', PLAYER, 60, 180); M.nav.rebuild(); TM.money = 5000; M.issue({ t: 'train', id: fac.id, type: 'r_tank' }); run(M, 2);
-  ok(TM.money === 4400, 'the discounted price is what is charged'); M.issue({ t: 'cancel', id: fac.id, idx: 0 }); run(M, 2); ok(TM.money === 5000 && fac.queue.length === 0, 'and what is refunded');
+  ok(TM.money === 4310, 'the discounted price is what is charged'); M.issue({ t: 'cancel', id: fac.id, idx: 0 }); run(M, 2); ok(TM.money === 5000 && fac.queue.length === 0, 'and what is refunded');
   console.log(`cyber / mass   : permanent watch on enemy buildings; Cash Hack $2,500 / 150 s | tank $${unitCost(TM, 'r_tank')} (normal $${unitCost(TN, 'r_tank')}), Overlord $${unitCost(TM, 'r_overlord')}`);
 }
 

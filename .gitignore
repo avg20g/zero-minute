@@ -1,7 +1,7 @@
 Game/*.zip
 Game/_to_delete/
 Reference/photos/
-out/
-balance/runs/
+**/out/
+**/balance/runs/
 .DS_Store
 node_modules/

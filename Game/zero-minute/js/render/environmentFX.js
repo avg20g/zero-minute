@@ -66,8 +66,20 @@ SURFACES.grass = (u, v) => { // forest floor: tufted grass, darker in the clumps
   const k = (0.66 + 0.5 * n) * (0.82 + 0.3 * fine) * (0.8 + 0.3 * clump);
   return [0.3 * n + 0.45 * clump + 0.2 * fine, (70 + 62 * dry) * k, (112 + 22 * dry) * k, (46 + 12 * dry) * k, 0.96];
 };
+SURFACES.concrete = (u, v) => { // city paving: square slabs with dark joints, weathered and stained
+  const gx = ((u * 6) % 1 + 1) % 1, gz = ((v * 6) % 1 + 1) % 1, j = ss(0.0, 0.035, Math.min(gx, 1 - gx, gz, 1 - gz));
+  const n = fbmT(u, v, 5, 151), grain = hash((u * S) | 0, (v * S) | 0, 153), stain = ss(0.6, 0.9, fbmT(u, v, 3, 157));
+  const k = (0.8 + 0.25 * n) * (0.58 + 0.42 * j) * (0.94 + 0.1 * grain) * (1 - 0.22 * stain);
+  return [j * (0.6 + 0.2 * n) + 0.05 * grain, 152 * k, 152 * k, 148 * k, 0.88];
+};
+SURFACES.snow = (u, v) => { // wind-packed snow: long soft drifts, blue in the hollows, fine sparkle
+  const n = fbmT(u, v, 4, 161), drift = 0.5 + 0.5 * Math.sin((u * 5 + v * 2 + n * 1.5) * 6.2831853), fine = hash((u * S) | 0, (v * S) | 0, 163);
+  const h = 0.55 * drift + 0.35 * n + 0.06 * fine, k = 0.84 + 0.16 * h;
+  return [h, 228 * k, 236 * k, 247 * k, 0.82];
+};
+SURFACES.greyrock = (u, v) => { const r = SURFACES.rock(u, v), g = r[1] * 0.45 + r[2] * 0.35 + r[3] * 0.2; return [r[0], g * 0.94, g * 0.98, g * 1.08, r[4]]; };   // the canyon rock without its red: concrete blocks, frozen cliffs
 export const SURFACE_ORDER = ['sand', 'rock', 'asphalt', 'dirt'];
-export const BIOME_SURFACES = { desert: SURFACE_ORDER, woods: ['grass', 'rock', 'asphalt', 'dirt'] }; // the first slot is the open ground of the biome
+export const BIOME_SURFACES = { desert: SURFACE_ORDER, woods: ['grass', 'rock', 'asphalt', 'dirt'], urban: ['concrete', 'greyrock', 'asphalt', 'dirt'], snow: ['snow', 'greyrock', 'asphalt', 'dirt'] }; // the first slot is the open ground of the biome
 // Pure data for one material: albedo, tangent-space normal and roughness, as RGBA byte arrays.
 export function surfaceMaps(name, bump = 2.2) {
   const f = SURFACES[name], H = new Float32Array(S * S), albedo = new Uint8ClampedArray(S * S * 4), normal = new Uint8ClampedArray(S * S * 4), rough = new Uint8ClampedArray(S * S * 4);

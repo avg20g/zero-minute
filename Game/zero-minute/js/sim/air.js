@@ -17,6 +17,7 @@ export const CLIMB_TICKS = 30;    // ticks from lift-off to cruise altitude
 export const FINAL = 55;          // metres from the approach fix to the runway threshold
 export const APPROACH = 0.6;      // approach speed as a fraction of cruise speed
 export const SPOOL = 14, LIFT = 30; // helicopter: ticks of rotor spool-up, then ticks to climb
+export const HELI_REPAIR = 0.06;    // fraction of full health a helicopter regains per second while sitting on a helipad
 export const LOITER = 600;        // ticks an aircraft holds over its destination before going home (30 s)
 export const ORBIT = 22;          // metres: radius of the holding circle
 const ON_RUNWAY = { taxi: 1, backtaxi: 1, lineup: 1, roll: 1, final: 1, rollout: 1, taxiin: 1, park: 1 };
@@ -87,7 +88,7 @@ function fighter(sim, u, d) {
       u.landed = true; u.altK = 0; u.goal = null; u.spd = 0; u.vx = u.vz = 0; u.x = pad.x; u.z = pad.z;
       if (u.ammo < d.ammo && ++u.reloadT >= d.reload) { u.ammo = d.ammo; u.reloadT = 0; }
       const o = u.order;
-      if (o && (o.t === 'attack' || o.t === 'move' || o.t === 'amove')) { if (u.ammo > 0 && lockRunway(sim, home, u)) u.as = 'taxi'; } // holds on the pad while the runway is busy
+      if (o && (o.t === 'attack' || o.t === 'fattack' || o.t === 'move' || o.t === 'amove')) { if (u.ammo > 0 && lockRunway(sim, home, u)) u.as = 'taxi'; } // holds on the pad while the runway is busy
       else if (o) u.order = null;
       return true;
     }
@@ -110,7 +111,7 @@ function fighter(sim, u, d) {
       const o = u.order;
       if (!o || u.ammo <= 0) { u.as = 'return'; u.appr = 0; if (!(o && o.guard)) u.order = null; u.target = 0; u.loiterT = 0; break; } // a guard order survives the trip home to re-arm
       if (u.loiterO !== o) { u.loiterO = o; u.loiterT = 0; }
-      const t = sim.byId.get(o.t === 'attack' ? o.id : u.target);
+      const t = o.t === 'fattack' ? (o.id ? sim.byId.get(o.id) : o.g) : sim.byId.get(o.t === 'attack' ? o.id : u.target);   // force attack may aim at a spot on the ground
       if (t && !t.dead) { // attack run. A jet cannot turn inside its own turning circle: if the target is close and
         // off the nose, it flies straight out for a moment, then turns back in with room to line up.
         const dx = t.x - u.x, dz = t.z - u.z;
@@ -120,7 +121,7 @@ function fighter(sim, u, d) {
         break;
       }
       u.extend = 0;
-      if (o.t === 'attack') { const g = u.goal || u; u.order = { t: 'amove', x: g.x, z: g.z }; break; } // target gone, missiles left: hold over the spot
+      if (o.t === 'attack' || o.t === 'fattack') { const g = u.goal || u; u.order = { t: 'amove', x: g.x, z: g.z }; break; } // target gone, missiles left: hold over the spot
       // On station: fly a holding circle and engage whatever comes into range. A plain order holds for
       // LOITER ticks; a guard order holds until the missiles are gone.
       const dx = u.x - o.x, dz = u.z - o.z;
@@ -168,6 +169,42 @@ function fighter(sim, u, d) {
   return false;
 }
 
+// Helicopters. Returns true when this function moved (or held) the helicopter itself.
+//   spool -> lift            start-up on the helipad
+//   order 'repair'           fly to the helipad, wait nearby if another helicopter is on it, descend ('land'), sit ('pad')
+//   pad                      repaired at HELI_REPAIR per second; any new order starts the rotors again
+function heli(sim, u) {
+  const o = u.order;
+  const still = () => { u.vx = u.vz = 0; u.spd = 0; };   // the goal is kept: a helicopter ordered away flies there once it is up
+  if (u.as === 'spool') { still(); if (++u.reloadT >= SPOOL) { u.as = 'lift'; u.landed = false; } return true; }
+  if (u.as === 'lift') { u.vx = u.vz = 0; u.spd = 0; u.altK = Math.min(1, u.altK + 1 / LIFT); if (u.altK >= 1) { u.as = null; u.reloadT = 0; } return true; }
+  const b = o && o.t === 'repair' ? sim.byId.get(o.id) : null, pad = b && !b.dead && b.team === u.team ? b.heli : null;
+  if (u.as === 'pad') {
+    still(); u.landed = true; u.altK = 0;
+    if (u.hp < u.maxHp) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * HELI_REPAIR * DT);
+    const leave = o && o.t !== 'repair' && o.t !== 'hold';
+    if (leave || (o && o.t === 'repair' && !pad)) { // ordered away (or the airfield is gone): start up and climb out
+      for (const f of sim.ents) if (f.heli && f.heli.by === u.id) f.heli.by = 0;
+      if (!leave) u.order = null;
+      u.as = 'spool'; u.reloadT = 0;
+    }
+    return true;
+  }
+  if (!o || o.t !== 'repair') { if (u.as === 'land') { u.as = null; for (const f of sim.ents) if (f.heli && f.heli.by === u.id) f.heli.by = 0; } return false; }
+  if (!pad) { u.order = null; u.as = null; return false; }
+  if (u.as === 'land') { // straight down onto the pad
+    still(); u.x = pad.x; u.z = pad.z; u.altK = Math.max(0, u.altK - 1 / LIFT);
+    if (u.altK <= 0) { u.as = 'pad'; u.landed = true; sim.events.push({ t: 'helipad', id: u.id, x: u.x, z: u.z, team: u.team }); }
+    return true;
+  }
+  if (pad.by && pad.by !== u.id) { const h = sim.byId.get(pad.by); if (!h || h.dead || !h.order || h.order.t !== 'repair' || h.order.id !== b.id) { if (!h || h.dead || h.as !== 'pad') pad.by = 0; } }
+  if (!pad.by || pad.by === u.id) {
+    pad.by = u.id; u.goal = { x: pad.x, z: pad.z };
+    if (Math.hypot(pad.x - u.x, pad.z - u.z) < 1.6) { u.as = 'land'; u.goal = null; }
+  } else { const a = u.id * 2.399; u.goal = { x: pad.x + Math.cos(a) * 13, z: pad.z + Math.sin(a) * 13 }; }   // pad busy: hold nearby
+  return false;
+}
+
 export function stepAir(sim) {
   let airs = null;
   for (const u of sim.ents) if (u.kind === 'unit' && u.air && !u.dead) (airs || (airs = [])).push(u);
@@ -177,13 +214,8 @@ export function stepAir(sim) {
     u.px = u.x; u.pz = u.z; u.pfacing = u.facing; u.pturret = u.turret; u.paltK = u.altK; u.arrived = false;
     if (u.emp) { u.vx = u.vz = 0; u.spd = 0; continue; }
     if (d.based) { if (fighter(sim, u, d) || u.dead) continue; }
-    else if (d.heli && u.as) { // on the helipad: spool the rotors up, then climb straight up
-      u.vx = u.vz = 0; u.spd = 0;
-      if (u.as === 'spool') { if (++u.reloadT >= SPOOL) { u.as = 'lift'; u.landed = false; } }
-      else { u.altK = Math.min(1, u.altK + 1 / LIFT); if (u.altK >= 1) { u.as = null; u.reloadT = 0; } }
-      continue;
-    }
-    if (u.altK < 1) u.altK = Math.min(1, u.altK + 1 / CLIMB_TICKS);  // e.g. climbing away from a go-around
+    else if (d.heli) { if (heli(sim, u)) continue; }
+    if (u.altK < 1 && !u.hoverLow) u.altK = Math.min(1, u.altK + 1 / CLIMB_TICKS);  // e.g. climbing away from a go-around
     let dvx = 0, dvz = 0;
     const g = u.goal;
     if (g) {

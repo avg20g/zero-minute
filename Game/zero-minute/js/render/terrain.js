@@ -111,7 +111,7 @@ export { WORLD };
 // ---------------------------------------------------------------- water, bridges, trees (woods maps)
 // One flat, slightly see-through sheet at the water level: the terrain is only below it inside river beds.
 export function buildWater(map) {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(WORLD, WORLD), std(0x2c6c86, 0.1, 0.25, { transparent: true, opacity: 0.78 }));
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(WORLD, WORLD), std(map.biome === 'snow' ? 0x8fb6c9 : 0x2c6c86, map.biome === 'snow' ? 0.25 : 0.1, 0.25, { transparent: true, opacity: map.biome === 'snow' ? 0.9 : 0.78 }));   // snow maps: pale, nearly opaque ice-water
   m.rotation.x = -Math.PI / 2; m.position.set(WORLD / 2, WATER_Y, WORLD / 2); m.receiveShadow = true; m.renderOrder = 1;
   return m;
 }
@@ -132,7 +132,7 @@ export function buildBridges(map) {
 export function buildTrees(map) {
   const g = new THREE.Group(), n = map.trees.length / 3; if (!n) return g;
   const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.22, 0.32, 1, 6), std(0x4b3826, 0.95, 0), n);
-  const crown = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 7), std(0x2f5a2c, 0.95, 0, { flatShading: true }), n);
+  const crown = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 7), std(map.biome === 'snow' ? 0x9db8aa : 0x2f5a2c, 0.95, 0, { flatShading: true }), n);   // pines carry snow on snow maps
   const M = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
   for (let i = 0; i < n; i++) {
     const x = map.trees[i * 3], z = map.trees[i * 3 + 1], s = map.trees[i * 3 + 2], y = heightAt(map, x, z), h = 5.5 * s;

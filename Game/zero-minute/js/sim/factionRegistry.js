@@ -57,7 +57,9 @@ const TANK  = { model: 'tank', cost: 900, secs: 10, hp: 480, speed: 9, turn: 1.7
 export const UNITS = {
   // ---- Vanguard Coalition
   v_dozer:      { ...DOZER, name: 'Dozer', faction: 'vanguard' },
-  v_truck:      { ...TRUCK, name: 'Supply Truck', faction: 'vanguard' },
+  v_truck:      { ...TRUCK, name: 'Supply Truck', faction: 'vanguard' },   // no longer trained: the United States collects with Chinooks
+  v_chinook:    { model: 'chinook', name: 'Chinook', faction: 'vanguard', cost: 800, secs: 8, hp: 320, speed: 15, turn: 2.2, radius: 2.8, cls: 1, sight: 30, armor: 'air',
+                  air: true, alt: 11, heli: true, harvester: true, carry: 200 },
   v_ranger:     { ...SQUAD, name: 'Flashbang Ranger', faction: 'vanguard', weapon2: 'flashbang' },
   v_pathfinder: { model: 'sniper', name: 'Pathfinder Sniper', faction: 'vanguard', cost: 600, secs: 8, hp: 120, speed: 6, turn: 9, radius: 0.9, cls: 0, sight: 48, armor: 'inf',
                   weapon: 'sniper', infantry: true, canGarrison: true, canCapture: true, stealth: 'still', detector: 26, promo: 'v_pathfinder' },
@@ -125,7 +127,7 @@ const AIRFIELD= { model: 'airfield', role: 'airfield', cost: 1800, secs: 14, hp:
 export const BLDGS = {
   v_cc:       { ...CC, name: 'Command Center', faction: 'vanguard', trains: ['v_dozer', 'v_drone'] },
   v_power:    { ...POWER, name: 'Cold Fusion Reactor', faction: 'vanguard' },
-  v_supply:   { ...SUPPLY, name: 'Supply Center', faction: 'vanguard', trains: ['v_truck'], needs: 'v_power' },
+  v_supply:   { ...SUPPLY, name: 'Supply Center', faction: 'vanguard', trains: ['v_chinook'], needs: 'v_power' },
   v_barracks: { ...BARRACKS, name: 'Barracks', faction: 'vanguard', trains: ['v_ranger', 'v_pathfinder'] },
   v_factory:  { ...FACTORY, name: 'War Factory', faction: 'vanguard', trains: ['v_tank', 'v_avenger'], upgrades: ['v_pdl'], needs: 'v_supply' },
   v_airfield: { ...AIRFIELD, name: 'Air Field', faction: 'vanguard', trains: ['v_raptor', 'v_comanche'], needs: 'v_factory' },
@@ -200,7 +202,7 @@ export const FACTIONS = {
     blurb: 'Abrams tanks, F-22s, Comanche gunships and stealth snipers. Everything leans on the power grid.',
     hull: 0xc4b79a, dark: 0x8a8067, usesPower: true, radarNeedsPower: true,
     build: ['v_power', 'v_barracks', 'v_supply', 'v_factory', 'v_airfield', 'v_patriot', 'v_uplink', 'v_particle', 'v_cc'],
-    roles: { cc: 'v_cc', power: 'v_power', supply: 'v_supply', barracks: 'v_barracks', factory: 'v_factory', airfield: 'v_airfield', defense: 'v_patriot', income: 'v_uplink', super: 'v_particle', builder: 'v_dozer', truck: 'v_truck', squad: 'v_ranger', scout: 'v_drone' },
+    roles: { cc: 'v_cc', power: 'v_power', supply: 'v_supply', barracks: 'v_barracks', factory: 'v_factory', airfield: 'v_airfield', defense: 'v_patriot', income: 'v_uplink', super: 'v_particle', builder: 'v_dozer', truck: 'v_chinook', squad: 'v_ranger', scout: 'v_drone' },
     aiArmy: ['v_ranger', 'v_tank', 'v_ranger', 'v_avenger', 'v_tank', 'v_comanche'],
     tree: [
       { id: 'v_pathfinder', tier: 1, name: 'Pathfinder Training', desc: 'Unlocks the Pathfinder Sniper at the Barracks.', unlock: 'v_pathfinder' },

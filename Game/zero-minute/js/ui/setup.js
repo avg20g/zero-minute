@@ -2,7 +2,7 @@
 // so it can show while the 3D library is still loading.
 import { FACTIONS, FACTION_IDS, UNITS, BLDGS, POWERS, GENERALS, generalsOf } from '../sim/factionRegistry.js';
 import { DIFFICULTY } from '../sim/aiController.js';
-import { OPEN_MAP, FOREST_MAP } from '../sim/map.js';
+import { MAPS } from '../sim/map.js';
 import { openMapBuilder, loadSavedMap } from './mapBuilder.js';
 import { PALETTE, resolveColors } from './teamColors.js';
 
@@ -22,7 +22,7 @@ function roster(f) { // signature units and tech, straight from the registry
 export function showSetup(onStart) {
   const root = document.getElementById('setup'), cards = document.getElementById('setup-factions'), foes = document.getElementById('setup-foes'), tiers = document.getElementById('setup-levels');
   let mine = 'vanguard', foe = 'random', level = 'medium', light = 'noon', funds = 10000, treaty = false, noSuper = false, koth = false, mapId = 'canyon', custom = loadSavedMap(), colYou = 'blue', colFoe = 'red', gen = {};   // gen: the general picked for each faction
-  try { const s = JSON.parse(localStorage.getItem('cz-setup') || 'null'); if (s && FACTIONS[s.mine]) { mine = s.mine; if (s.foe === 'random' || FACTIONS[s.foe]) foe = s.foe; if (DIFFICULTY[s.level] || s.level === 'none') level = s.level; if (s.map === 'open' || s.map === 'forest' || (s.map === 'custom' && custom)) mapId = s.map; if (s.gen) gen = s.gen; if (s.colors) [colYou, colFoe] = resolveColors(s.colors[0], s.colors[1]); if (LIGHTING.some(l => l[0] === s.light)) light = s.light; if (FUNDS.includes(s.funds)) funds = s.funds; treaty = !!s.treaty; noSuper = !!s.noSuper; koth = !!s.koth; } } catch (e) { /* storage unavailable */ }
+  try { const s = JSON.parse(localStorage.getItem('cz-setup') || 'null'); if (s && FACTIONS[s.mine]) { mine = s.mine; if (s.foe === 'random' || FACTIONS[s.foe]) foe = s.foe; if (DIFFICULTY[s.level] || s.level === 'none') level = s.level; if ((s.map !== 'custom' && MAPS.some(m => m.id === s.map)) || (s.map === 'custom' && custom)) mapId = s.map; if (s.gen) gen = s.gen; if (s.colors) [colYou, colFoe] = resolveColors(s.colors[0], s.colors[1]); if (LIGHTING.some(l => l[0] === s.light)) light = s.light; if (FUNDS.includes(s.funds)) funds = s.funds; treaty = !!s.treaty; noSuper = !!s.noSuper; koth = !!s.koth; } } catch (e) { /* storage unavailable */ }
   cards.innerHTML = FACTION_IDS.map(id => {
     const f = FACTIONS[id], r = roster(f), hex = '#' + f.hull.toString(16).padStart(6, '0');
     return `<label class="fcard"><input type="radio" name="faction" id="fac-${id}" value="${id}"><span class="fbody"><i class="swatch" style="background:${hex}"></i>
@@ -35,7 +35,7 @@ export function showSetup(onStart) {
     + `<label class="fchip lvl"><input type="radio" name="level" id="lvl-none" value="none"><span><b>No enemy</b><small>Sandbox: no AI and no enemy base</small></span></label>`;
   const mapNote = document.getElementById('setup-map-note');
   const drawMaps = () => {
-    document.getElementById('setup-map').innerHTML = [['canyon', 'Desert Canyon', 'Ridges, ramps and a walled base'], ['open', 'Open Desert', 'No rock: wide open ground'], ['forest', 'Forest River', 'Woods, a river and three bridges'], ['custom', 'Custom map', custom ? 'Your saved map' : 'Not built yet']].map(([id, n, d]) => `<label class="fchip lvl"><input type="radio" name="map" id="map-${id}" value="${id}"${id === mapId ? ' checked' : ''}${id === 'custom' && !custom ? ' disabled' : ''}><span><b>${esc(n)}</b><small>${esc(d)}</small></span></label>`).join('') + '<button type="button" class="tbtn sm" id="setup-mapbuild">Open map builder</button>';
+    document.getElementById('setup-map').innerHTML = MAPS.map(m => [m.id, m.name, m.desc]).concat([['custom', 'Custom map', custom ? 'Your saved map' : 'Not built yet']]).map(([id, n, d]) => `<label class="fchip lvl"><input type="radio" name="map" id="map-${id}" value="${id}"${id === mapId ? ' checked' : ''}${id === 'custom' && !custom ? ' disabled' : ''}><span><b>${esc(n)}</b><small>${esc(d)}</small></span></label>`).join('') + '<button type="button" class="tbtn sm" id="setup-mapbuild">Open map builder</button>';
     mapNote.textContent = mapId === 'custom' ? 'Playing your custom map.' : '';
   };
   drawMaps();
@@ -50,7 +50,7 @@ export function showSetup(onStart) {
     const cur = myGen(); document.getElementById('setup-general').innerHTML = generalsOf(mine).map(id => { const G = GENERALS[id]; return `<label class="fchip lvl"><input type="radio" name="general" value="${id}"${id === cur ? ' checked' : ''}><span><b>${esc(G.name)}</b><small>${esc(G.title)}: ${esc(G.desc)}</small></span></label>`; }).join('');
   };
   drawGenerals();
-  root.addEventListener('click', (e) => { if (e.target.id !== 'setup-mapbuild') return; root.hidden = true; openMapBuilder(custom || (mapId === 'open' ? OPEN_MAP : mapId === 'forest' ? FOREST_MAP : null), (spec) => { root.hidden = false; if (spec) { custom = spec; mapId = 'custom'; } drawMaps(); }); });
+  root.addEventListener('click', (e) => { if (e.target.id !== 'setup-mapbuild') return; root.hidden = true; openMapBuilder(custom || (MAPS.find(m => m.id === mapId) || MAPS[0]).spec, (spec) => { root.hidden = false; if (spec) { custom = spec; mapId = 'custom'; } drawMaps(); }); });
   document.getElementById('setup-light').innerHTML = LIGHTING.map(([id, n, d]) => `<label class="fchip lvl"><input type="radio" name="light" id="light-${id}" value="${id}"><span><b>${esc(n)}</b><small>${esc(d)}</small></span></label>`).join('');
   document.getElementById('setup-funds').innerHTML = FUNDS.map(v => `<label class="fchip"><input type="radio" name="funds" id="funds-${v}" value="${v}"><span>$${v.toLocaleString('en-US')}</span></label>`).join('');
   const tbox = document.getElementById('setup-treaty'), nbox = document.getElementById('setup-nosuper'), kbox = document.getElementById('setup-koth');
@@ -59,7 +59,7 @@ export function showSetup(onStart) {
   root.addEventListener('change', (e) => { if (e.target.name === 'faction') { mine = e.target.value; drawGenerals(); } else if (e.target.name === 'general') gen[mine] = e.target.value; else if (e.target.name === 'foe') foe = e.target.value; else if (e.target.name === 'level') level = e.target.value; else if (e.target.name === 'col-you') { colYou = e.target.value; drawColors(); } else if (e.target.name === 'col-foe') { colFoe = e.target.value; drawColors(); } else if (e.target.name === 'map') { mapId = e.target.value; mapNote.textContent = mapId === 'custom' ? 'Playing your custom map.' : ''; } else if (e.target.name === 'light') light = e.target.value; else if (e.target.name === 'funds') funds = +e.target.value; else if (e.target === tbox) treaty = tbox.checked; else if (e.target === nbox) noSuper = nbox.checked; else if (e.target === kbox) koth = kbox.checked; });
   root.hidden = false;
   const go = (a, b, lv = level, o = {}) => {
-    const opt = { lighting: o.lighting || light, money: o.money || funds, treaty: (o.treaty ?? treaty) ? TREATY_SECONDS : 0, noSuper: !!(o.noSuper ?? noSuper), koth: !!(o.koth ?? koth), noEnemy: !!(o.noEnemy ?? lv === 'none'), colors: resolveColors(...(o.colors || [colYou, colFoe])), map: o.map !== undefined ? o.map : mapId === 'custom' ? custom : mapId === 'open' ? OPEN_MAP : mapId === 'forest' ? FOREST_MAP : null };
+    const opt = { lighting: o.lighting || light, money: o.money || funds, treaty: (o.treaty ?? treaty) ? TREATY_SECONDS : 0, noSuper: !!(o.noSuper ?? noSuper), koth: !!(o.koth ?? koth), noEnemy: !!(o.noEnemy ?? lv === 'none'), colors: resolveColors(...(o.colors || [colYou, colFoe])), map: o.map !== undefined ? o.map : mapId === 'custom' ? custom : ((MAPS.find(m => m.id === mapId) || MAPS[0]).spec || null) };
     try { localStorage.setItem('cz-setup', JSON.stringify({ mine: a, foe: b, level: lv, light: opt.lighting, funds: opt.money, treaty: !!opt.treaty, noSuper: opt.noSuper, koth: opt.koth, map: mapId, colors: opt.colors, gen })); } catch (e) { /* ignore */ }
     const pick = b === 'random' ? FACTION_IDS[Math.floor(Math.random() * FACTION_IDS.length)] : b; // chosen before the sim starts, so the sim itself stays deterministic
     const eg = generalsOf(pick); opt.generals = o.generals || [a === mine ? myGen() : generalsOf(a)[0], eg[Math.floor(Math.random() * eg.length)]];   // the enemy's general is drawn here, before the sim starts

@@ -18,7 +18,7 @@ export function makeUnit(sim, type, team, x, z, facing = 0) {
     xp: 0, vet: 0, tier: 0, addon: null, addonQ: null, garrison: null,
     stealthMode: d.stealth || null, cloaked: false, detected: false, revealUntil: 0, stillT: 0,
     empUntil: 0, emp: false, deployed: false, cashAcc: 0, horde: false, pdlCd: 0, capT: 0,
-    ammo: d.ammo || 0, as: d.based ? 'parked' : null, home: 0, pad: -1, rw: -1, loiterT: 0, loiterO: null, extend: 0, appr: 0, landed: false, reloadT: 0,
+    ammo: d.ammo || 0, as: d.based ? 'parked' : null, home: 0, pad: -1, rw: -1, loiterT: 0, loiterO: null, extend: 0, appr: 0, wps: null, hb: 0, hoverLow: false, landed: false, reloadT: 0,
     altK: d.air && !d.based ? 1 : 0, paltK: d.air && !d.based ? 1 : 0, // height as a fraction of cruise altitude (see air.js)
   };
   sim.ents.push(u); sim.byId.set(u.id, u);
@@ -239,6 +239,14 @@ export function kill(sim, e) {
   }
 }
 
+// Take an unfinished building off the map without a wreck or a loss on the scoreboard (cancelled construction).
+export function removeBldg(sim, b) {
+  if (b.dead) return;
+  b.dead = true; b.hp = 0;
+  sim.nav.setRect(b.cx, b.cz, b.w, b.h, 0);
+  if (b.slots) { for (const s of b.slots) s.by = 0; markBays(sim, b, 0); }
+}
+
 // Hit zone for directional armor: 0 front, 1 side, 2 rear.
 export function hitZone(t, sx, sz) {
   const a = Math.atan2(sz - t.z, sx - t.x), d = Math.abs(angDiff(a, t.facing));
@@ -278,14 +286,26 @@ export function splashDamage(sim, x, z, r, dmg, wname, src, sx = x, sz = z) {
   }
 }
 
-// Placement rule shared by the sim (authoritative) and the UI ghost.
+// Area damage to everything in the radius, whoever owns it (force attack). The shooter itself is spared.
+export function splashAll(sim, x, z, r, dmg, wname, src, sx = x, sz = z) {
+  const n = sim.ents.length;
+  for (let i = 0; i < n; i++) {
+    const e = sim.ents[i];
+    if (e.dead || e === src || (e.kind === 'unit' && e.inB)) continue;
+    if (e.kind === 'unit' && e.air && !e.landed && !WEAPONS[wname].vs.air) continue;
+    const d = e.kind === 'unit' ? Math.max(0, Math.hypot(e.x - x, e.z - z) - e.radius) : rectDist(e, x, z);
+    if (d > r) continue;
+    applyDamage(sim, e, dmg * (1 - 0.6 * d / r), wname, sx, sz, src);
+  }
+}
+
+// Placement rule shared by the sim (authoritative) and the UI ghost. Any open ground will do: it does not have to be scouted or near your base.
 export function canPlace(sim, type, cx, cz, team) {
   const d = BLDGS[type], nav = sim.nav;
   if (cx < 4 || cz < 4 || cx + d.w > N - 4 || cz + d.h > N - 4) return false;
   for (let z = cz - 1; z <= cz + d.h; z++) for (let x = cx - 1; x <= cx + d.w; x++) {
     const i = z * N + x;
     if (nav.stat[i] || nav.bld[i]) return false;
-    if (team >= 0 && team < 2 && !sim.fog.exp[team][i]) return false;
   }
   const x0 = cx * CELL, z0 = cz * CELL, x1 = (cx + d.w) * CELL, z1 = (cz + d.h) * CELL;
   for (const e of sim.ents) {

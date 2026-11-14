@@ -13,6 +13,6 @@ const local = (g) => { const out = [];
   else { for (let i = 0; i < 12; i++) for (let j = 0; j <= 6; j++) { const a = i / 12 * 6.283, b = j / 6 * 3.1416; out.push([Math.sin(b) * Math.cos(a) * p0, Math.cos(b) * p0, Math.sin(b) * Math.sin(a) * p0]); } }
   return out; };
 const meshes = [];
-const walk = (o, chain) => { const c2 = chain.concat([o]); if (o.isMesh) { let pts = local(o.geometry); for (let i = c2.length - 1; i >= 0; i--) { const n = c2[i]; pts = pts.map(p => { const q = rot([p[0] * n.scale.x, p[1] * n.scale.y, p[2] * n.scale.z], n.rotation); return [q[0] + n.position.x, q[1] + n.position.y, q[2] + n.position.z]; }); } meshes.push({ name: o.name, dark: o.material.color.hex < 0x505050, pts }); } for (const c of o.children) walk(c, c2); };
+const walk = (o, chain) => { const c2 = chain.concat([o]); if (o.isMesh) { let pts = local(o.geometry); for (let i = c2.length - 1; i >= 0; i--) { const n = c2[i]; pts = pts.map(p => { const q = rot([p[0] * n.scale.x, p[1] * n.scale.y, p[2] * n.scale.z], n.rotation); return [q[0] + n.position.x, q[1] + n.position.y, q[2] + n.position.z]; }); } meshes.push({ name: o.name, hex: o.material.color.hex, dark: o.material.color.hex < 0x505050, pts }); } for (const c of o.children) walk(c, c2); };
 walk(rig.body, []);
 console.log(JSON.stringify(meshes));

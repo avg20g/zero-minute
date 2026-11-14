@@ -3,7 +3,7 @@
 // faction registry; nothing here knows about specific units.
 import { DT, NEUTRAL, GARRISON_RANGE_BONUS, angDiff } from './defs.js';
 import { UNITS, BLDGS, WEAPONS, VET, HORDE, armorOf } from './factionRegistry.js';
-import { applyDamage, splashDamage, moveTo, stopUnit, isMoving, kill } from './entities.js';
+import { applyDamage, splashDamage, splashAll, moveTo, stopUnit, isMoving, kill } from './entities.js';
 import { addHazard } from './abilities.js';
 
 const NONE = [];
@@ -21,7 +21,13 @@ export function slotsOf(e) {
   }
   return (e.wslots = out);
 }
-const canUse = (w, t) => (w.garrisonOnly ? t.kind === 'bldg' && t.garrison.length > 0 : (w.vs[armorOf(t)] || 0) > 0);
+// Force attack aims at a spot on the ground: a stand-in target with no owner. Any weapon that can hurt something on the ground may fire at it.
+export const groundTarget = (x, z) => ({ id: 0, ground: true, kind: 'ground', x, z, radius: 0, dead: false, air: false, landed: false, team: -1 });
+const groundOK = (w) => !w.garrisonOnly && ((w.vs.inf || 0) + (w.vs.light || 0) + (w.vs.heavy || 0) + (w.vs.tank || 0) + (w.vs.bldg || 0)) > 0;
+const GROUND_HIT = 1.8;   // metres: a direct-fire weapon aimed at the ground hurts whatever stands this close to the spot
+const canUse = (w, t) => t.ground ? groundOK(w) : (w.garrisonOnly ? t.kind === 'bldg' && t.garrison.length > 0 : (w.vs[armorOf(t)] || 0) > 0);
+// Can this unit be given a force-attack order at all?
+export function canForce(sim, u) { _sim = sim; const d = UNITS[u.type]; if (d.suicide) return false; for (const n of slotsOf(u)) if (groundOK(WEAPONS[n])) return true; return false; }
 // Which slot leads against t. A garrison-clearing weapon is used on its own so
 // the building shell is not shot up alongside it. Returns -1 if nothing can hit t.
 function leadSlot(slots, t) {
@@ -29,7 +35,7 @@ function leadSlot(slots, t) {
   for (let i = 0; i < slots.length; i++) {
     const w = WEAPONS[slots[i]]; if (!canUse(w, t)) continue;
     if (w.garrisonOnly) return i + 100;
-    const v = w.vs[armorOf(t)]; if (v > bv) { bv = v; best = i; }
+    const v = t.ground ? 1 : w.vs[armorOf(t)]; if (v > bv) { bv = v; best = i; }
   }
   return best;
 }
@@ -81,12 +87,13 @@ function fire(sim, s, i, wname, ox, oz, t) {
   s.lastFire = sim.tick;
   if (s.kind === 'unit') { s.revealUntil = sim.tick + 40; if (UNITS[s.type].ammo) s.ammo--; }
   const dmg = dmgOf(sim, s, w), a = Math.atan2(t.z - oz, t.x - ox), vet = s.vet || 0;
+  const ff = s.kind === 'unit' && !!s.order && s.order.t === 'fattack';   // force attack: the shot hurts whatever it lands on, friend or foe
   if (w.kind === 'hitscan' || w.kind === 'laser' || w.kind === 'spray') {
     sim.events.push({ t: w.kind === 'hitscan' ? 'tracer' : w.kind, w: wname, x: ox, z: oz, tx: t.x, tz: t.z, sid: s.id, tid: t.id, vet, sAir: !!s.air && !s.landed, tAir: !!t.air && !t.landed });
-    applyDamage(sim, t, dmg, wname, ox, oz, s);
+    if (t.ground) splashAll(sim, t.x, t.z, GROUND_HIT, dmg, wname, s, ox, oz); else applyDamage(sim, t, dmg, wname, ox, oz, s);
   } else {
     sim.projs.push({ id: sim.nextId++, kind: w.kind, w: wname, x: ox, z: oz, px: ox, pz: oz, sx: ox, sz: oz, tid: t.id, tx: t.x, tz: t.z,
-      speed: w.speed, dmg, team: s.team, srcId: s.id, vet, dead: false, a, homing: w.kind !== 'lob', sAir: !!s.air && !s.landed, tAir: !!t.air && !t.landed, thermo: s.kind === 'unit' && !!UNITS[s.type].thermo });
+      speed: w.speed, dmg, team: s.team, srcId: s.id, vet, dead: false, a, ff, homing: w.kind !== 'lob', sAir: !!s.air && !s.landed, tAir: !!t.air && !t.landed, thermo: s.kind === 'unit' && !!UNITS[s.type].thermo });
     sim.events.push({ t: 'fire', k: w.kind, w: wname, x: ox, z: oz, a, sid: s.id, vet });
   }
 }
@@ -118,8 +125,13 @@ function unitCombat(sim, u, d, slots) {
   const o = u.order;
   let t = null, maxR = 0;
   for (let i = 0; i < slots.length; i++) { const w = WEAPONS[slots[i]]; if (!w.garrisonOnly) maxR = Math.max(maxR, w.range); }
-  const forced = o && o.t === 'attack';
-  if (forced) {
+  const forced = o && (o.t === 'attack' || o.t === 'fattack');
+  if (o && o.t === 'fattack') { // force attack: a spot on the ground, or any unit or building whoever owns it
+    t = o.id ? sim.byId.get(o.id) : o.g;
+    const gone = !t || t.dead || t.ruined || (t.kind === 'unit' && t.inB) || sim.tick < sim.treatyUntil;
+    if (gone || leadSlot(slots, t) < 0 || (d.ammo && u.ammo <= 0 && !d.based)) { u.order = null; u.target = 0; stopUnit(u); u.guardX = u.x; u.guardZ = u.z; return; }
+    u.target = 0;
+  } else if (forced) {
     t = sim.byId.get(o.id);
     if (!targetable(sim, u.team, t) || leadSlot(slots, t) < 0) { u.order = null; u.target = 0; stopUnit(u); u.guardX = u.x; u.guardZ = u.z; return; }
     u.target = t.id;
@@ -201,7 +213,8 @@ function stepProjectiles(sim) {
     p.x = p.tx; p.z = p.tz; p.dead = true;
     const src = sim.byId.get(p.srcId) || { team: p.team };
     let hit = false;
-    if (W.splash) { splashDamage(sim, p.x, p.z, W.splash, p.dmg, p.w, src, p.sx, p.sz); hit = true; }
+    if (W.splash) { (p.ff ? splashAll : splashDamage)(sim, p.x, p.z, W.splash, p.dmg, p.w, src, p.sx, p.sz); hit = true; }
+    else if (p.ff && !p.tid) { splashAll(sim, p.x, p.z, GROUND_HIT, p.dmg, p.w, src, p.sx, p.sz); hit = true; }
     else if (t && Math.hypot(t.x - p.x, t.z - p.z) <= t.radius + 2) { applyDamage(sim, t, p.dmg, p.w, p.sx, p.sz, src); hit = true; }
     if (W.hazard) {
       const big = p.thermo && sim.teams[p.team].upgrades.has('r_thermo');

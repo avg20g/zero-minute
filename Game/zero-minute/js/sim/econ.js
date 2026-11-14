@@ -25,7 +25,10 @@ export function completeBldg(sim, b) {
     sim.teams[b.team].powerReady[sp] = sim.tick + Math.round(POWERS[sp].cd * 20 * (G && G.superCd || 1)); b.seen[0] = b.seen[1] = true;
     sim.events.push({ t: 'superbuilt', id: sp, bid: b.id, team: b.team, x: b.x, z: b.z });
   }
-  if (BLDGS[b.type].role === 'supply') spawnNear(sim, FACTIONS[sim.teams[b.team].faction].roles.truck, b.team, b.x + (b.w / 2 + 3) * CELL, b.z, 0);
+  if (BLDGS[b.type].role === 'supply') { // every Supply Center comes with one free collector
+    const tk = FACTIONS[sim.teams[b.team].faction].roles.truck;
+    if (UNITS[tk].air) makeUnit(sim, tk, b.team, b.x, b.z, 0); else spawnNear(sim, tk, b.team, b.x + (b.w / 2 + 3) * CELL, b.z, 0);
+  }
 }
 
 // Queue entries are unit ids, or "up:<id>" for a team-wide upgrade.
@@ -202,6 +205,55 @@ function stepTruck(sim, u) {
   }
 }
 
+// Supply helicopter (Chinook): flies straight between a dock and a Supply Center, drops low over each to load and unload.
+// It needs no loading bay and no road, so it never queues, but anti-air can shoot it down.
+const CH_LOW = 0.32, CH_LOAD = 80, CH_UNLOAD = 32;
+function stepChopper(sim, u) {
+  const o = u.order;
+  if (o && o.t !== 'harvest') { u.hoverLow = false; u.hs = 'seek'; u.timer = -1; return; }
+  if (u.as) return;                                   // on a helipad, or lifting off it
+  if (!o) { u.order = { t: 'harvest' }; u.hs = 'seek'; u.timer = -1; }
+  const team = sim.teams[u.team], isCenter = e => BLDGS[e.type].role === 'supply' && e.team === u.team && e.done;
+  switch (u.hs) {
+    case 'seek': {
+      u.hoverLow = false;
+      if ((sim.tick + u.id) % 10 !== 0 && u.timer !== -1) break;
+      u.timer = 0;
+      let b;
+      if (u.cargo > 0) { b = nearestOf(sim, u, isCenter); if (!b) break; u.center = b.id; u.hs = 'toCenter'; }
+      else {
+        let dk = u.dock ? sim.byId.get(u.dock) : null;
+        if (!dk || dk.dead || dk.supplies <= 0) dk = nearestOf(sim, u, e => e.type === 'dock' && e.supplies > 0 && sim.fog.exp[u.team][sim.nav.cellOf(e.x, e.z)]);
+        if (!dk || !nearestOf(sim, u, isCenter)) break;
+        u.dock = dk.id; b = dk; u.hs = 'toDock';
+      }
+      const a = u.id * 2.399; u.hb = b.id; u.goal = { x: b.x + Math.cos(a) * 4, z: b.z + Math.sin(a) * 4 };   // each helicopter has its own spot over the building
+      break;
+    }
+    case 'toDock': case 'toCenter': {
+      const b = sim.byId.get(u.hb), isDock = u.hs === 'toDock';
+      if (!b || b.dead || (isDock ? b.supplies <= 0 : !b.done || b.team !== u.team)) { u.goal = null; u.hs = 'seek'; u.timer = -1; if (isDock) u.dock = 0; break; }
+      if (!u.goal || Math.hypot(u.goal.x - u.x, u.goal.z - u.z) < 3) { u.goal = null; u.hs = isDock ? 'loading' : 'unloading'; u.timer = isDock ? CH_LOAD : CH_UNLOAD; u.hoverLow = true; }
+      break;
+    }
+    case 'loading': case 'unloading': {
+      const b = sim.byId.get(u.hb), load = u.hs === 'loading';
+      if (!b || b.dead || (load && b.supplies <= 0)) { u.hoverLow = false; u.hs = 'seek'; u.timer = -1; if (load) u.dock = 0; break; }
+      u.goal = null; u.altK = Math.max(CH_LOW, u.altK - 0.06);
+      if (u.altK > CH_LOW + 0.01 || --u.timer > 0) break;
+      if (load) {
+        const take = Math.min(UNITS[u.type].carry, b.supplies); b.supplies -= take; u.cargo = take;
+        if (b.supplies <= 0) sim.events.push({ t: 'dockEmpty', id: b.id, x: b.x, z: b.z });
+      } else {
+        team.money += u.cargo; team.earned += u.cargo;
+        sim.events.push({ t: 'cash', x: b.x, z: b.z, amt: u.cargo, team: u.team }); u.cargo = 0;
+      }
+      u.hoverLow = false; u.hs = 'seek'; u.timer = -1;
+      break;
+    }
+  }
+}
+
 export function stepHarvest(sim) {
-  for (const u of sim.ents) if (u.kind === 'unit' && !u.dead && UNITS[u.type].harvester) stepTruck(sim, u);
+  for (const u of sim.ents) if (u.kind === 'unit' && !u.dead && UNITS[u.type].harvester) { if (u.air) stepChopper(sim, u); else stepTruck(sim, u); }
 }

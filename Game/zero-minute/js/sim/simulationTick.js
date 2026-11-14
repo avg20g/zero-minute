@@ -2,14 +2,14 @@
 // Nothing in here touches the DOM, the clock, or Math.random. All three
 // factions run through this one loop; their differences are registry data.
 import { N, CELL, WORLD, PLAYER, ENEMY, NEUTRAL } from './defs.js';
-import { UNITS, BLDGS, FACTIONS, UPGRADES, GENERALS, trainsOf, upgradesOf, unitCost } from './factionRegistry.js';
+import { UNITS, BLDGS, FACTIONS, UPGRADES, GENERALS, GENERAL, trainsOf, upgradesOf, unitCost } from './factionRegistry.js';
 import { generateMap } from './map.js';
 import { Nav } from './pathfinding.js';
 import { Fog } from './fog.js';
-import { makeUnit, makeBldg, spawnNear, kill, reqPath, moveTo, isMoving, stopUnit, releaseSlot, rectDist, canPlace, hasBldg, ejectGarrison, capacityOf } from './entities.js';
+import { makeUnit, makeBldg, spawnNear, kill, reqPath, moveTo, isMoving, stopUnit, releaseSlot, rectDist, canPlace, hasBldg, ejectGarrison, capacityOf, removeBldg } from './entities.js';
 import { stepMovement, stepPaths, formationSlots } from './move.js';
 import { stepAir, padCount } from './air.js';
-import { stepCombat, targetable, canAttack } from './combat.js';
+import { stepCombat, targetable, canAttack, canForce, groundTarget } from './combat.js';
 import { stepPower, stepProduction, stepConstruction, stepHarvest, approachPoint } from './econ.js';
 import { stepUpkeep, teleport, nearestTunnel, captureTick, sabotage } from './abilities.js';
 import { stepPowers, usePower } from './powers.js';
@@ -34,8 +34,12 @@ export class Sim {
     this.teams = [mkTeam(f[0], money), mkTeam(f[1], money)]; // equal starting cash; the AI never receives a bonus
     const gens = (opts.generals || []).map((g, i) => (g && GENERALS[g] && GENERALS[g].faction === f[i]) ? g : null);
     this.teams.forEach((T, i) => { T.general = gens[i] || null; const G = T.general && GENERALS[T.general]; if (G && G.grant) for (const id of G.grant) T.promos.add(id); });
+    if (opts.noEnemy) { // sandbox: the player starts at full rank with every General's promotion and power unlocked
+      const T = this.teams[PLAYER]; T.rank = GENERAL.rankXp.length; T.xp = GENERAL.rankXp[GENERAL.rankXp.length - 1]; T.points = 0;
+      for (const n of FACTIONS[T.faction].tree) { T.promos.add(n.id); if (n.flag) T.flags[n.flag] = true; if (n.power) T.powerReady[n.power] = 0; }
+    }
     this.tick = 0; this.winner = -1;
-    this.setup = { factions: f.slice(), money, difficulty: opts.difficulty || 'medium', seed: this.rng, treaty: opts.treaty || 0, noSuper: !!opts.noSuper, koth: !!opts.koth, noEnemy: !!opts.noEnemy, map: opts.map || null, generals: [gens[0] || null, gens[1] || null] }; // everything a replay needs
+    this.setup = { factions: f.slice(), money, difficulty: opts.difficulty || 'medium', seed: this.rng, treaty: opts.treaty || 0, noSuper: !!opts.noSuper, koth: !!opts.koth, noEnemy: !!opts.noEnemy, noShroud: !!opts.noShroud, map: opts.map || null, generals: [gens[0] || null, gens[1] || null] }; // everything a replay needs
     this.noSuper = !!opts.noSuper;               // lobby rule: superweapons cannot be built
     this.koth = null;                            // King of the Hill state, set in setupSkirmish when the mode is on
     this.treatyUntil = (opts.treaty || 0) * 20; // peace treaty: nobody can be targeted before this tick
@@ -49,6 +53,7 @@ export class Sim {
     }
     stepPower(this);
     this.fog.update(this);
+    if (opts.noShroud) this.fog.exp[PLAYER].fill(1);   // lobby default: the player starts with the whole map charted (terrain only: the enemy stays hidden until seen)
     // AI opponents: opts.ai false = none, 'both' = AI on both sides (tests), otherwise the enemy side
     if (opts.ai !== false && !opts.empty && !opts.noEnemy) {
       const lv = opts.difficulty || 'medium';
@@ -160,7 +165,7 @@ function setupSkirmish(sim) {
 function own(sim, id, team) { const e = sim.byId.get(id); return e && !e.dead && e.team === team ? e : null; }
 function freeUnit(sim, u) { // clear any state tied to the previous order
   if (u.slotB || u.exitB) releaseSlot(sim, u);
-  u.still = false; u.working = false; u.target = 0; u.noPath = 0; u.capT = 0; u.deployed = false;
+  u.still = false; u.working = false; u.target = 0; u.noPath = 0; u.capT = 0; u.deployed = false; u.wps = null;   // a new order also drops any queued move markers
   u.bursts[0] = u.bursts[1] = u.bursts[2] = 0;
 }
 const msg = (sim, team, text) => sim.events.push({ t: 'msg', team, text });
@@ -175,7 +180,16 @@ function applyCommand(sim, c) {
   const units = (pred) => { const out = []; for (const id of c.ids || []) { const u = own(sim, id, team); if (u && u.kind === 'unit' && !u.inB && (!pred || pred(u, UNITS[u.type]))) out.push(u); } return out; };
   switch (c.t) {
     case 'move': {
-      const all = units(), us = all.filter(u => !u.air), air = all.filter(u => u.air);
+      let all = units();
+      if (c.queue) { // move marker: units already on a move add this point after the ones they have; the rest treat it as a plain move
+        if (sim.nav.dirty) sim.nav.rebuild();
+        const busy = all.filter(u => !UNITS[u.type].based && u.order && (u.order.t === 'move' || u.order.t === 'amove'));
+        const gq = busy.filter(u => !u.air), slots = gq.length ? formationSlots(sim, gq, c.x, c.z) : [];
+        gq.forEach((u, i) => { (u.wps || (u.wps = [])).length < MAX_WPS && u.wps.push({ x: slots[i][0], z: slots[i][1], a: !!c.attack }); });
+        busy.filter(u => u.air).forEach((u, i) => { (u.wps || (u.wps = [])).length < MAX_WPS && u.wps.push({ x: c.x + ((i % 3) - 1) * 7, z: c.z + ((i / 3) | 0) * 7, a: !!c.attack }); });
+        all = all.filter(u => !busy.includes(u));
+      }
+      const us = all.filter(u => !u.air), air = all.filter(u => u.air);
       if (us.length) {
         if (sim.nav.dirty) sim.nav.rebuild();
         // keep relative left/right ordering so paths cross less
@@ -193,6 +207,33 @@ function applyCommand(sim, c) {
         const u = air[i], ox = ((i % 3) - (Math.min(air.length, 3) - 1) / 2) * 7, oz = ((i / 3) | 0) * 7;
         freeUnit(sim, u); u.order = { t: c.attack ? 'amove' : 'move', x: c.x + ox, z: c.z + oz, guard: !!c.guard }; // guard: strike aircraft hold over the point until out of missiles (air.js)
         if (!UNITS[u.type].based) moveTo(sim, u, c.x + ox, c.z + oz);
+      }
+      break;
+    }
+    case 'force': { // force attack: a point on the ground, or any unit or building (yours, the enemy's or neutral)
+      if (sim.tick < sim.treatyUntil) { msg(sim, team, 'Peace treaty: weapons are locked'); break; }
+      const t = c.target ? sim.byId.get(c.target) : null, ent = !!t && !t.dead && !t.ruined && !(t.kind === 'unit' && t.inB);
+      if (!ent && !(c.x >= 0 && c.z >= 0)) break;
+      for (const u of units((u) => canForce(sim, u))) {
+        if (ent && t === u) continue;
+        freeUnit(sim, u); stopUnit(u); u.target = 0;
+        u.order = ent ? { t: 'fattack', id: t.id, x: t.x, z: t.z, g: null } : { t: 'fattack', id: 0, x: c.x, z: c.z, g: groundTarget(c.x, c.z) };
+      }
+      break;
+    }
+    case 'cancelbuild': { // cancel an unfinished building: the full price comes back
+      const b = own(sim, c.id, team); if (!b || b.kind !== 'bldg' || b.done) break;
+      const back = BLDGS[b.type].cost | 0; T.money += back; removeBldg(sim, b);
+      sim.events.push({ t: 'cancelbuild', id: b.id, x: b.x, z: b.z, team, amt: back });
+      break;
+    }
+    case 'landrepair': { // helicopters fly to the nearest friendly helipad, land and are repaired there
+      for (const u of units((u, d) => d.heli)) {
+        let best = null, bd = 1e18;
+        for (const b of sim.ents) { if (b.kind !== 'bldg' || b.dead || !b.done || b.team !== team || !b.heli) continue; const dd = (b.x - u.x) ** 2 + (b.z - u.z) ** 2; if (dd < bd) { bd = dd; best = b; } }
+        if (!best) { msg(sim, team, 'Requires an Airfield (helipad)'); break; }
+        if (u.as === 'pad') continue;                                     // already down
+        freeUnit(sim, u); stopUnit(u); u.order = { t: 'repair', id: best.id };
       }
       break;
     }
@@ -320,6 +361,16 @@ function applyCommand(sim, c) {
 
 // ---------------- Order upkeep ----------------
 function done(u) { u.order = null; u.guardX = u.x; u.guardZ = u.z; }
+export const MAX_WPS = 12;   // move markers one unit can have queued
+// Head for the next queued move marker, if there is one.
+function nextMarker(sim, u) {
+  const w = u.wps && u.wps.shift();
+  if (!w) { u.wps = null; return false; }
+  if (!u.wps.length) u.wps = null;
+  u.order = { t: w.a ? 'amove' : 'move', x: w.x, z: w.z, rev: false }; u.noPath = 0; u.arrived = false;
+  moveTo(sim, u, w.x, w.z);
+  return true;
+}
 function stepOrders(sim) {
   for (const u of sim.ents) {
     if (u.kind !== 'unit' || u.dead || u.inB) continue;
@@ -327,13 +378,13 @@ function stepOrders(sim) {
     switch (o.t) {
       case 'move':
         if (UNITS[u.type].based) break; // flight logic owns strike aircraft
-        if (u.arrived || !isMoving(u)) done(u);
+        if (u.arrived || !isMoving(u)) { if (!nextMarker(sim, u)) done(u); }
         break;
       case 'amove':
         if (UNITS[u.type].based) break;
-        if (u.arrived && !u.target) done(u);
+        if (u.arrived && !u.target) { if (!nextMarker(sim, u)) done(u); }
         else if (!u.target && !isMoving(u)) {
-          if (Math.hypot(o.x - u.x, o.z - u.z) < 5 || u.noPath > 2) done(u);
+          if (Math.hypot(o.x - u.x, o.z - u.z) < 5 || u.noPath > 2) { if (!nextMarker(sim, u)) done(u); }
           else moveTo(sim, u, o.x, o.z);
         }
         break;

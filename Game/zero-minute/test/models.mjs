@@ -51,7 +51,7 @@ const P = MF.paint('vanguard', 0), PR = MF.paint('redhammer', 1), PS = MF.paint(
 {
   const rigs = { abrams: MF.ASSEMBLY.abrams(P), overlord: MF.ASSEMBLY.overlord(PR), battlemaster: MF.ASSEMBLY.battlemaster(PR), technical: MF.ASSEMBLY.technical(PS), scoutcar: MF.ASSEMBLY.scoutcar(PR),
     comanche: MF.ASSEMBLY.comanche(P), drone: MF.ASSEMBLY.drone(P), a10: MF.AIRCRAFT.a10(P), rocket: MF.createRocket(), raptor: MF.ASSEMBLY.raptor(P),
-    f15e: MF.ASSEMBLY.f15e(P), j11: MF.ASSEMBLY.j11(PR), b2: MF.AIRCRAFT.b2(P), lav25: MF.ASSEMBLY.lav25(P), scudtel: MF.ASSEMBLY.scudtel(PS), fpv: MF.ASSEMBLY.fpv(PS) };
+    f15e: MF.ASSEMBLY.f15e(P), j11: MF.ASSEMBLY.j11(PR), b2: MF.AIRCRAFT.b2(P), lav25: MF.ASSEMBLY.lav25(P), scudtel: MF.ASSEMBLY.scudtel(PS), fpv: MF.ASSEMBLY.fpv(PS), chinook: MF.ASSEMBLY.chinook(P) };
   let prisms = 0, meshes = 0;
   for (const [k, r] of Object.entries(rigs)) r.g.traverse((o) => {
     if (!o.isMesh) return; meshes++;
@@ -59,11 +59,21 @@ const P = MF.paint('vanguard', 0), PR = MF.paint('redhammer', 1), PS = MF.paint(
   });
   const glow = made.materials.filter(m => m.emissive !== undefined || m.emissiveIntensity);
   ok(glow.length === 0, `no emissive materials in the factory (${glow.length})`);
-  const shiny = made.materials.filter(m => m.roughness < 0.55 && m.color.hex !== 0x121a22);
+  const shiny = made.materials.filter(m => m.roughness < 0.55 && m.color.hex !== 0x121a22 && m.color.hex !== 0xd9a441);   // clear glass and the F-22's gold-tinted canopy
   ok(shiny.length === 0, `every paint and metal is matte (roughness >= 0.55); only glass is glossy (${shiny.map(m => m.color.hex.toString(16))})`);
   const hull = [P.hull, PR.hull, PS.hull];
   ok(hull.every(m => m.roughness >= 0.85 && m.metalness <= 0.1), 'hull paints: roughness >= 0.85, metalness <= 0.1');
   console.log(`assemblies     : ${Object.keys(rigs).length} rigs, ${meshes} meshes, ${prisms} extruded profiles all convex and outward; ${made.materials.length} materials, 0 emissive`);
+  { // batch 6: the three jets must not look alike, and the Chinook has its two rotors
+    const mats = (r, name) => { const out = new Set(); const walk = (o) => { if (o.isMesh && (!name || o.name === name)) out.add(o.material.color.hex); (o.children || []).forEach(walk); }; walk(r.g); return [...out]; };
+    const skin = (r) => mats(r, 'fuselage')[0], can = (r) => mats(r, 'canopy')[0];
+    ok(can(rigs.raptor) === 0xd9a441 && can(rigs.f15e) === 0x121a22 && can(rigs.j11) === 0x121a22, 'only the F-22 has the gold-tinted canopy');
+    ok(new Set([skin(rigs.raptor), skin(rigs.f15e), skin(rigs.j11)]).size === 3, 'F-22, F-15E and J-11 each have their own body colour (' + [rigs.raptor, rigs.f15e, rigs.j11].map(r => skin(r).toString(16)).join(', ') + ')');
+    const count = (r, name) => { let n = 0; const walk = (o) => { if (o.isMesh && o.name === name) n++; (o.children || []).forEach(walk); }; walk(r.g); return n; };
+    ok(count(rigs.raptor, 'camopatch') === 2 && count(rigs.f15e, 'conformaltank') === 2 && count(rigs.j11, 'radome') === 1 && count(rigs.f15e, 'camopatch') === 0, 'F-22 camouflage patches, F-15E conformal tanks, J-11 radome');
+    ok(rigs.chinook.rotor && rigs.chinook.rotor2 && rigs.chinook.rotor2.position.y > rigs.chinook.rotor.position.y && count(rigs.chinook, 'blade') === 6 && count(rigs.chinook, 'wheel') === 4, 'Chinook: two three-blade rotors in tandem, the aft one higher, four wheels');
+    const span = MF.CHINOOK.rotor * MF.CHINOOK.scale; ok(Math.abs(rigs.chinook.rotor.position.x - rigs.chinook.rotor2.position.x) < span && span > 6.5, 'the rotor discs overlap, as on the real aircraft');
+  }
   globalThis.__rigs = rigs;
 }
 const R = globalThis.__rigs;

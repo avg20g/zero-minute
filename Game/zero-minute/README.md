@@ -133,6 +133,30 @@ guard and promotions, so attack-move is F and guard is V.
 - **Models from real dimensions**: F-15E, J-11 (replaces the MiG), B-2, LAV-25, Scud launcher, FPV drone.
 - Tests: `node test/batch5.mjs` (52 checks) and section D of `python3 test/browser5.py <outdir>`.
 
+## Batch 6: orders, Chinooks, two maps, free-hand terrain
+- **Force attack** (T then click, or Ctrl + right-click): units fire on any spot, unit or building, including
+  your own. Command `{ t: 'force', ids, x, z, target }`, order `fattack`. Shots aimed at the ground hurt
+  whatever stands within 1.8 m (or the weapon's splash radius). Jets fly the attack run and go home.
+- **Move markers** (Shift + right-click, or the Move markers button): up to 12 queued points per unit
+  (`u.wps`). A plain order clears them. The HUD draws the route and a numbered flag at each marker.
+- **Cancel construction**: select an unfinished building, press Cancel construction: full refund.
+- **Build anywhere**: placement no longer needs scouted ground. **No black fog**: unseen ground is dimmed,
+  never hidden; enemy units and buildings stay hidden until seen (`noShroud` option, on in the game).
+- **Sandbox** (No enemy): the player starts at rank 5 with every promotion and power.
+- **Chinook**: the United States collects supplies by helicopter ($800, carries $200, no loading bays, crosses
+  water and cliffs; anti-air can shoot it down). One comes free with each Supply Center.
+- **Land & repair** (L): helicopters fly to the nearest friendly helipad, land one at a time and regain
+  6% health per second. Any new order makes them take off.
+- **Maps**: Urban Megacity (paved, 48 buildings, city blocks) and Arctic Refinery (snow, ten oil derricks,
+  frozen inlet). Ground types are now desert, woods, city and snow (`BIOMES` in `js/sim/map.js`).
+- **Map builder**: Rock, Hill and Water brushes for free-hand terrain (`spec.paint`, up to 400 stamps per
+  side), a brush-size slider, and all four ground types.
+- **Looks**: each jet has its own finish (F-22 pale grey with a gold canopy, F-15E dark grey with conformal
+  tanks, J-11 blue-grey with a pale radome). New Chinook model with tandem rotors.
+- **Fix**: a unit beside a building could skip the corner step of its path and push into the wall forever
+  (this could freeze an AI builder). Units now only cut a corner when the way ahead is open.
+- Tests: `node test/batch6.mjs` (68 checks) and section E of `python3 test/browser5.py <outdir>`.
+
 ## Replays
 A replay is the match setup plus the player's commands with their tick numbers
 (a 20-minute match is a few kilobytes). The AI runs inside the simulation, so
@@ -156,6 +180,8 @@ Node (simulation only):
     node test/air.mjs         runway take-off and landing, runway sharing, helipad, AI use
     node test/maps.mjs        map tools, validator, AI match on a custom map, sandbox
     node test/batch5.mjs      generals, Forest River, water and bridges, building types
+    node test/batch6.mjs      force attack, move markers, cancel build, Chinooks, helipad repair,
+                              new maps and brushes
     node test/bench.mjs       simulation speed benchmark
     node test/addon.mjs       superweapons, No-Superweapons rule, new powers,
                               King of the Hill, AI use of all of them

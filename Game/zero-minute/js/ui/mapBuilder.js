@@ -2,10 +2,13 @@
 // mirrored through the map centre by the generator, so both sides always get the same ground.
 // No Three.js here: the preview is a 2D picture drawn from the same generateMap() the match uses.
 import { N } from '../sim/defs.js';
-import { DEFAULT_MAP, OPEN_MAP, FOREST_MAP, CIV_KINDS, FOOT, MAP_LIMITS, cloneSpec, validateMap } from '../sim/map.js';
+import { DEFAULT_MAP, OPEN_MAP, FOREST_MAP, URBAN_MAP, ARCTIC_MAP, BIOMES, CIV_KINDS, FOOT, MAP_LIMITS, cloneSpec, validateMap } from '../sim/map.js';
 
 export const MAP_KEY = 'cz-map';
 export const TOOLS = [
+  ['paintrock', 'Rock brush', 'Free-hand: drag to paint rock in any shape. Blocks ground units.'],
+  ['painthill', 'Hill brush', 'Free-hand: drag to raise gentle hills. Units can drive over them.'],
+  ['paintwater', 'Water brush', 'Free-hand: drag to paint lakes and winding rivers.'],
   ['rock', 'Rock plateau', 'Drag a rectangle. Plateaus block all ground units.'],
   ['ramp', 'Ramp', 'Drag from the top edge of a plateau down to the floor.'],
   ['road', 'Road', 'Drag a line. Roads are visual: they do not change speed.'],
@@ -26,8 +29,13 @@ export function loadSavedMap() { try { const s = JSON.parse(localStorage.getItem
 
 // Pure edit operations (also used by the tests). Each returns true if the spec changed.
 export function applyTool(spec, tool, a, b, opt = {}) {
-  const [x0, z0] = a, [x1, z1] = b || a;
+  const [x0, z0] = a || (opt.pts && opt.pts[0]) || [0, 0], [x1, z1] = b || a || [x0, z0];
   switch (tool) {
+    case 'paintrock': case 'painthill': case 'paintwater': { // free-hand: one stamp per point of the stroke
+      spec.paint = spec.paint || []; const kind = BRUSH[tool], r = clamp(+opt.size || 6, 3, 14); let n = 0;
+      for (const p of opt.pts || [[x0, z0]]) { if (spec.paint.length >= MAP_LIMITS.paint) break; spec.paint.push([Math.round(p[0] * 2) / 2, Math.round(p[1] * 2) / 2, r, kind]); n++; }
+      return n > 0;
+    }
     case 'rock': { const hw = Math.abs(x1 - x0) / 2, hh = Math.abs(z1 - z0) / 2; if (hw < 3 || hh < 3 || spec.mesas.length >= MAP_LIMITS.mesas) return false; spec.mesas.push([(x0 + x1) / 2, (z0 + z1) / 2, hw, hh, Math.min(6, hw, hh)]); return true; }
     case 'ramp': { const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz); if (len < 6) return false; const hor = Math.abs(dx) >= Math.abs(dz); spec.ramps.push({ x: x0, z: z0, dx: hor ? Math.sign(dx) : 0, dz: hor ? 0 : Math.sign(dz), len: clamp(Math.round(len), 8, 24), hw: 6 }); return true; }
     case 'water': { spec.water = spec.water || []; if (Math.hypot(x1 - x0, z1 - z0) < 8 || spec.water.length >= MAP_LIMITS.water) return false; spec.water.push([x0, z0, x1, z1, 5]); return true; }
@@ -38,6 +46,10 @@ export function applyTool(spec, tool, a, b, opt = {}) {
     case 'civ': if (spec.civs.length >= MAP_LIMITS.civs) return false; spec.civs.push([Math.round(x0 - 3), Math.round(z0 - 3), (opt.kind | 0) % CIV_KINDS.length]); return true;
     case 'start': spec.start = [Math.round(x0 - 5), Math.round(z0 - 5)]; delete spec.rampTop; return true;
     case 'erase': {
+      if (spec.paint && spec.paint.length) { // brush work comes off first: every stamp the click (or its mirror) touches
+        const before = spec.paint.length; spec.paint = spec.paint.filter(s => ![[x0, z0], mir([x0, z0])].some(p => Math.hypot(p[0] - s[0], p[1] - s[1]) <= s[2] + 1));
+        if (spec.paint.length < before) return true;
+      }
       for (const p of [[x0, z0], mir([x0, z0])]) { // the click may be on the object or on its mirror twin
         const inRect = (x, z, w, h) => p[0] >= x && p[0] <= x + w && p[1] >= z && p[1] <= z + h;
         let i = spec.docks.findIndex(d => inRect(d.x, d.z, 8, 6)); if (i >= 0) { spec.docks.splice(i, 1); return true; }
@@ -55,7 +67,8 @@ export function applyTool(spec, tool, a, b, opt = {}) {
   }
   return false;
 }
-const normalise = (s) => { const o = cloneSpec(s); for (const k of ['mesas', 'ramps', 'roads', 'docks', 'derricks', 'civs', 'water', 'bridges']) o[k] = o[k] || []; o.biome = o.biome || 'desert'; o.name = 'Custom map'; return o; };
+export const BRUSH = { paintrock: 0, painthill: 1, paintwater: 2 };
+const normalise = (s) => { const o = cloneSpec(s); for (const k of ['mesas', 'ramps', 'roads', 'docks', 'derricks', 'civs', 'water', 'bridges', 'paint']) o[k] = o[k] || []; o.biome = o.biome || 'desert'; o.name = 'Custom map'; return o; };
 
 export function openMapBuilder(initial, onDone) {
   const root = $('mapbuilder'), cv = $('mb-canvas'), g = cv.getContext('2d'), base = document.createElement('canvas'); base.width = base.height = N;
@@ -78,7 +91,8 @@ export function openMapBuilder(initial, onDone) {
     const c = cv.width / 2; g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(c - 7, c); g.lineTo(c + 7, c); g.moveTo(c, c - 7); g.lineTo(c, c + 7); g.stroke(); // the mirror point: every object has a twin on the opposite side of it
     if (drag && drag.b) {
       g.strokeStyle = '#fff'; g.lineWidth = 2; g.setLineDash([5, 3]);
-      if (tool === 'rock') g.strokeRect(Math.min(drag.a[0], drag.b[0]) * S, Math.min(drag.a[1], drag.b[1]) * S, Math.abs(drag.b[0] - drag.a[0]) * S, Math.abs(drag.b[1] - drag.a[1]) * S);
+      if (tool in BRUSH) { g.setLineDash([]); g.fillStyle = ['rgba(120,90,60,0.6)', 'rgba(230,220,150,0.5)', 'rgba(52,116,146,0.65)'][BRUSH[tool]]; for (const q of drag.pts) for (const t of [q, mir(q)]) { g.beginPath(); g.arc(t[0] * S, t[1] * S, size() * S, 0, 6.283); g.fill(); } }
+      else if (tool === 'rock') g.strokeRect(Math.min(drag.a[0], drag.b[0]) * S, Math.min(drag.a[1], drag.b[1]) * S, Math.abs(drag.b[0] - drag.a[0]) * S, Math.abs(drag.b[1] - drag.a[1]) * S);
       else { g.beginPath(); g.moveTo(drag.a[0] * S, drag.a[1] * S); g.lineTo(drag.b[0] * S, drag.b[1] * S); g.stroke(); }
       g.setLineDash([]);
     }
@@ -88,32 +102,34 @@ export function openMapBuilder(initial, onDone) {
     const m = result.map, bg = base.getContext('2d'), img = bg.createImageData(N, N), px = img.data;
     if (m) for (let z = 0; z < N; z++) for (let x = 0; x < N; x++) {
       const r = m.rock[z * m.V + x], k = (z * N + x) * 4, dark = m.blocked[z * N + x] ? 0.62 : 1;
-      const wd = m.biome === 'woods';
-      px[k] = ((wd ? 104 : 198) - (wd ? 20 : 84) * r) * dark; px[k + 1] = ((wd ? 132 : 166) - (wd ? 50 : 78) * r) * dark; px[k + 2] = ((wd ? 78 : 112) - (wd ? 20 : 46) * r) * dark; px[k + 3] = 255;
+      const B = BIOMES[m.biome] || BIOMES.desert, lift = 1 + Math.max(0, Math.min(0.18, (m.height[z * m.V + x] - 0.8) * 0.06)) * (1 - r);   // hills show a little lighter
+      px[k] = Math.min(255, (B.rgb[0] + (B.rock[0] - B.rgb[0]) * r) * dark * lift); px[k + 1] = Math.min(255, (B.rgb[1] + (B.rock[1] - B.rgb[1]) * r) * dark * lift); px[k + 2] = Math.min(255, (B.rgb[2] + (B.rock[2] - B.rgb[2]) * r) * dark * lift); px[k + 3] = 255;
       if (m.water[z * N + x]) { px[k] = 52; px[k + 1] = 116; px[k + 2] = 146; }
     }
     if (m) for (let i = 0; i < m.trees.length; i += 3) { const k = (Math.floor(m.trees[i + 1] / 2) * N + Math.floor(m.trees[i] / 2)) * 4; px[k] = 38; px[k + 1] = 78; px[k + 2] = 40; } // one dark dot per tree
     bg.putImageData(img, 0, 0);
     const msgs = result.errors.map(e => `<li class="bad">${e}</li>`).concat(result.warnings.map(w => `<li class="warn">${w}</li>`));
-    if (result.ok) msgs.unshift(`<li class="good">Map is playable: ${spec.mesas.length * 2} plateaus, ${m.docks.length} Supply Docks, ${m.derricks.length} Oil Derricks, ${m.civs.length} buildings.</li>`);
+    if (result.ok) msgs.unshift(`<li class="good">Map is playable: ${spec.mesas.length * 2} plateaus, ${spec.paint.length} of ${MAP_LIMITS.paint} brush stamps, ${m.docks.length} Supply Docks, ${m.derricks.length} Oil Derricks, ${m.civs.length} buildings.</li>`);
     $('mb-msgs').innerHTML = msgs.join(''); $('mb-use').disabled = !result.ok; $('mb-undo').disabled = !undo.length;
     paint();
   };
   const edit = (fn) => { const before = JSON.stringify(spec); if (fn() === false) return; undo.push(before); if (undo.length > 60) undo.shift(); rebuild(); };
   const cell = (ev) => { const r = cv.getBoundingClientRect(); return [clamp((ev.clientX - r.left) / r.width * N, 0, N), clamp((ev.clientY - r.top) / r.height * N, 0, N)]; };
-  const isDrag = () => tool === 'rock' || tool === 'ramp' || tool === 'road' || tool === 'water' || tool === 'bridge';
-  const down = (ev) => { ev.preventDefault(); const p = cell(ev); if (isDrag()) { drag = { a: p, b: null }; try { cv.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ } } else edit(() => applyTool(spec, tool, p, null, { kind: +$('mb-kind').value })); };
-  const move = (ev) => { if (drag) { drag.b = cell(ev); paint(); } };
-  const up = (ev) => { if (!drag) return; const d = drag; drag = null; d.b = cell(ev); edit(() => applyTool(spec, tool, d.a, d.b)); paint(); };
+  const isDrag = () => tool === 'rock' || tool === 'ramp' || tool === 'road' || tool === 'water' || tool === 'bridge' || tool in BRUSH;
+  const size = () => clamp(+$('mb-size').value || 6, 3, 14);
+  const down = (ev) => { ev.preventDefault(); const p = cell(ev); if (isDrag()) { drag = { a: p, b: p, pts: [p] }; try { cv.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ } } else edit(() => applyTool(spec, tool, p, null, { kind: +$('mb-kind').value })); };
+  const move = (ev) => { if (drag) { drag.b = cell(ev); const l = drag.pts[drag.pts.length - 1]; if (tool in BRUSH && Math.hypot(drag.b[0] - l[0], drag.b[1] - l[1]) >= size() * 0.6) drag.pts.push(drag.b); paint(); } };   // a brush stroke drops a stamp every 0.6 brush-widths
+  const up = (ev) => { if (!drag) return; const d = drag; drag = null; d.b = cell(ev); edit(() => applyTool(spec, tool, d.a, d.b, { pts: d.pts, size: size() })); paint(); };
   const tools = (ev) => { if (ev.target.name === 'mb-tool') tool = ev.target.value; };
   const load = (s) => { edit(() => { spec = normalise(s); }); $('mb-biome').value = spec.biome || 'desert'; };
-  const H = { 'mb-undo': () => { if (undo.length) { spec = JSON.parse(undo.pop()); rebuild(); } }, 'mb-canyon': () => load(DEFAULT_MAP), 'mb-open': () => load(OPEN_MAP), 'mb-forest': () => load(FOREST_MAP), 'mb-clear': () => load({ mesas: [], ramps: [], roads: [], docks: [], derricks: [], civs: [], start: spec.start }),
+  const H = { 'mb-undo': () => { if (undo.length) { spec = JSON.parse(undo.pop()); rebuild(); } }, 'mb-canyon': () => load(DEFAULT_MAP), 'mb-open': () => load(OPEN_MAP), 'mb-forest': () => load(FOREST_MAP), 'mb-urban': () => load(URBAN_MAP), 'mb-arctic': () => load(ARCTIC_MAP), 'mb-clear': () => load({ mesas: [], ramps: [], roads: [], docks: [], derricks: [], civs: [], start: spec.start, biome: spec.biome }),
     'mb-use': () => { if (!result || !result.ok) return; try { localStorage.setItem(MAP_KEY, JSON.stringify(spec)); } catch (e) { /* storage unavailable: the map still works for this match */ } close(); onDone(spec); }, 'mb-cancel': () => { close(); onDone(null); } };
   const click = (ev) => { const b = ev.target.closest('button'); if (b && H[b.id]) H[b.id](); };
   const key = (ev) => { if (ev.key === 'Escape') H['mb-cancel'](); };
   function close() { root.hidden = true; cv.removeEventListener('pointerdown', down); cv.removeEventListener('pointermove', move); cv.removeEventListener('pointerup', up); $('mb-biome').removeEventListener('change', setBiome); $('mb-tools').removeEventListener('change', tools); root.removeEventListener('click', click); window.removeEventListener('keydown', key); }
   cv.addEventListener('pointerdown', down); cv.addEventListener('pointermove', move); cv.addEventListener('pointerup', up); $('mb-tools').addEventListener('change', tools); root.addEventListener('click', click); window.addEventListener('keydown', key);
   $('mb-kind').innerHTML = CIV_KINDS.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+  $('mb-biome').innerHTML = Object.entries(BIOMES).map(([id, b]) => `<option value="${id}">${b.name}</option>`).join('');
   const biome = $('mb-biome'), setBiome = () => edit(() => { spec.biome = biome.value; }); biome.addEventListener('change', setBiome);
   const syncBiome = () => { biome.value = spec.biome || 'desert'; };
   root.hidden = false; rebuild(); syncBiome();

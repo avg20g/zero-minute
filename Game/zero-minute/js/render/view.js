@@ -185,7 +185,7 @@ export class View {
     const fog = this.sim.fog, vis = fog.vis[PLAYER], exp = fog.exp[PLAYER], cur = this.fowCur, d = this.fowData;
     const k = Math.min(1, dt * 7);
     for (let i = 0; i < N * N; i++) {
-      const tgt = this.reveal || vis[i] ? 255 : exp[i] ? 118 : 0, c = cur[i] + (tgt - cur[i]) * k;
+      const tgt = this.reveal || vis[i] ? 255 : 118, c = cur[i] + (tgt - cur[i]) * k;   // no black shroud: unseen ground is dimmed, never hidden (enemy units and buildings still are)
       cur[i] = c; d[i * 4] = c;
     }
     this.fowTex.needsUpdate = true;
@@ -248,6 +248,7 @@ export class View {
           v.body.rotation.z = d.based ? (e.altK > e.paltK ? 0.26 : e.altK < e.paltK ? 0.09 : 0) * Math.min(1, ak * 6 + 0.25) : e.landed ? 0 : -Math.min(0.16, e.spd * 0.008); // nose up to climb, flare to land
           if (v.rotor) v.rotor.rotation.y += dt * (e.landed ? (e.as === 'spool' ? 3 + e.reloadT * 0.9 : 3) : 30);                    // rotors spool up on the helipad
           if (v.rotorTail) v.rotorTail.rotation.z += dt * 55;
+          if (v.rotor2) v.rotor2.rotation.y -= dt * (e.landed ? (e.as === 'spool' ? 3 + e.reloadT * 0.9 : 3) : 30);                  // tandem rotors turn opposite ways
           if (v.prop) v.prop.rotation.x += dt * 60;
           if (ak > 0.5 && d.based && fx.rnd() < dt * 40) { const g = 0.85; fx.smoke.spawn(x - c * 3, y, z - s * 3, 0, 0, 0, 0.5, 0.6, 1.4, g, g, g, 0.25, 0, 0.5); }
         } else {

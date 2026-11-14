@@ -4,7 +4,7 @@
 import { TEAM } from './teamColors.js';
 import { N, CELL, WORLD, PLAYER, ENEMY, NEUTRAL, ZONE_MULT, ZONE_NAME, TICK_HZ } from '../sim/defs.js';
 import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS, GENERAL, VET, GENERALS, trainsOf, upgradesOf, unitCost, nodePower } from '../sim/factionRegistry.js';
-import { heightAt } from '../sim/map.js';
+import { heightAt, BIOMES } from '../sim/map.js';
 import { hasBldg, capacityOf } from '../sim/entities.js';
 import { strikeVisible, hasPower, superOf } from '../sim/powers.js';
 
@@ -33,6 +33,10 @@ const ICON = {
   stop: svg('<rect x="6" y="6" width="12" height="12"/>'),
   scatter: svg('<path d="M12 12L4 5M12 12l8-7M12 12l-8 7M12 12l8 7" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2"/>'),
   guard: svg('<path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" fill="none" stroke="currentColor" stroke-width="2"/>'),
+  force: svg('<circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v6M12 16v6M2 12h6M16 12h6" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.6"/>'),
+  marker: svg('<path d="M6 21V4M6 4l10 3-10 4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="18" r="2"/><circle cx="20" cy="12" r="1.5"/>'),
+  land: svg('<path d="M3 6h18M12 6v4" stroke="currentColor" stroke-width="2" fill="none"/><path d="M6 10h10l3 3v2H6z"/><path d="M5 19h14" stroke="currentColor" stroke-width="2"/>'),
+  cancel: svg('<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="2"/>'),
   amove: svg('<path d="M12 2v5M12 17v5M2 12h5M17 12h5" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="12" cy="12" r="4"/>'),
   evac: svg('<path d="M3 21V5h10v16z"/><path d="M15 12h7m-3-3 3 3-3 3" stroke="currentColor" stroke-width="2" fill="none"/>'),
   star: svg('<path d="M12 2l2.900 6.300 6.900.800-5.100 4.700 1.400 6.800L12 17.200 5.900 20.600l1.400-6.800L2.200 9.100l6.900-.800z"/>'),
@@ -82,11 +86,10 @@ export class Hud {
     for (let z = 0; z < N; z++) for (let x = 0; x < N; x++) {
       const k = z * V + x, e = map.rock[k], i = (z * N + x) * 4;
       const lit = Math.max(0.55, Math.min(1.35, 1 + (H[k] - H[k + 1] + H[k] - H[k + V]) * 0.16));
-      let r = 198, gg = 166, b = 114;
-      if (map.biome === 'woods') { r = 104; gg = 132; b = 78; }
-      if (road[z * N + x] && e < 0.2) { r = 150; gg = 138; b = 118; }
-      if (e > 0.6) { r = 158; gg = 120; b = 84; }
-      if (map.blocked[z * N + x]) { r = 104; gg = 76; b = 56; }
+      const BI = BIOMES[map.biome] || BIOMES.desert; let [r, gg, b] = BI.rgb;
+      if (road[z * N + x] && e < 0.2) { if (map.biome === 'urban' || map.biome === 'snow') { r = 92; gg = 94; b = 100; } else { r = 150; gg = 138; b = 118; } }
+      if (e > 0.6) [r, gg, b] = BI.rock;
+      if (map.blocked[z * N + x]) [r, gg, b] = BI.cliff;
       if (map.water && map.water[z * N + x]) { r = 52; gg = 116; b = 146; }
       img.data[i] = r * lit; img.data[i + 1] = gg * lit; img.data[i + 2] = b * lit; img.data[i + 3] = 255;
     }
@@ -103,6 +106,8 @@ export class Hud {
         case 'msg': if ((e.team ?? PLAYER) === PLAYER) this.toast(e.text, 'warn'); break;
         case 'cash': if (e.team === PLAYER && !e.quiet) this.float(e.x, e.z, 6, '+$' + e.amt, '#f2a93b'); break;
         case 'done': if (e.team === PLAYER) this.toast(BLDGS[e.type].name + ' complete'); break;
+        case 'cancelbuild': if (e.team === PLAYER) { this.toast('Construction cancelled: $' + fmt(e.amt) + ' refunded'); this.float(e.x, e.z, 5, '+$' + e.amt, '#f2a93b'); } break;
+        case 'helipad': if (e.team === PLAYER) this.float(e.x, e.z, 4, 'REPAIRING', '#7dffa0'); break;
         // Superweapons are public: both sides are told when one comes online, where it is, and when it fires.
         case 'superbuilt': this.alert(e.x, e.z); this.toast(e.team === PLAYER ? POWERS[e.id].name + ' online. Ready in 5:00.' : 'WARNING: enemy ' + POWERS[e.id].name + ' detected. It fires in 5:00.', e.team === PLAYER ? '' : 'bad'); break;
         case 'superlaunch': if (e.team !== PLAYER) this.toast('WARNING: enemy ' + POWERS[e.id].name + ' launched', 'bad'); break;
@@ -111,7 +116,7 @@ export class Hud {
         case 'spawn': if (e.team === PLAYER) this.toast(UNITS[e.type].name + ' ready'); break;
         case 'upgrade': if (e.team === PLAYER) this.toast(UPGRADES[e.id].name + ' researched'); break;
         case 'addon': if (e.team === PLAYER) this.toast(UNITS.r_overlord.hardpoints[e.type].name + ' fitted'); break;
-        case 'dockEmpty': if (fog.exp[PLAYER][sim.nav.cellOf(e.x, e.z)]) this.toast('Supply Dock depleted. Trucks will look for another dock you have explored.', 'warn'); break;
+        case 'dockEmpty': if (fog.exp[PLAYER][sim.nav.cellOf(e.x, e.z)]) this.toast('Supply Dock depleted. Collectors will move to another dock.', 'warn'); break;
         case 'garrison': if (e.team === PLAYER) this.toast('Squad garrisoned'); break;
         case 'hit': {
           const t = sim.byId.get(e.id);
@@ -163,6 +168,10 @@ export class Hud {
       } else if (act === 'stop') { if (units.length) sim.issue({ t: 'stop', ids: units.map(u => u.id) }); }
       else if (act === 'amove') { ctl.cancelModes(); ui.amove = true; ui.guard = false; }
       else if (act === 'guard') { ctl.cancelModes(); ui.amove = true; ui.guard = true; }
+      else if (act === 'force') { const on = ui.force; ctl.cancelModes(); ui.force = !on; }
+      else if (act === 'wp') { ui.wp = !ui.wp; if (ui.wp) ctl.cancelModes(); }
+      else if (act === 'land') ctl.landRepair();
+      else if (act === 'cancelbuild') { for (const x of ctl.selectedOwn('bldg')) if (!x.done) sim.issue({ t: 'cancelbuild', id: x.id }); }
       else if (act === 'scatter') { if (units.length) { sim.issue({ t: 'scatter', ids: units.map(u => u.id) }); ui.sfx && ui.sfx('order'); } }
       else if (act === 'deploy') sim.issue({ t: 'deploy', ids: units.filter(u => UNITS[u.type].deploy).map(u => u.id) });
       else if (act === 'addon') { for (const u of units) if (UNITS[u.type].hardpoints && !u.addon && !u.addonQ) sim.issue({ t: 'addon', id: u.id, type: arg }); }
@@ -249,13 +258,17 @@ export class Hud {
       out.push({ act: 'stop', icon: ICON.stop, name: 'Stop', key: 'Z' });
       out.push({ act: 'scatter', icon: ICON.scatter, name: 'Scatter', key: 'X' });
       if (units.some(u => UNITS[u.type].weapon)) { out.push({ act: 'amove', icon: ICON.amove, name: 'Attack-move', key: 'F', on: this.ui.amove && !this.ui.guard }); out.push({ act: 'guard', icon: ICON.guard, name: 'Guard area', key: 'V', on: this.ui.amove && !!this.ui.guard }); }
+      if (units.some(u => UNITS[u.type].weapon && !UNITS[u.type].suicide)) out.push({ act: 'force', icon: ICON.force, name: 'Force attack', key: 'T', on: !!this.ui.force, tip: 'Fire on any spot, unit or building, even your own. Shortcut: Ctrl + right-click.' });
+      out.push({ act: 'wp', icon: ICON.marker, name: 'Move markers', key: 'Shift', on: !!this.ui.wp, tip: 'While on, every right-click adds another point to the route. Shortcut: Shift + right-click.' });
+      if (units.some(u => UNITS[u.type].heli)) out.push({ act: 'land', icon: ICON.land, name: 'Land & repair', key: 'L', tip: 'Fly to the nearest friendly helipad, land and repair.' });
       const dep = units.filter(u => UNITS[u.type].deploy);
       if (dep.length) out.push({ act: 'deploy', icon: ICON.income, name: dep.every(u => u.deployed) ? 'Pack up' : 'Deploy hack', key: '+$6/s', on: dep.every(u => u.deployed) });
       const ov = units.filter(u => UNITS[u.type].hardpoints && !u.addon && !u.addonQ);
       if (ov.length) for (const [k, hp] of Object.entries(UNITS[ov[0].type].hardpoints)) out.push({ act: 'addon:' + k, icon: k === 'gatling' ? ICON.defense : ICON.barracks, name: hp.name, cost: hp.cost, why: T.money < hp.cost ? 'Insufficient funds' : '' });
       if (units.some(u => u.garrison && u.garrison.length)) out.push({ act: 'evac', icon: ICON.evac, name: 'Unload bunker' });
     } else if (bldgs.length) {
-      const seen = new Set();
+      const seen = new Set(), sites = bldgs.filter(b => !b.done);
+      if (sites.length) out.push({ act: 'cancelbuild', icon: ICON.cancel, name: 'Cancel construction', key: 'refund $' + fmt(sites.reduce((a, b) => a + BLDGS[b.type].cost, 0)), tip: 'Remove the unfinished building and get its full price back.' });
       for (const b of bldgs) {
         if (!b.done) continue;
         const bd = BLDGS[b.type];
@@ -370,7 +383,7 @@ export class Hud {
     $('perf').textContent = `${fps.toFixed(0)} fps · sim ${simMs.toFixed(2)} ms/tick`;
     $('paused').hidden = !ui.paused;
     const pw = ui.power;
-    const m = pw ? POWERS[pw.id].name + ': ' + (pw.ok ? 'left-click the target' : pw.err) + ' (right-click cancels)' : ui.place ? 'Placing ' + BLDGS[ui.place.type].name + ': left-click to place, right-click to cancel' : ui.amove ? (ui.guard ? 'Guard area: left-click the spot to hold' : 'Attack-move: left-click a destination') : '';
+    const m = pw ? POWERS[pw.id].name + ': ' + (pw.ok ? 'left-click the target' : pw.err) + ' (right-click cancels)' : ui.place ? 'Placing ' + BLDGS[ui.place.type].name + ': left-click to place, right-click to cancel' : ui.amove ? (ui.guard ? 'Guard area: left-click the spot to hold' : 'Attack-move: left-click a destination') : ui.force ? 'Force attack: left-click any spot, unit or building. It will be fired on, even if it is yours. (right-click cancels)' : ui.wp ? 'Move markers ON: each right-click adds a point to the route. Press Esc or the button to finish.' : '';
     $('mode').textContent = m; $('mode').hidden = !m; $('mode').classList.toggle('bad', !!pw && !pw.ok);
     // General: rank, XP toward the next rank, unspent points
     const lo = GENERAL.rankXp[t.rank - 1], hi = GENERAL.rankXp[t.rank];
@@ -422,7 +435,7 @@ export class Hud {
     if (degraded) { this.radarT += dt; if (this.radarT < 3) return; } this.radarT = 0;
     if (fog.version !== this.fogVer) {
       this.fogVer = fog.version; const d = this.fogImg.data, vis = fog.vis[PLAYER], exp = fog.exp[PLAYER];
-      for (let i = 0; i < N * N; i++) { d[i * 4] = 7; d[i * 4 + 1] = 9; d[i * 4 + 2] = 11; d[i * 4 + 3] = vis[i] ? 0 : exp[i] ? 138 : 255; }
+      for (let i = 0; i < N * N; i++) { d[i * 4] = 7; d[i * 4 + 1] = 9; d[i * 4 + 2] = 11; d[i * 4 + 3] = vis[i] ? 0 : 138; }   // no black shroud: ground you have not seen is only dimmed
       this.fogCtx.putImageData(this.fogImg, 0, 0);
     }
     g.drawImage(this.base, 0, 0);
@@ -521,6 +534,39 @@ export class Hud {
         g.fillStyle = '#f2a93b'; g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p.x, p.y - 16); g.lineTo(p.x + 11, p.y - 12); g.lineTo(p.x, p.y - 8); g.fill();
       }
     }
+    // routes of the selected units: the point they are heading for, then every queued move marker, numbered in order
+    {
+      const flags = []; let drawn = 0;
+      for (const id of ui.selection) {
+        const u = sim.byId.get(id); if (!u || u.kind !== 'unit' || u.team !== PLAYER || !u.order || drawn >= 30) continue;
+        const o = u.order;
+        if (o.t === 'fattack') { // force-attack target: a red cross on the spot
+          const tgt = o.id ? sim.byId.get(o.id) : null, fx = tgt ? tgt.x : o.x, fz = tgt ? tgt.z : o.z;
+          if (v.project(fx, heightAt(map, fx, fz) + 0.4, fz, p)) { g.strokeStyle = '#ff7a1a'; g.lineWidth = 2.5; const r = 9 * k; g.beginPath(); g.moveTo(p.x - r, p.y - r * 0.6); g.lineTo(p.x + r, p.y + r * 0.6); g.moveTo(p.x + r, p.y - r * 0.6); g.lineTo(p.x - r, p.y + r * 0.6); g.stroke(); g.beginPath(); g.ellipse(p.x, p.y, r * 1.5, r * 0.9, 0, 0, 6.283); g.stroke(); }
+          continue;
+        }
+        if ((o.t !== 'move' && o.t !== 'amove') || (!u.wps && !ui.wp)) continue;
+        drawn++;
+        const pts = [[o.x, o.z, !!(o.t === 'amove')]].concat((u.wps || []).map(w => [w.x, w.z, w.a])), a = { x: 0, y: 0 };
+        let okPrev = v.project(u.x, heightAt(map, u.x, u.z) + 0.4, u.z, a);
+        g.strokeStyle = 'rgba(90,209,255,0.55)'; g.lineWidth = 1.5; g.setLineDash([5, 5]);
+        pts.forEach((q, i) => {
+          const okCur = v.project(q[0], heightAt(map, q[0], q[1]) + 0.3, q[1], p);
+          if (okPrev && okCur) { g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(p.x, p.y); g.stroke(); }
+          if (okCur && !flags.some(f => f[2] === i && Math.hypot(f[3] - q[0], f[4] - q[1]) < 14)) flags.push([p.x, p.y, i, q[0], q[1], q[2]]);
+          a.x = p.x; a.y = p.y; okPrev = okCur;
+        });
+        g.setLineDash([]);
+      }
+      g.font = `bold ${Math.round(10 * k)}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      for (const f of flags) { // a small numbered flag at each marker
+        const c = f[5] ? '#ff5a4d' : '#5ad1ff';
+        g.strokeStyle = c; g.lineWidth = 2; g.beginPath(); g.moveTo(f[0], f[1]); g.lineTo(f[0], f[1] - 18 * k); g.stroke();
+        g.fillStyle = c; g.beginPath(); g.moveTo(f[0], f[1] - 18 * k); g.lineTo(f[0] + 12 * k, f[1] - 14 * k); g.lineTo(f[0], f[1] - 10 * k); g.fill();
+        g.fillStyle = 'rgba(8,10,12,0.85)'; g.beginPath(); g.arc(f[0], f[1], 6.5 * k, 0, 6.283); g.fill(); g.fillStyle = c; g.fillText(String(f[2] + 1), f[0], f[1] + 0.5);
+      }
+      g.font = '700 10px "JetBrains Mono", ui-monospace, monospace'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    }
     // order pings
     for (const mk of this.controls.markers) {
       if (!v.project(mk.x, heightAt(map, mk.x, mk.z) + 0.2, mk.z, p)) continue;
@@ -553,6 +599,6 @@ export class Hud {
     this.acc += dt;
     if (this.acc >= 0.1) { const step = this.acc; this.acc = 0; this.renderStats(fps, simMs); this.renderInfo(); this.renderButtons(); this.drawMinimap(step); }
     const ui = this.ui;
-    this.ov.style.cursor = this.view.renderer.domElement.style.cursor = ui.power ? 'none' : ui.place ? 'cell' : ui.amove ? 'crosshair' : 'default';
+    this.ov.style.cursor = this.view.renderer.domElement.style.cursor = ui.power ? 'none' : ui.place ? 'cell' : ui.amove || ui.force ? 'crosshair' : 'default';
   }
 }

@@ -27,10 +27,12 @@ async def main():
         # ---- A. lobby + map builder
         lob = await pg.evaluate("({ maps: [...document.querySelectorAll('#setup-map .fchip b')].map(e => e.textContent), customDisabled: document.getElementById('map-custom').disabled, levels: [...document.querySelectorAll('#setup-levels .fchip b')].map(e => e.textContent) })")
         print('lobby          : maps', lob['maps'], '| custom disabled until built:', lob['customDisabled'], '| opponent', lob['levels'])
-        if lob['maps'] != ['Desert Canyon', 'Open Desert', 'Forest River', 'Custom map'] or not lob['customDisabled'] or lob['levels'][-1] != 'No enemy': fail('lobby map / opponent options')
+        if lob['maps'] != ['Desert Canyon', 'Open Desert', 'Forest River', 'Urban Megacity', 'Arctic Refinery', 'Custom map'] or not lob['customDisabled'] or lob['levels'][-1] != 'No enemy': fail('lobby map / opponent options')
         await pg.click('#setup-mapbuild'); await pg.wait_for_timeout(500)
         box = await pg.evaluate("(() => { const r = document.getElementById('mb-canvas').getBoundingClientRect(); return [r.left, r.top, r.width]; })()")
         P = lambda cx, cz: (box[0] + cx / 256 * box[2], box[1] + cz / 256 * box[2])
+        async def rb():   # the page may have scrolled since the last click: find the canvas again
+            nonlocal box; box = await pg.evaluate("(() => { const c = document.getElementById('mb-canvas'); c.scrollIntoView({ block: 'nearest' }); const r = c.getBoundingClientRect(); return [r.left, r.top, r.width]; })()")
         st = lambda: pg.evaluate("(() => { const m = [...document.querySelectorAll('#mb-msgs li')].map(l => l.className + ': ' + l.textContent); return { msgs: m, use: !document.getElementById('mb-use').disabled, shown: !document.getElementById('mapbuilder').hidden, setupHidden: document.getElementById('setup').hidden }; })()")
         s0 = await st()
         mb = await pg.evaluate("({ tools: [...document.querySelectorAll('#mb-tools input')].map(i => i.value), kinds: [...document.querySelectorAll('#mb-kind option')].map(o => o.textContent), biomes: [...document.querySelectorAll('#mb-biome option')].map(o => o.value) })")
@@ -38,11 +40,23 @@ async def main():
         await pg.click('#mb-clear'); s1 = await st()
         await pg.click('#mb-open'); s2 = await st()
         async def dragm(a, c):
-            x0, y0 = P(*a); x1, y1 = P(*c); await pg.mouse.move(x0, y0); await pg.mouse.down(); await pg.mouse.move((x0 + x1) / 2, (y0 + y1) / 2); await pg.mouse.move(x1, y1); await pg.mouse.up(); await pg.wait_for_timeout(250)
+            await rb(); x0, y0 = P(*a); x1, y1 = P(*c); await pg.mouse.move(x0, y0); await pg.mouse.down(); await pg.mouse.move((x0 + x1) / 2, (y0 + y1) / 2); await pg.mouse.move(x1, y1); await pg.mouse.up(); await pg.wait_for_timeout(250)
         await dragm((150, 160), (180, 235))                                  # rock plateau (tool is Rock by default)
         await pg.click('#mb-tools input[value="ramp"] + span'); await dragm((165, 160), (165, 142))
-        await pg.click('#mb-tools input[value="derrick"] + span'); x, y = P(150, 120); await pg.mouse.click(x, y); await pg.wait_for_timeout(250)
-        await pg.select_option('#mb-kind', '7'); await pg.click('#mb-tools input[value="civ"] + span'); x, y = P(120, 150); await pg.mouse.click(x, y); await pg.wait_for_timeout(250)   # a building of a chosen type
+        await pg.click('#mb-tools input[value="derrick"] + span'); await rb(); x, y = P(150, 120); await pg.mouse.click(x, y); await pg.wait_for_timeout(250)
+        # free-hand brushes, drawn with the real mouse: a curved water stroke, a hill, then erase part of the water
+        async def strokem(pts):
+            await rb(); await rb(); x, y = P(*pts[0]); await pg.mouse.move(x, y); await pg.mouse.down()
+            for q in pts[1:]:
+                x, y = P(*q); await pg.mouse.move(x, y, steps=4)
+            await pg.mouse.up(); await pg.wait_for_timeout(300)
+        npaint = lambda: pg.evaluate("JSON.parse(localStorage.getItem('cz-map-probe') || '0')")
+        await pg.click('#mb-tools input[value="paintwater"] + span'); await pg.fill('#mb-size', '5'); await strokem([(40, 30), (60, 44), (84, 50), (104, 66)])
+        await pg.click('#mb-tools input[value="painthill"] + span'); await pg.fill('#mb-size', '9'); await strokem([(200, 150), (214, 160)])
+        sb = await st(); brush_msg = sb['msgs'][0]
+        await pg.click('#mb-tools input[value="erase"] + span'); await rb(); x, y = P(40, 30); await pg.mouse.click(x, y); await pg.wait_for_timeout(250); sb2 = await st()
+        await pg.select_option('#mb-biome', 'snow'); await pg.wait_for_timeout(250); await pg.screenshot(path=OUT + '/p6_builder_brush.png'); await pg.select_option('#mb-biome', 'desert'); await pg.wait_for_timeout(250)
+        await pg.select_option('#mb-kind', '7'); await pg.click('#mb-tools input[value="civ"] + span'); await rb(); x, y = P(120, 150); await pg.mouse.click(x, y); await pg.wait_for_timeout(250)   # a building of a chosen type
         await pg.click('#mb-tools input[value="rock"] + span'); await dragm((0, 120), (256, 136)); s3 = await st()      # a wall across the whole map: must be refused
         await pg.click('#mb-undo'); s4 = await st()
         await pg.screenshot(path=OUT + '/p5_builder_custom.png')
@@ -60,16 +74,21 @@ async def main():
         col1 = await pg.evaluate("""async () => { const C = await import('./js/ui/teamColors.js'); return { ids: C.TEAM.ids, css: C.TEAM.css, cssVar: getComputedStyle(document.documentElement).getPropertyValue('--blue').trim(), ring: typeof window.__rts.view.ringMatE }; }""")
         print('team colours   : choices', col0['you'], '| default', col0['picked'], '| you pick the enemy colour ->', clash, '| in match', col1['ids'], col1['css'][:2], 'HUD accent', col1['cssVar'])
         if not (len(col0['you']) == 6 and col0['foe'] == 6 and col0['picked'] == ['blue', 'red'] and clash == ['gold', 'red', True] and col1['ids'] == ['green', 'purple'] and col1['css'][0] == '#5fd16f' and col1['cssVar'] == '#5fd16f'): fail('team colours')
-        g1 = await pg.evaluate("(() => { const s = window.__rts.sim; return { custom: s.map.custom, mesas: s.setup.map.mesas.length, ramps: s.setup.map.ramps.length, derricks: s.map.derricks.length, ai: s.ais.length, ents: s.ents.length, tick: s.tick }; })()")
+        g1 = await pg.evaluate("(() => { const s = window.__rts.sim; window.__paint = (s.setup.map.paint || []).length; window.__hasWater = s.map.hasWater; return { custom: s.map.custom, mesas: s.setup.map.mesas.length, ramps: s.setup.map.ramps.length, derricks: s.map.derricks.length, ai: s.ais.length, ents: s.ents.length, tick: s.tick }; })()")
         await pg.wait_for_timeout(4000); g1b = await pg.evaluate("window.__rts.sim.tick")
         civ = await pg.evaluate("""(() => { const g = window.__rts, s = g.sim, out = { spec: s.setup.map.civs.filter(c => c[2] === 7).length, ents: 0, white: 0, noMap: 0, kinds: [] };
             for (const e of s.ents) { if (e.type !== 'civ') continue; out.ents++; if (!out.kinds.includes(e.variant)) out.kinds.push(e.variant); if (!g.view.views.get(e.id)) out.noMap++; }
             return out; })()""")
+        print('brushes        :', brush_msg[:90], '| after erase:', sb2['msgs'][0][:90])
+        if not (sb['use'] and 'brush stamps' in brush_msg and brush_msg != sb2['msgs'][0] and sb2['use']): fail('free-hand brushes in the map builder')
         print('builder tools  :', len(mb['tools']), mb['tools'], '|', len(mb['kinds']), 'building types', mb['kinds'], '| ground', mb['biomes'])
         print('custom building: type 7 in the map', civ['spec'], '| civilian buildings in match', civ['ents'], 'kinds', sorted(civ['kinds']), '| buildings the view failed to build', civ['noMap'])
-        if not (len(mb['tools']) == 10 and 'water' in mb['tools'] and 'bridge' in mb['tools'] and len(mb['kinds']) == 10 and 'woods' in mb['biomes'] and civ['spec'] == 1 and 7 in civ['kinds'] and civ['noMap'] == 0): fail('map builder building types / white buildings')
+        if not (len(mb['tools']) == 13 and mb['tools'][:3] == ['paintrock', 'painthill', 'paintwater'] and 'bridge' in mb['tools'] and len(mb['kinds']) == 10 and mb['biomes'] == ['desert', 'woods', 'urban', 'snow'] and civ['spec'] == 1 and 7 in civ['kinds'] and civ['noMap'] == 0): fail('map builder building types / white buildings')
         print('custom match   : back in lobby', back, '| in match', g1, '| sim running', g1b > g1['tick'])
         if not (back['setup'] and back['builder'] and back['custom'] and back['saved'] and g1['custom'] and g1['mesas'] == 1 and g1['ramps'] == 1 and g1['derricks'] == 4 and g1['ai'] == 1 and g1b > g1['tick']): fail('custom map did not reach the match')
+        pw = await pg.evaluate("({ paint: window.__paint, water: window.__hasWater })")
+        print('brush in match :', pw)
+        if not (pw['paint'] >= 3 and pw['water']): fail('brush work did not reach the match')
         # ---- B. sandbox
         await grab(); await pg.goto(URL); await pg.wait_for_timeout(900)
         keep = await pg.evaluate("({ custom: document.getElementById('map-custom').checked, enabled: !document.getElementById('map-custom').disabled, colours: [document.querySelector('#setup-color-you input:checked').value, document.querySelector('#setup-color-foe input:checked').value] })")
@@ -151,11 +170,71 @@ async def main():
             return { general: s.teams[0].general, foe: R.FACTIONS[s.teams[1].faction].name, foeGeneral: s.teams[1].general, sub: document.getElementById('brand-sub').textContent, ticks: s.tick - t0, scudtruck: R.trainsOf(s.teams[0], 's_factory').includes('s_scudtruck') }; }""")
         print('WMD general    :', wm)
         if not (wm['general'] == 'wmd' and 'ISIS' in wm['sub'] and 'Nuclear Nadal' in wm['sub'] and wm['ticks'] > 40 and wm['scudtruck']): fail('ISIS WMD general vs AI on Forest River')
+        # ---- E. batch 6: new maps, no black fog, new orders, sandbox rank
+        rows = {}
+        for mp, fac, gen in [('urban', 'redhammer', 'mass'), ('arctic', 'vanguard', 'marine')]:
+            await grab(); await pg.goto(URL); await pg.wait_for_timeout(900)
+            await pg.click('#fac-' + fac + ' + span'); await pg.wait_for_timeout(150); await pg.click('#setup-general input[value="' + gen + '"] + span')
+            await pg.click('#setup-map input[value="' + mp + '"] + span'); await pg.click('#setup-levels input[value="medium"] + span'); await pg.click('#setup-start'); await pg.wait_for_timeout(5000)
+            rows[mp] = await pg.evaluate("""(() => { const g = window.__rts, s = g.sim, f = g.view.fowCur; let lo = 255, ex = 1; for (let i = 0; i < f.length; i += 37) { if (f[i] < lo) lo = f[i]; if (!s.fog.exp[0][i]) ex = 0; }
+                let hidden = 0; for (const e of s.ents) if (e.team === 1 && !s.fog.shouldShow(0, e)) hidden++;
+                return { name: s.map.name, biome: s.map.biome, civs: s.map.civs.length, derricks: s.map.derricks.length, water: s.map.hasWater, trees: s.map.trees.length / 3, darkest: Math.round(lo), charted: ex, enemyHidden: hidden, tick: s.tick, sub: document.getElementById('brand-sub').textContent }; })()""")
+            await pg.screenshot(path=OUT + '/p6_' + mp + '.png')
+        print('urban megacity :', rows['urban']); print('arctic refinery:', rows['arctic'])
+        u, a = rows['urban'], rows['arctic']
+        if not (u['biome'] == 'urban' and u['civs'] == 48 and not u['water'] and u['tick'] > 40 and a['biome'] == 'snow' and a['derricks'] == 10 and a['water'] and a['trees'] > 800 and a['tick'] > 40): fail('new maps in the page')
+        if not (u['darkest'] >= 100 and a['darkest'] >= 100 and u['charted'] and a['charted'] and u['enemyHidden'] > 0 and a['enemyHidden'] > 0): fail('no black fog: all ground dimmed at worst, the enemy still hidden')
+        # orders on the Arctic match (United States): real keys and mouse
+        od = await pg.evaluate("""async () => { const g = window.__rts, s = g.sim, E = await import('./js/sim/entities.js'), R = await import('./js/sim/factionRegistry.js');
+            const hq = s.ents.find(e => e.kind === 'bldg' && e.team === 0 && R.BLDGS[e.type].role === 'cc'); s.teams[0].money = 20000;
+            const tank = E.spawnNear(s, 'v_tank', 0, hq.x + 40, hq.z - 30), tank2 = E.spawnNear(s, 'v_tank', 0, hq.x + 48, hq.z - 30);
+            g.rig.focus(tank.x + 10, tank.z); g.ui.selection.clear(); g.ui.selection.add(tank.id); await new Promise(r => setTimeout(r, 600));
+            const p = { x: 0, y: 0 }, scr = (x, z) => { g.view.project(x, 0.5, z, p); const r = document.getElementById('gl').getBoundingClientRect(); return [p.x + r.left, p.y + r.top]; };
+            window.__t = { tank, tank2, scr, hq };
+            return { btns: [...document.querySelectorAll('#cmd button')].map(b => b.querySelector('.nm').textContent), a: scr(tank.x + 18, tank.z + 2), b: scr(tank.x + 26, tank.z + 12), c: scr(tank.x + 12, tank.z + 16), f: scr(tank.x + 14, tank.z - 8), t2: scr(tank2.x, tank2.z) }; }""")
+        await pg.mouse.click(od['a'][0], od['a'][1], button='right'); await pg.wait_for_timeout(250)
+        await pg.keyboard.down('Shift'); await pg.mouse.click(od['b'][0], od['b'][1], button='right'); await pg.mouse.click(od['c'][0], od['c'][1], button='right'); await pg.keyboard.up('Shift'); await pg.wait_for_timeout(300)
+        wp = await pg.evaluate("({ order: window.__t.tank.order && window.__t.tank.order.t, wps: (window.__t.tank.wps || []).length })")
+        await pg.screenshot(path=OUT + '/p6_markers.png')
+        await pg.keyboard.press('t'); await pg.wait_for_timeout(150); mode = await pg.evaluate("({ force: window.__rts.ui.force, hint: document.getElementById('mode').textContent })")
+        await pg.mouse.click(od['f'][0], od['f'][1]); await pg.wait_for_timeout(300)
+        fa = await pg.evaluate("({ order: window.__t.tank.order && window.__t.tank.order.t, id: window.__t.tank.order && window.__t.tank.order.id, wps: (window.__t.tank.wps || []).length, force: window.__rts.ui.force })")
+        await pg.keyboard.down('Control'); await pg.mouse.click(od['t2'][0], od['t2'][1], button='right'); await pg.keyboard.up('Control'); await pg.wait_for_timeout(300)
+        fb = await pg.evaluate("({ order: window.__t.tank.order && window.__t.tank.order.t, onFriend: window.__t.tank.order && window.__t.tank.order.id === window.__t.tank2.id })")
+        await pg.wait_for_timeout(5000); hurt = await pg.evaluate("(() => { const t = window.__t.tank2; return t.hp < t.maxHp; })()")
+        print('orders         : buttons', od['btns'], '| move + 2 Shift markers ->', wp, '| T ->', mode['force'], '| click ground ->', fa, '| Ctrl+right-click own tank ->', fb, '| it takes damage', hurt)
+        if not (all(n in od['btns'] for n in ['Force attack', 'Move markers']) and wp == {'order': 'move', 'wps': 2} and mode['force'] and 'Force attack' in mode['hint'] and fa['order'] == 'fattack' and fa['id'] == 0 and fa['wps'] == 0 and not fa['force'] and fb['onFriend'] and hurt): fail('force attack / move markers with real input')
+        # cancel construction through the command card, Chinook, land and repair button
+        cb = await pg.evaluate("""async () => { const g = window.__rts, s = g.sim, E = await import('./js/sim/entities.js'), EC = await import('./js/sim/econ.js'), R = await import('./js/sim/factionRegistry.js'), { hq } = window.__t;
+            const put = (type, done) => { for (let r = 8; r <= 60; r += 4) for (let dz = -r; dz <= r; dz += 4) for (let dx = -r; dx <= r; dx += 4) { if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue; if (E.canPlace(s, type, hq.cx + dx, hq.cz + dz, 0)) { const b = E.makeBldg(s, type, 0, hq.cx + dx, hq.cz + dz, done); s.nav.rebuild(); return b; } } return null; };
+            const doz = s.ents.find(e => e.team === 0 && e.kind === 'unit' && R.UNITS[e.type].builder); let site = null;
+            for (let r = 10; r <= 40 && !site; r += 4) if (E.canPlace(s, 'v_power', hq.cx + r, hq.cz - r, 0)) { s.issue({ t: 'build', id: doz.id, type: 'v_power', cx: hq.cx + r, cz: hq.cz - r }); await new Promise(r2 => setTimeout(r2, 400)); site = s.ents.find(e => e.type === 'v_power' && e.team === 0 && !e.done); }
+            const m0 = s.teams[0].money; g.ui.selection.clear(); g.ui.selection.add(site.id); await new Promise(r => setTimeout(r, 400));
+            const btn = [...document.querySelectorAll('#cmd button')].find(b => b.dataset.act === 'cancelbuild'); const label = btn ? btn.textContent.trim() : ''; if (btn) btn.click(); await new Promise(r => setTimeout(r, 500));
+            const out = { label, refunded: s.teams[0].money - m0, gone: !s.byId.get(site.id) };
+            put('v_power', true); put('v_power', true); const sc = put('v_supply', false); EC.completeBldg(s, sc); const af = put('v_airfield', false); EC.completeBldg(s, af); await new Promise(r => setTimeout(r, 600));
+            const ch = s.ents.find(e => e.type === 'v_chinook' && e.team === 0); out.chinook = !!ch; if (!ch) return out;
+            const v = g.view.views.get(ch.id); out.view = !!v; out.rotors = !!(v && v.rotor && v.rotor2);
+            ch.hp = 80; g.ui.selection.clear(); g.ui.selection.add(ch.id); await new Promise(r => setTimeout(r, 400));
+            out.btns = [...document.querySelectorAll('#cmd button')].map(b => b.querySelector('.nm').textContent);
+            window.__ch = ch; return out; }""")
+        await pg.keyboard.press('l'); await pg.wait_for_timeout(300)
+        lr = await pg.evaluate("""async () => { const ch = window.__ch; const o = ch.order && ch.order.t; const t0 = performance.now(); while (ch.as !== 'pad' && performance.now() - t0 < 40000) await new Promise(r => setTimeout(r, 100)); await new Promise(r => setTimeout(r, 3000)); return { order: o, as: ch.as, hp: Math.round(ch.hp), max: ch.maxHp, viewAlt: +window.__rts.view.views.get(ch.id).alt.toFixed(2) }; }""")
+        print('cancel build   :', {k: cb.get(k) for k in ['label', 'refunded', 'gone']}, '| Chinook view', cb.get('view'), 'two rotors', cb.get('rotors'), '| buttons', cb.get('btns'))
+        print('land + repair  : L ->', lr)
+        if not ('Cancel construction' in cb['label'] and cb['refunded'] == 800 and cb['gone']): fail('cancel construction from the command card')
+        if not (cb.get('chinook') and cb.get('rotors') and 'Land & repair' in cb.get('btns', []) and lr['order'] == 'repair' and lr['as'] == 'pad' and lr['hp'] > 100 and lr['viewAlt'] < 2): fail('Chinook / land and repair in the page')
+        # sandbox: full rank and every power button
+        await grab(); await pg.goto(URL); await pg.wait_for_timeout(900)
+        await pg.click('#fac-redhammer + span'); await pg.click('#setup-map input[value="urban"] + span'); await pg.click('#setup-levels input[value="none"] + span'); await pg.click('#setup-start'); await pg.wait_for_timeout(2500)
+        sb6 = await pg.evaluate("(async () => { const g = window.__rts, T = g.sim.teams[0], R = await import('./js/sim/factionRegistry.js'); return { rank: T.rank, promos: T.promos.size, tree: R.FACTIONS[T.faction].tree.length, powers: document.querySelectorAll('#pw button').length, points: T.points }; })()")
+        print('sandbox rank   :', sb6)
+        if not (sb6['rank'] == 5 and sb6['promos'] == sb6['tree'] and sb6['powers'] >= 1): fail('sandbox full rank in the page')
         await grab()
         print('three.js API   : properties the game read that the real r158 classes do not have:', len(reads)); [print('    ', k, '<-', v) for k, v in sorted(reads.items())]
         print('console errors :', len(errs)); [print('   ', e[:400]) for e in errs[:10]]
         bad += len(errs) + len(reads)
         await b.close()
-    print('BATCH 3-5 CLIENT:', 'all checks passed' if not bad else f'{bad} FAILURES')
+    print('BATCH 3-6 CLIENT:', 'all checks passed' if not bad else f'{bad} FAILURES')
 try: asyncio.run(main())
 finally: srv.terminate()

@@ -177,6 +177,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--amber); out
 .mb-body { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; margin-top: 12px; }
 #mb-canvas { width: min(512px, 100%); height: auto; aspect-ratio: 1; border: 1px solid var(--edge); touch-action: none; cursor: crosshair; image-rendering: pixelated; }
 .mb-side { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 12px; } .mb-side .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.mb-side #mb-tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); } #mb-size { width: 120px; }
+@media (min-width: 900px) { #mb-canvas { position: sticky; top: 8px; } }   /* the map stays in view while you scroll the tool list */
 #mb-msgs { list-style: none; margin: 0; padding: 0; font-size: 14px; display: flex; flex-direction: column; gap: 4px; } #mb-msgs li { padding: 5px 9px; border-left: 3px solid var(--edge); background: var(--panel); }
 #mb-msgs .bad { border-color: var(--red); } #mb-msgs .warn { border-color: var(--amber); } #mb-msgs .good { border-color: var(--good); }
 .tbtn:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -262,13 +264,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--amber); out
       <dt>Ctrl + 1-9</dt><dd>Save control group (Alt + 1-9 also works). 1-9 recalls, twice to jump</dd>
       <dt>F, then click</dt><dd>Attack-move: advance and engage anything on the way</dd>
       <dt>V, then click</dt><dd>Guard area: go there, then hold that spot</dd>
+      <dt>T, then click</dt><dd>Force attack: fire on any spot, unit or building, even your own. Ctrl + right-click does the same</dd>
+      <dt>Shift + right-click</dt><dd>Add a move marker: units visit every marker in order (up to 12)</dd>
+      <dt>L</dt><dd>Helicopters land on the nearest helipad and repair</dd>
       <dt>R + right-click</dt><dd>Reverse-move: vehicles back up, keeping thick front armor toward the enemy</dd>
       <dt>X &middot; Z</dt><dd>Scatter &middot; Stop</dd>
       <dt>Superweapon</dt><dd>Build it with your builder (needs the factory, $5,000). Both sides are warned. After 5:00 its round button lights up: click it, then the target</dd>
       <dt>G</dt><dd>General&rsquo;s Promotions. Unlocked support powers appear as round buttons: click one, then click the target</dd>
       <dt>H &middot; P &middot; Esc</dt><dd>Home &middot; Pause &middot; Cancel</dd>
     </dl>
-    <p>Start: select your builder, build a reactor if your faction uses power, then a supply building beside the Supply Dock south-east of your base. Its truck starts hauling on its own.</p>
+    <p>Start: select your builder, build a reactor if your faction uses power, then a supply building beside the Supply Dock south-east of your base. Its truck (a Chinook for the United States) starts hauling on its own. You can build on any open ground, and an unfinished building can be cancelled for a full refund.</p>
     <label><input type="checkbox" id="opt-edge" checked> Edge scrolling</label>
     <p id="touch">This build needs a mouse and keyboard.</p>
   </div>
@@ -328,8 +333,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--amber); out
         <canvas id="mb-canvas" width="512" height="512" aria-label="Top-down map. North is up."></canvas>
         <div class="mb-side">
           <div id="mb-tools" class="chips" role="radiogroup" aria-label="Tool"></div>
-          <div class="chips"><label class="tctl"><span class="lbl">Building type</span><select id="mb-kind"></select></label><label class="tctl"><span class="lbl">Ground</span><select id="mb-biome"><option value="desert">Desert</option><option value="woods">Woods (grass and trees)</option></select></label></div>
-          <div class="chips"><button type="button" class="tbtn sm" id="mb-undo">Undo</button><button type="button" class="tbtn sm" id="mb-canyon">Load Desert Canyon</button><button type="button" class="tbtn sm" id="mb-open">Load Open Desert</button><button type="button" class="tbtn sm" id="mb-forest">Load Forest River</button><button type="button" class="tbtn sm" id="mb-clear">Clear all</button></div>
+          <div class="chips"><label class="tctl"><span class="lbl">Building type</span><select id="mb-kind"></select></label><label class="tctl"><span class="lbl">Ground</span><select id="mb-biome"></select></label><label class="tctl"><span class="lbl">Brush size</span><input type="range" id="mb-size" min="3" max="14" step="1" value="6"></label></div>
+          <div class="chips"><button type="button" class="tbtn sm" id="mb-undo">Undo</button><button type="button" class="tbtn sm" id="mb-canyon">Load Desert Canyon</button><button type="button" class="tbtn sm" id="mb-open">Load Open Desert</button><button type="button" class="tbtn sm" id="mb-forest">Load Forest River</button><button type="button" class="tbtn sm" id="mb-urban">Load Urban Megacity</button><button type="button" class="tbtn sm" id="mb-arctic">Load Arctic Refinery</button><button type="button" class="tbtn sm" id="mb-clear">Clear all</button></div>
           <ul id="mb-msgs" aria-live="polite"></ul>
           <div class="chips"><button type="button" class="tbtn" id="mb-use">Use this map</button><button type="button" class="tbtn" id="mb-cancel">Cancel</button></div>
         </div>

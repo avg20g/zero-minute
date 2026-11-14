@@ -97,9 +97,21 @@ export class Controls {
 
   // ---------- orders ----------
   ping(x, z, color) { this.markers.push({ x, z, t: 0, color }); this.ui.sfx && this.ui.sfx('order'); }
-  smartOrder(mx, my) {
+  // Force attack: fire on the clicked spot, or on the unit or building under the cursor, whoever owns it.
+  forceOrder(mx, my) {
+    const g = this.ground(mx, my); if (!g) return false;
+    const ids = this.selectedOwn('unit').map(u => u.id); if (!ids.length) return false;
+    const t = this.entityAt(mx, my), target = t && !ids.includes(t.id) ? t.id : 0;
+    this.sim.issue({ t: 'force', ids, x: g.x, z: g.z, target }); this.ping(t && target ? t.x : g.x, t && target ? t.z : g.z, '#ff7a1a');
+    return true;
+  }
+  smartOrder(mx, my, opt = {}) {
     const sim = this.sim, g = this.ground(mx, my); if (!g) return;
-    const units = this.selectedOwn('unit'), t = this.entityAt(mx, my);
+    if (opt.force) { this.forceOrder(mx, my); return; }
+    const units = this.selectedOwn('unit'), t = opt.queue ? null : this.entityAt(mx, my);
+    if (opt.queue && units.length) { // move marker: goes after the points these units already have
+      sim.issue({ t: 'move', ids: units.map(u => u.id), x: g.x, z: g.z, queue: true }); this.ping(g.x, g.z, '#5ad1ff'); return;
+    }
     if (!units.length) {
       for (const b of this.selectedOwn('bldg')) if (BLDGS[b.type].trains) { sim.issue({ t: 'rally', id: b.id, x: g.x, z: g.z }); this.ping(g.x, g.z, '#f2a93b'); }
       return;
@@ -123,7 +135,7 @@ export class Controls {
     // hold R while right-clicking: vehicles back up to the point, keeping their front armour toward the fight
     if (rest.size) { const reverse = this.keys.has('KeyR'); sim.issue({ t: 'move', ids: [...rest], x: g.x, z: g.z, reverse }); if (rest.size === total) this.ping(g.x, g.z, reverse ? '#f2a93b' : '#7dffa0'); }
   }
-  startPlacing(type) { this.ui.place = { type, cx: 0, cz: 0, ok: false }; this.ui.amove = false; this.ui.power = null; this.updatePlace(); }
+  startPlacing(type) { this.ui.place = { type, cx: 0, cz: 0, ok: false }; this.ui.amove = false; this.ui.force = false; this.ui.power = null; this.updatePlace(); }
   updatePlace() {
     const pl = this.ui.place; if (!pl) return;
     const g = this.ground(this.mouse.x, this.mouse.y); if (!g) { pl.ok = false; return; }
@@ -141,14 +153,15 @@ export class Controls {
     if (builders.length > 1) this.pendingHelp = { ids: builders.slice(1).map(d => d.id), cx: pl.cx, cz: pl.cz, type: pl.type };
     if (!keep) this.ui.place = null;
   }
-  startPower(id) { this.ui.power = { id, ok: false, err: '' }; this.ui.place = null; this.ui.amove = false; this.updatePower(); }
+  startPower(id) { this.ui.power = { id, ok: false, err: '' }; this.ui.place = null; this.ui.amove = false; this.ui.force = false; this.updatePower(); }
   updatePower() {
     const pw = this.ui.power; if (!pw) return;
     const g = this.ground(this.mouse.x, this.mouse.y);
     if (!g) { pw.x = undefined; pw.ok = false; pw.err = 'Point at the ground'; return; }
     pw.x = g.x; pw.z = g.z; pw.err = powerError(this.sim, PLAYER, pw.id, g.x, g.z) || ''; pw.ok = !pw.err;
   }
-  cancelModes() { const ui = this.ui, had = ui.place || ui.amove || ui.power; ui.place = null; ui.amove = false; ui.power = null; return !!had; }
+  cancelModes() { const ui = this.ui, had = ui.place || ui.amove || ui.power || ui.force; ui.place = null; ui.amove = false; ui.power = null; ui.force = false; return !!had; }
+  landRepair() { const ids = this.selectedOwn('unit').filter(u => UNITS[u.type].heli).map(u => u.id); if (ids.length) { this.sim.issue({ t: 'landrepair', ids }); this.ui.sfx && this.ui.sfx('order'); } return ids.length > 0; }
 
   // ---------- groups ----------
   assignGroup(n) { this.ui.groups[n] = [...this.ui.selection].filter(id => { const e = this.sim.byId.get(id); return e && e.team === PLAYER; }); this.ui.toast && this.ui.toast(`Group ${n} set (${this.ui.groups[n].length})`); }
@@ -170,7 +183,7 @@ export class Controls {
     c.addEventListener('mousedown', e => {
       pos(e);
       if (e.button === 1) { e.preventDefault(); this.rot = { x: e.clientX, y: e.clientY }; return; }
-      if (e.button === 2) { if (!this.cancelModes()) this.smartOrder(this.mouse.x, this.mouse.y); return; }
+      if (e.button === 2) { if (!this.cancelModes()) this.smartOrder(this.mouse.x, this.mouse.y, { queue: e.shiftKey || !!ui.wp, force: e.ctrlKey }); return; }   // Shift: add a move marker. Ctrl: force attack.
       if (e.button !== 0) return;
       if (ui.power) {
         this.updatePower(); const pw = ui.power;
@@ -179,6 +192,7 @@ export class Controls {
         return;
       }
       if (ui.place) { this.confirmPlace(e.shiftKey); return; }
+      if (ui.force) { this.forceOrder(this.mouse.x, this.mouse.y); if (!e.shiftKey) ui.force = false; return; }
       if (ui.amove) {
         const g = this.ground(this.mouse.x, this.mouse.y), ids = this.selectedOwn('unit').map(u => u.id);
         if (g && ids.length) { this.sim.issue({ t: 'move', ids, x: g.x, z: g.z, attack: true, guard: !!this.ui.guard }); this.ping(g.x, g.z, this.ui.guard ? '#7dffa0' : '#ff5a4d'); }
@@ -221,8 +235,10 @@ export class Controls {
         case 'KeyX': { const ids = this.selectedOwn('unit').map(u => u.id); if (ids.length) { this.sim.issue({ t: 'scatter', ids }); ui.sfx && ui.sfx('order'); } break; }
         case 'KeyV': if (this.selectedOwn('unit').some(u => UNITS[u.type].weapon)) { this.cancelModes(); ui.amove = true; ui.guard = true; } break;
         case 'KeyF': if (this.selectedOwn('unit').some(u => UNITS[u.type].weapon)) { this.cancelModes(); ui.amove = true; ui.guard = false; } break;
+        case 'KeyT': if (this.selectedOwn('unit').some(u => UNITS[u.type].weapon)) { this.cancelModes(); ui.force = true; } break;
+        case 'KeyL': this.landRepair(); break;
         case 'KeyG': ui.togglePromo && ui.togglePromo(); break;
-        case 'Escape': if (ui.promoOpen) ui.togglePromo(); else if (!this.cancelModes()) ui.selection.clear(); break;
+        case 'Escape': if (ui.promoOpen) ui.togglePromo(); else if (ui.wp) ui.wp = false; else if (!this.cancelModes()) ui.selection.clear(); break;
         case 'KeyH': { const cc = this.sim.ents.find(b => b.kind === 'bldg' && b.team === PLAYER && BLDGS[b.type].role === 'cc'); if (cc) this.rig.focus(cc.x, cc.z); break; }
         case 'KeyP': ui.paused = !ui.paused; break;
         case 'ArrowUp': case 'ArrowDown': case 'ArrowLeft': case 'ArrowRight': case 'Space': e.preventDefault(); break;
@@ -252,6 +268,7 @@ export class Controls {
     this.prune();
     if (ui.place) { if (!this.selectedOwn('unit').some(u => UNITS[u.type].builder)) ui.place = null; else this.updatePlace(); }
     if (ui.power) this.updatePower();
+    if ((ui.force || ui.wp) && !this.selectedOwn('unit').length) { ui.force = false; ui.wp = false; }
     // hover (10 Hz): used for veterancy badges and health bars
     if ((this.hoverAcc += dt) > 0.1) { this.hoverAcc = 0; const h = m.overCanvas && !this.drag ? this.entityAt(m.x, m.y) : null; ui.hover = h ? h.id : 0; }
     // extra builders join a site once the sim has created it

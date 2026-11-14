@@ -46,6 +46,9 @@ export function stepMovement(sim) {
     if (u.path && !immovable(u)) {
       let ex = u.path[u.pi] - u.x, ez = u.path[u.pi + 1] - u.z, dist = Math.hypot(ex, ez);
       while (u.pi < u.path.length - 2 && dist < Math.max(2.4, u.radius * 1.4)) {
+        // Cut the corner only if the way to the next point is open from where the unit actually stands. Otherwise it must
+        // reach this point first (a unit beside a building could skip the step around its corner and push into the wall forever).
+        if (dist > 0.7 && !nav.lineClear(u.x / CELL, u.z / CELL, u.path[u.pi + 2] / CELL, u.path[u.pi + 3] / CELL, u.nc)) break;
         u.pi += 2; ex = u.path[u.pi] - u.x; ez = u.path[u.pi + 1] - u.z; dist = Math.hypot(ex, ez);
       }
       const last = u.pi >= u.path.length - 2;

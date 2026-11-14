@@ -110,7 +110,7 @@ const hold = (u) => { u.order = { t: 'hold' }; return u; };
     if (sim.winner >= 0 && overAt < 0) overAt = sim.tick;
     const d = dz();
     if (plan[t] && d) sim.issue({ t: 'build', id: d.id, type: plan[t][0], cx: plan[t][1], cz: plan[t][2] });
-    if (t === 600) { const sc = mine('v_supply'); if (sc) { sim.issue({ t: 'train', id: sc.id, type: 'v_truck' }); sim.issue({ t: 'train', id: sc.id, type: 'v_truck' }); } }
+    if (t === 600) { const sc = mine('v_supply'); if (sc) { sim.issue({ t: 'train', id: sc.id, type: 'v_chinook' }); sim.issue({ t: 'train', id: sc.id, type: 'v_chinook' }); } }
     if (t > 1300 && t % 300 === 0) { const f = mine('v_factory'), b = mine('v_barracks'); if (f) sim.issue({ t: 'train', id: f.id, type: (t / 300) % 2 ? 'v_tank' : 'v_avenger' }); if (b && t % 600 === 0) sim.issue({ t: 'train', id: b.id, type: 'v_ranger' }); }
     if (t > 2000 && t % 700 === 0) { const army = sim.ents.filter(e => e.kind === 'unit' && e.team === PLAYER && !e.dead && UNITS[e.type].weapon).map(e => e.id); if (army.length) { sim.issue({ t: 'scatter', ids: army }); sim.issue({ t: 'move', ids: army.slice(0, 3), x: 70 * CELL, z: 190 * CELL, reverse: true }); } }
     sim.step(); rec.mark(); sim.events.length = 0;

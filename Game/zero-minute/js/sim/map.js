@@ -47,7 +47,8 @@ const mirrorRect = (x, z, w, h) => [N - x - w, N - z - h];
 //   civs (half)     [x, z, kind]                      kind is an index into CIV_KINDS (see below)
 //   water (half)    [x0, z0, x1, z1, halfWidth]       river segments: blocked for everything except amphibious units and aircraft
 //   bridges (half)  [x0, z0, x1, z1, halfWidth]       crossings: the river is not cut inside a bridge strip
-//   biome           'desert' | 'woods'                ground textures; woods also grows trees (trees: 0..1 density)
+//   paint (half)    [x, z, radius, kind]              free-hand brush stamps: kind 0 rock, 1 gentle hill (units drive over it), 2 water
+//   biome           'desert' | 'woods' | 'urban' | 'snow'   ground textures; woods and snow grow trees (trees: 0..1 density)
 //   start           [x, z]                            your Command Center (10 x 10); the enemy gets the mirror
 export const DEFAULT_MAP = {
   name: 'Desert Canyon', mesas: MESA_HALF, ramps: RAMP_HALF,
@@ -70,6 +71,40 @@ export const FOREST_MAP = {
   docks: [{ x: 62, z: 222, amount: 30000 }, { x: 150, z: 204, amount: 30000 }], derricks: [[96, 150]],
   civs: [[112, 172, 6], [72, 152, 7], [128, 150, 5]], start: [30, 196],
 };
+// City map: paved ground, a street grid, raised city blocks nobody can drive over, and 48 buildings to garrison. No water.
+export const URBAN_MAP = {
+  name: 'Urban Megacity', biome: 'urban', ramps: [],
+  mesas: [[70, 100, 12, 9, 3], [112, 178, 9, 7, 3], [56, 150, 7, 6, 3], [128, 156, 7, 5, 3], [170, 216, 10, 6, 3]],
+  roads: [[35, 201, 127.5, 127.5, 5], [20, 164, 236, 164, 3.5], [92, 20, 92, 236, 3.5], [20, 128, 128, 128, 4], [128, 128, 128, 236, 4], [150, 164, 150, 236, 3], [20, 192, 20, 128, 3]],
+  docks: [{ x: 62, z: 222, amount: 30000 }, { x: 150, z: 196, amount: 30000 }], derricks: [[100, 150], [38, 132]],
+  civs: [[24, 136, 0], [50, 136, 2], [76, 136, 0], [154, 136, 1], [180, 136, 2], [206, 136, 4], [24, 150, 0], [76, 150, 2], [180, 150, 8], [219, 150, 0], [141, 178, 2], [167, 178, 9], [193, 178, 0], [219, 178, 2], [102, 192, 0], [141, 192, 1], [193, 192, 2], [219, 192, 4], [102, 206, 0], [141, 206, 2], [206, 206, 8], [76, 220, 0], [115, 220, 2], [193, 220, 9]], start: [30, 196],
+};
+// Snow map: an oil field in the middle (ten derricks in all), a frozen inlet in two corners, a ridge with ramps, low hills and sparse pines.
+export const ARCTIC_MAP = {
+  name: 'Arctic Refinery', biome: 'snow', trees: 0.22,
+  mesas: [[60, 112, 26, 7, 6], [176, 222, 14, 6, 5], [118, 190, 6, 9, 4]], ramps: [{ x: 60, z: 119.5, dx: 0, dz: 1, len: 14, hw: 6 }, { x: 60, z: 104.5, dx: 0, dz: -1, len: 14, hw: 6 }],
+  water: [[14, 30, 60, 52, 8], [60, 52, 96, 44, 6]], bridges: [],
+  paint: [[26, 44, 14, 2], [40, 62, 10, 2], [200, 170, 9, 1], [150, 232, 8, 1]],
+  roads: [[35, 201, 100, 160, 3.5], [100, 160, 127.5, 127.5, 4], [100, 160, 160, 196, 3], [60, 134, 100, 160, 3]],
+  docks: [{ x: 62, z: 222, amount: 30000 }, { x: 140, z: 206, amount: 30000 }],
+  derricks: [[92, 150], [112, 138], [140, 156], [58, 96], [30, 150]],
+  civs: [[100, 172, 8], [124, 160, 4], [84, 136, 9], [150, 176, 4], [112, 122, 8], [136, 136, 9], [70, 176, 5]], start: [30, 196],
+};
+// The maps the lobby offers, in order. `id` is what the lobby and saved settings use.
+export const MAPS = [
+  { id: 'canyon', name: 'Desert Canyon', desc: 'Ridges, ramps and a walled base', spec: null },
+  { id: 'open', name: 'Open Desert', desc: 'No rock: wide open ground', spec: OPEN_MAP },
+  { id: 'forest', name: 'Forest River', desc: 'Woods, a river and three bridges', spec: FOREST_MAP },
+  { id: 'urban', name: 'Urban Megacity', desc: 'Street grid, city blocks, 48 buildings', spec: URBAN_MAP },
+  { id: 'arctic', name: 'Arctic Refinery', desc: 'Snow, a frozen inlet, ten oil derricks', spec: ARCTIC_MAP },
+];
+// Ground types: name for the lobby, flat colours for the minimap and the map builder (open ground, rock), and whether trees grow.
+export const BIOMES = {
+  desert: { name: 'Desert', rgb: [198, 166, 114], rock: [158, 120, 84], cliff: [104, 76, 56], trees: false },
+  woods: { name: 'Woods (grass and trees)', rgb: [104, 132, 78], rock: [128, 112, 92], cliff: [84, 72, 58], trees: true },
+  urban: { name: 'City (paved)', rgb: [150, 150, 146], rock: [118, 118, 122], cliff: [78, 78, 84], trees: false },
+  snow: { name: 'Snow', rgb: [226, 232, 238], rock: [150, 156, 166], cliff: [96, 102, 114], trees: true },
+};
 export const FOOT = { dock: [8, 6], derrick: [4, 4], civ: [6, 6], start: [10, 10] };
 export const cloneSpec = (s) => JSON.parse(JSON.stringify(s));
 
@@ -79,6 +114,8 @@ export function generateMap(spec) {
   const seg2 = (r, mir) => mir ? [N - r[0], N - r[1], N - r[2], N - r[3], r[4]] : r.slice();
   for (const r of S.water || []) { rivers.push(seg2(r, false)); rivers.push(seg2(r, true)); }
   for (const r of S.bridges || []) { bridges.push(seg2(r, false)); bridges.push(seg2(r, true)); }
+  const rocks = [], hills = [];   // brush stamps [x, z, r]; a water stamp is simply a river segment of zero length
+  for (const p of S.paint || []) for (const q of [[p[0], p[1], p[2]], [N - p[0], N - p[1], p[2]]]) { if (p[3] === 2) rivers.push([q[0], q[1], q[0], q[1], q[2]]); else (p[3] === 1 ? hills : rocks).push(q); }
   const segD = (px, pz, q) => { const vx = q[2] - q[0], vz = q[3] - q[1], l2 = vx * vx + vz * vz || 1, t = Math.min(1, Math.max(0, ((px - q[0]) * vx + (pz - q[1]) * vz) / l2)); return Math.hypot(px - q[0] - vx * t, pz - q[1] - vz * t); };
   for (const m of S.mesas || []) { mesas.push(m); mesas.push([N - m[0], N - m[1], m[2], m[3], m[4]]); }
   for (const r of S.ramps || []) { ramps.push(r); ramps.push({ x: N - r.x, z: N - r.z, dx: -r.dx, dz: -r.dz, len: r.len, hw: r.hw }); }
@@ -97,6 +134,9 @@ export function generateMap(spec) {
       const d = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0) - q[4] + en;
       m = Math.max(m, sstep(1.3, -1.3, d));
     }
+    for (const q of rocks) { const dx = i - q[0], dz = j - q[1]; if (Math.abs(dx) > q[2] + 6 || Math.abs(dz) > q[2] + 6) continue; m = Math.max(m, sstep(1.3, -1.3, Math.hypot(dx, dz) - q[2] + en)); }
+    let hill = 0;   // gentle mound: at most 0.8 m of rise per cell, so it never counts as a cliff
+    for (const q of hills) { const dx = i - q[0], dz = j - q[1]; if (Math.abs(dx) > q[2] || Math.abs(dz) > q[2]) continue; hill = Math.max(hill, Math.min(4, q[2] * 0.4) * sstep(q[2], q[2] * 0.25, Math.hypot(dx, dz))); }
     let r = 0, carve = 0;
     for (const q of ramps) {
       const ax = i - q.x, az = j - q.z;
@@ -108,7 +148,7 @@ export function generateMap(spec) {
     }
     const e = Math.max(m * (1 - carve), r);
     const dune = (fbm(i * 0.045, j * 0.045, 11) - 0.5) * 1.6;
-    height[j * V + i] = MESA_H * e + dune * (1 - 0.7 * e);
+    height[j * V + i] = MESA_H * e + dune * (1 - 0.7 * e) + hill * (1 - e);
     rock[j * V + i] = e;
     if (rivers.length) { // cut the river bed, except under bridges (a bridge is a causeway with a deck on top)
       let w = 0; for (const q of rivers) { if (Math.abs(i - (q[0] + q[2]) / 2) > Math.abs(q[2] - q[0]) / 2 + q[4] + 6 || Math.abs(j - (q[1] + q[3]) / 2) > Math.abs(q[3] - q[1]) / 2 + q[4] + 6) continue; w = Math.max(w, sstep(q[4] + 4.5, q[4] - 0.5, segD(i, j, q))); } // gentle banks: steep ones would count as cliffs and wall the river off
@@ -135,7 +175,7 @@ export function generateMap(spec) {
   const rt = S.rampTop || (S.ramps && S.ramps[0] ? [S.ramps[0].x, S.ramps[0].z] : [sc[0] + (N / 2 - sc[0]) / 3, sc[1] + (N / 2 - sc[1]) / 3]);
   // Trees (woods): clumps from a noise field, never on rock, water, roads, bridges, bases or other objects. Decoration only: they do not block.
   const trees = [];
-  if (S.biome === 'woods' && (S.trees ?? 0.6) > 0) {
+  if ((BIOMES[S.biome] || BIOMES.desert).trees && (S.trees ?? 0.6) > 0) {
     const dens = S.trees ?? 0.6, keep = new Uint8Array(N * N);
     const mark = (x, z, w, h, pad) => { for (let j = Math.max(0, z - pad); j < Math.min(N, z + h + pad); j++) for (let i = Math.max(0, x - pad); i < Math.min(N, x + w + pad); i++) keep[j * N + i] = 1; };
     mark(st[0], st[1], 10, 10, 20); const es = mirrorRect(st[0], st[1], 10, 10); mark(es[0], es[1], 10, 10, 20);
@@ -161,7 +201,7 @@ export function generateMap(spec) {
 
 // Checks a spec before a match starts. Errors stop the match; warnings do not.
 // Returns { ok, errors, warnings, map } with the generated map so the caller can draw a preview.
-export const MAP_LIMITS = { mesas: 24, docks: 6, derricks: 8, civs: 12, roads: 16, water: 12, bridges: 8 };
+export const MAP_LIMITS = { mesas: 24, docks: 6, derricks: 8, civs: 24, roads: 24, water: 12, bridges: 8, paint: 400 };
 export function validateMap(spec) {
   const errors = [], warnings = [];
   const S = spec; let map = null;

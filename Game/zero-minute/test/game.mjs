@@ -12,7 +12,7 @@ function scriptedGame(ticks, log) {
     [5, s => s.issue({ t: 'build', id: dz().id, type: 'v_power', cx: 44, cz: 212 })],
     [260, s => s.issue({ t: 'build', id: dz().id, type: 'v_supply', cx: 60, cz: 204 })],
     [560, s => s.issue({ t: 'build', id: dz().id, type: 'v_barracks', cx: 48, cz: 186 })],
-    [600, s => { const sc = s.ents.find(e => e.type === 'v_supply' && e.team === PLAYER); if (sc) { s.issue({ t: 'train', id: sc.id, type: 'v_truck' }); s.issue({ t: 'train', id: sc.id, type: 'v_truck' }); } }],
+    [600, s => { const sc = s.ents.find(e => e.type === 'v_supply' && e.team === PLAYER); if (sc) { s.issue({ t: 'train', id: sc.id, type: 'v_chinook' }); s.issue({ t: 'train', id: sc.id, type: 'v_chinook' }); } }],
     [800, s => s.issue({ t: 'build', id: dz().id, type: 'v_factory', cx: 62, cz: 184 })],
     [1200, s => s.issue({ t: 'build', id: dz().id, type: 'v_patriot', cx: 84, cz: 160 })],
     [1500, s => s.issue({ t: 'build', id: dz().id, type: 'v_patriot', cx: 50, cz: 166 })],
@@ -38,7 +38,7 @@ function scriptedGame(ticks, log) {
   const mine = t => sim.ents.filter(e => e.team === PLAYER && e.type === t);
   ok(mine('v_power')[0]?.done, 'power plant built'); ok(mine('v_supply')[0]?.done, 'supply centre built');
   ok(mine('v_barracks')[0]?.done, 'barracks built'); ok(mine('v_factory')[0]?.done, 'war factory built'); ok(mine('v_patriot').length >= 1, 'patriot placed');
-  ok(mine('v_truck').length === 3, '1 free + 2 trained trucks, got ' + mine('v_truck').length); ok(sim.teams[0].earned > 2000, 'income flowing: ' + sim.teams[0].earned);
+  ok(mine('v_chinook').length === 3, '1 free + 2 trained Chinooks, got ' + mine('v_chinook').length); ok(sim.teams[0].earned > 2000, 'income flowing: ' + sim.teams[0].earned);
   console.log('build flow     : power', sim.teams[0].prod + '/' + sim.teams[0].use, 'earned $' + sim.teams[0].earned, 'money $' + sim.teams[0].money, 'units', sim.ents.filter(e => e.team === PLAYER && e.kind === 'unit').map(e => e.type).join(','));
 }
 // --- directional armor ---

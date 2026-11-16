@@ -85,14 +85,14 @@ const X = 300, Z = 300;
   ok(slotsOf(tech)[0] === 'tech_mg', 'Technical starts with a machine gun');
   const wreck = (x) => { const v = makeUnit(s, 'v_tank', ENEMY, x, Z, 0); hold(v); applyDamage(s, v, 1e5, 'cannon', x, Z, { team: PLAYER }); };
   wreck(X + 20); run(s, 2); ok(s.crates.length === 1, 'destroyed enemy vehicle leaves a crate');
-  s.issue({ t: 'move', ids: [tech.id], x: X + 20, z: Z }); run(s, 100); ok(tech.tier === 1 && slotsOf(tech)[0] === 'tech_cannon' && s.crates.length === 0, 'crate 1: Technical gets a cannon');
-  wreck(X + 40); run(s, 2); s.issue({ t: 'move', ids: [tech.id], x: X + 40, z: Z }); run(s, 100); ok(tech.tier === 2 && slotsOf(tech)[0] === 'tech_rocket', 'crate 2: Technical gets rockets');
+  s.issue({ t: 'move', ids: [tech.id], x: X + 20, z: Z }); run(s, 100); ok(tech.tier === 1 && slotsOf(tech)[0] === 'tech_hmg' && s.crates.length === 0, 'crate 1: Technical gets a heavy machine gun');
+  wreck(X + 40); run(s, 2); s.issue({ t: 'move', ids: [tech.id], x: X + 40, z: Z }); run(s, 100); ok(tech.tier === 2 && slotsOf(tech)[0] === 'tech_twin', 'crate 2: Technical gets twin heavy machine guns');
   const m0 = s.teams[0].money; wreck(X + 60); run(s, 2); s.issue({ t: 'move', ids: [tech.id], x: X + 60, z: Z }); run(s, 100); ok(tech.tier === 2 && s.teams[0].money === m0 + 150, 'crate 3: capped at tier 2, pays $150 instead');
   const inf = makeUnit(s, 'v_ranger', ENEMY, X - 40, Z, 0); applyDamage(s, inf, 1e5, 'rifle', X, Z, { team: PLAYER }); run(s, 2); ok(s.crates.length === 0, 'infantry leave no crate');
   const s2 = empty(['vanguard', 'redhammer']); const v = makeUnit(s2, 'r_tank', ENEMY, X, Z, 0); applyDamage(s2, v, 1e5, 'cannon', X, Z, { team: PLAYER }); run(s2, 2); ok(s2.crates.length === 0, 'no crates when nobody can salvage');
   const sc = makeUnit(s, 's_scorpion', PLAYER, X, Z + 30, 0); const d0 = WEAPONS.toxin_shell.dmg; sc.tier = 2; sc.wslots = null; const tgt = makeUnit(s, 'v_tank', ENEMY, X + 26, Z + 30, Math.PI); hold(tgt); tgt.hp = tgt.maxHp = 1e6; tgt.cds = [1e9, 1e9, 1e9]; let dealt = 0;
   run(s, 30, () => { tgt.cds[0] = 1e9; }); dealt = 1e6 - tgt.hp; ok(dealt > 0 && Math.abs(dealt % (d0 * 1.5 * 0.85) ) < 1e-6 || dealt >= d0 * 1.5 * 0.85 - 0.01, 'tier 2 Scorpion hits 50% harder');
-  console.log('salvage        : wreck to crate to Technical MG, cannon, rockets; third crate pays cash; Scorpion +25% per tier');
+  console.log('salvage        : wreck to crate to Technical MG, heavy MG, twin MG; third crate pays cash; Scorpion +25% per tier');
 }
 // --- stealth and detection
 {
@@ -175,7 +175,7 @@ const X = 300, Z = 300;
   P('v_emp'); ok(!T.promos.has('v_emp'), 'EMP needs A-10 first (branch)'); P('v_a10'); P('v_emp'); ok(T.promos.has('v_emp') && T.powerReady.emp <= s.tick, 'A-10 then EMP unlocked and ready');
   P('v_fastpdl'); ok(T.flags.fastPdl && T.points === 1, 'Rapid Point Defense (needs Armor Veterancy) bought'); const tk = makeUnit(s, 'v_tank', PLAYER, X + 40, Z, 0); ok(tk.vet === 1, 'Armor Veterancy: new tanks are Veterans');
   const b = makeBldg(s, 'v_barracks', PLAYER, 150, 170); s.nav.rebuild(); s.teams[0].money = 5000; s.issue({ t: 'train', id: b.id, type: 'v_pathfinder' }); s.step(); ok(b.queue.length === 0, 'Pathfinder locked without its promotion'); P('v_pathfinder'); s.issue({ t: 'train', id: b.id, type: 'v_pathfinder' }); s.step(); ok(b.queue.length === 1 && T.points === 0, 'unlocked after promotion');
-  for (const f of FACTION_IDS) { const t = FACTIONS[f].tree; ok(t.filter(n => n.tier === 1).length === 2 && t.length === 7 && [1, 3, 5].every(k => t.some(n => n.tier === k)) && t.filter(n => n.power).length === 3 && t.every(n => !n.req || t.some(p => p.id === n.req && p.tier <= n.tier)), f + ': 7 nodes over 3 tiers, 3 powers, every branch has its parent'); }
+  for (const f of FACTION_IDS) { const t = FACTIONS[f].tree; ok(t.filter(n => n.tier === 1).length === 2 && t.length === (f === 'vanguard' ? 8 : 7) && [1, 3, 5].every(k => t.some(n => n.tier === k)) && t.filter(n => n.power).length === (f === 'vanguard' ? 4 : 3) && t.every(n => !n.req || t.some(p => p.id === n.req && p.tier <= n.tier)), f + ': 7 nodes over 3 tiers, 3 powers (United States: 8 and 4, with the AC-130), every branch has its parent'); }
   console.log('promotions     : rank gates, point costs, branch prerequisites, unlocks and flags work; XP ranks 2,3,4,5');
 }
 // --- upgrades + tech gates through the normal command path

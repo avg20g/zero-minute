@@ -6,7 +6,7 @@ import { N, CELL, WORLD, PLAYER, ENEMY, NEUTRAL, ZONE_MULT, ZONE_NAME, TICK_HZ }
 import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS, GENERAL, VET, GENERALS, trainsOf, upgradesOf, unitCost, nodePower } from '../sim/factionRegistry.js';
 import { heightAt, BIOMES } from '../sim/map.js';
 import { hasBldg, capacityOf } from '../sim/entities.js';
-import { strikeVisible, hasPower, superOf } from '../sim/powers.js';
+import { strikeVisible, hasPower, superOf, superBldgs } from '../sim/powers.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
@@ -110,7 +110,7 @@ export class Hud {
         case 'cancelbuild': if (e.team === PLAYER) { this.toast('Construction cancelled: $' + fmt(e.amt) + ' refunded'); this.float(e.x, e.z, 5, '+$' + e.amt, '#f2a93b'); } break;
         case 'helipad': if (e.team === PLAYER) this.float(e.x, e.z, 4, 'REPAIRING', '#7dffa0'); break;
         // Superweapons are public: both sides are told when one comes online, where it is, and when it fires.
-        case 'superbuilt': this.alert(e.x, e.z); this.toast(e.team === PLAYER ? POWERS[e.id].name + ' online. Ready in 5:00.' : 'WARNING: enemy ' + POWERS[e.id].name + ' detected. It fires in 5:00.', e.team === PLAYER ? '' : 'bad'); break;
+        case 'superbuilt': this.alert(e.x, e.z); this.toast(e.team === PLAYER ? POWERS[e.id].name + ' online. Ready in ' + mmss(e.secs) + '.' : 'WARNING: enemy ' + POWERS[e.id].name + ' detected. It fires in ' + mmss(e.secs) + '.', e.team === PLAYER ? '' : 'bad'); break;
         case 'superlaunch': if (e.team !== PLAYER) this.toast('WARNING: enemy ' + POWERS[e.id].name + ' launched', 'bad'); break;
         case 'cashhack': if (e.team === PLAYER) this.toast('Cash Hack: stole $' + fmt(e.amt)); else if (e.victim === PLAYER) { this.toast('Enemy hackers stole $' + fmt(e.amt), 'bad'); this.alert(e.x, e.z); } break;
         case 'hill': this.toast(e.owner === PLAYER ? 'You hold the hill' : e.owner === ENEMY ? 'The enemy holds the hill' : 'The hill is contested', e.owner === ENEMY ? 'bad' : e.owner === PLAYER ? '' : 'warn'); if (e.owner === ENEMY) this.ui.sfx && this.ui.sfx('klaxon'); break;
@@ -252,7 +252,6 @@ export class Hud {
       for (const t of this.F.build) {
         const d = BLDGS[t]; let why = '';
         if (d.superPower && sim.noSuper) continue;                       // lobby rule: no superweapons
-        if (d.superPower && sim.ents.some(e => e.kind === 'bldg' && e.team === PLAYER && e.type === t && !e.dead)) why = 'Only one superweapon per side'; else
         if (d.needs && !hasBldg(sim, PLAYER, d.needs)) why = 'Requires ' + BLDGS[d.needs].name; else if (T.money < d.cost) why = 'Insufficient funds';
         out.push({ act: 'build:' + t, icon: iconFor(d, true), name: d.name, cost: d.cost, why, sub: d.power > 0 ? '+' + d.power + ' PWR' : d.power < 0 ? '−' + (-d.power) + ' PWR' : '', on: this.ui.place && this.ui.place.type === t });
       }
@@ -376,7 +375,7 @@ export class Hud {
     $('clock').textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
     // public match state: superweapon countdowns for both sides, and the King of the Hill clocks
     const mmss = (n) => Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0'); let sw = '';
-    for (const t of [PLAYER, ENEMY]) { const id = superOf(sim, t); if (id && hasPower(sim, t, id)) { const left = Math.ceil(((sim.teams[t].powerReady[id] || 0) - sim.tick) / TICK_HZ); sw += `<span class="${t === PLAYER ? 'mine' : 'foe'}">${t === PLAYER ? 'Your' : 'Enemy'} ${POWERS[id].name} <b>${left > 0 ? mmss(left) : 'READY'}</b></span>`; } }
+    for (const t of [PLAYER, ENEMY]) { const id = superOf(sim, t); if (id && hasPower(sim, t, id)) { const left = Math.ceil(((sim.teams[t].powerReady[id] || 0) - sim.tick) / TICK_HZ), n = superBldgs(sim, t, id).length; sw += `<span class="${t === PLAYER ? 'mine' : 'foe'}">${t === PLAYER ? 'Your' : 'Enemy'} ${POWERS[id].name}${n > 1 ? ' ×' + n : ''} <b>${left > 0 ? mmss(left) : 'READY'}</b></span>`; } }
     if (sw !== this.swSig) { this.swSig = sw; $('sw').innerHTML = sw; $('sw').hidden = !sw; }
     const k = sim.koth, hb = $('hill');
     if (k) { hb.hidden = false; $('hill-t').textContent = 'You ' + mmss(k.secs[PLAYER]) + ' · Enemy ' + mmss(k.secs[ENEMY]) + ' / ' + mmss(k.need); hb.classList.toggle('foe', k.owner === ENEMY); hb.classList.toggle('mine', k.owner === PLAYER); }
@@ -406,7 +405,7 @@ export class Hud {
       box.hidden = !list.length;
     }
     for (const b of box.children) {
-      const id = b.dataset.power, left = Math.max(0, (T.powerReady[id] || 0) - sim.tick), frac = left / (POWERS[id].cd * TICK_HZ);
+      const id = b.dataset.power, left = Math.max(0, (T.powerReady[id] || 0) - sim.tick), frac = Math.min(1, left / (POWERS[id].cd * TICK_HZ));
       b.style.setProperty('--p', frac.toFixed(3)); b.classList.toggle('cool', left > 0); b.classList.toggle('on', !!this.ui.power && this.ui.power.id === id);
       b.querySelector('.sec').textContent = left > 0 ? Math.ceil(left / TICK_HZ) : '';
     }

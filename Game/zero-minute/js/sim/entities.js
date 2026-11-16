@@ -17,7 +17,7 @@ export function makeUnit(sim, type, team, x, z, facing = 0) {
     // phase 2
     xp: 0, vet: 0, tier: 0, addon: null, addonQ: null, garrison: null,
     stealthMode: d.stealth || null, cloaked: false, detected: false, revealUntil: 0, stillT: 0,
-    empUntil: 0, emp: false, deployed: false, cashAcc: 0, horde: false, pdlCd: 0, capT: 0,
+    empUntil: 0, emp: false, deployed: false, cashAcc: 0, horde: false, pdlCd: 0, capT: 0, windup: 0, dive: 0, charging: false,
     ammo: d.ammo || 0, as: d.based ? 'parked' : null, home: 0, pad: -1, rw: -1, loiterT: 0, loiterO: null, extend: 0, appr: 0, wps: null, hb: 0, hoverLow: false, landed: false, reloadT: 0,
     altK: d.air && !d.based ? 1 : 0, paltK: d.air && !d.based ? 1 : 0, // height as a fraction of cruise altitude (see air.js)
   };
@@ -59,6 +59,7 @@ export function makeBldg(sim, type, team, cx, cz, done = true) {
     target: 0, cds: [0, 0, 0], bursts: [0, 0, 0], burstCd: [0, 0, 0], wslots: null, slots: null, holds: null, variant: 0,
     lastHit: -999, lastZone: 0, lastFire: -999, vet: 0, horde: false,
     disabledUntil: 0, empUntil: 0, offline: false, capBy: 0, capT: 0, capXp: [false, false], pads: null,
+    superReady: 0, superCd: 0, superShot: -1e9,   // superweapon buildings: tick it can fire, length of its countdown, tick it last fired
   };
   b.px = b.x; b.pz = b.z;
   b.rallyX = b.x; b.rallyZ = b.z + (d.h / 2 + 6) * CELL;
@@ -187,6 +188,15 @@ export function clearGarrison(sim, c, dmg, src) {
   sim.events.push({ t: 'cleared', id: c.id, x: c.x, z: c.z, n: ids.length });
   return ids.length;
 }
+// Gas, fire and heat reach the people inside a building: every occupant takes the damage where they stand,
+// exactly as they would in the open. Nobody is thrown out and the shell is untouched.
+export function hurtGarrison(sim, c, dmg, wname, sx, sz, src) {
+  if (!c.garrison || !c.garrison.length) return 0;
+  const ids = c.garrison.slice();
+  for (const id of ids) { const u = sim.byId.get(id); if (u && !u.dead) applyDamage(sim, u, dmg, wname, sx, sz, src); }
+  if (!c.garrison.length) sim.events.push({ t: 'cleared', id: c.id, x: c.x, z: c.z, n: ids.length });
+  return ids.length;
+}
 
 // ---------------- XP ----------------
 export function addGeneralXp(sim, teamIdx, amt) {
@@ -260,7 +270,11 @@ export function applyDamage(sim, t, dmg, wname, sx, sz, src) {
   if (t.dead || t.ruined) return 0;
   const W = WEAPONS[wname];
   if (t.kind === 'bldg') {
-    if (W.clearsGarrison && t.garrison.length && BLDGS[t.type].capacity) { clearGarrison(sim, t, dmg * (W.vs.inf || 0), src); return 0; }
+    if (W.clearsGarrison && t.garrison.length && BLDGS[t.type].capacity) {
+      if (W.garrisonOnly) clearGarrison(sim, t, dmg * (W.vs.inf || 0), src);   // flashbang: stuns the occupants and throws them out
+      else hurtGarrison(sim, t, dmg, wname, sx, sz, src);                       // toxin spray, incendiary shells: kill them inside
+      return 0;
+    }
     if (BLDGS[t.type].indestructible) return 0;
   }
   let m = W.vs[armorOf(t)] || 0, zone = 0;
@@ -274,14 +288,16 @@ export function applyDamage(sim, t, dmg, wname, sx, sz, src) {
   return dealt;
 }
 
-// Area damage to everything hostile to src. Garrison-clearing weapons empty
-// buildings in the radius instead of damaging them (handled by applyDamage).
-export function splashDamage(sim, x, z, r, dmg, wname, src, sx = x, sz = z) {
-  const n = sim.ents.length;
+// Area damage to everything hostile to src. With the friendly-fire rule on (sim.ff) it also hurts src's own
+// side, the shooter itself excepted. Garrison weapons act on the people inside buildings in the radius instead of
+// the shell (handled by applyDamage). `layer`: 'air' or 'ground' limits the blast to things at that height.
+export function splashDamage(sim, x, z, r, dmg, wname, src, sx = x, sz = z, layer = null) {
+  const n = sim.ents.length, ff = sim.ff && !WEAPONS[wname].garrisonOnly;
   for (let i = 0; i < n; i++) {
     const e = sim.ents[i];
-    if (e.dead || e.team === src.team || e.team === NEUTRAL) continue;
+    if (e.dead || e.team === NEUTRAL || e === src || (e.team === src.team && !ff)) continue;
     if (e.kind === 'unit' && e.inB) continue;
+    if (layer && (layer === 'air') !== (e.kind === 'unit' && e.air && !e.landed)) continue;
     const d = e.kind === 'unit' ? Math.max(0, Math.hypot(e.x - x, e.z - z) - e.radius) : rectDist(e, x, z);
     if (d > r) continue;
     applyDamage(sim, e, dmg * (1 - 0.6 * d / r), wname, sx, sz, src);
@@ -289,7 +305,7 @@ export function splashDamage(sim, x, z, r, dmg, wname, src, sx = x, sz = z) {
 }
 
 // Area damage from a support power or superweapon: like splashDamage, and it also wrecks civilian buildings that nobody holds.
-// (Ones the enemy holds were already hit; ones you hold are spared, like the rest of your own side.)
+// (Ones somebody holds were already handled by splashDamage: the enemy's always, your own under the friendly-fire rule.)
 export function strikeDamage(sim, x, z, r, dmg, wname, src, sx = x, sz = z) {
   splashDamage(sim, x, z, r, dmg, wname, src, sx, sz);
   for (const e of sim.ents) {

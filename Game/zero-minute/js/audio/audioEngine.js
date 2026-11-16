@@ -214,6 +214,7 @@ export class AudioEngine {
         case 'rockethit': if (hear(e)) this.explosion(e.x, e.z, 1.8); break;
         case 'rocketfire': if (hear(e)) this.whoosh(e.x, e.z); break;
         case 'strafe': if (hear(e)) this.gau8(e.x, e.z); break;
+        case 'gunship': if (hear(e)) { if (e.k === 'cannon') { this.cannon(e.x, e.z, 1.3); this.explosion(e.x, e.z, 1.8); } else this.rifle(e.x, e.z, true); } break;
         case 'fab': if (hear(e)) this.explosion(e.x, e.z, 3.4); break;
         case 'suicide': if (hear(e)) this.explosion(e.x, e.z, 2.2); break;
         case 'nuke': this.explosion(e.x, e.z, hear(e) ? 5 : 2.2); break;                   // a nuclear blast is heard across the map, fogged or not

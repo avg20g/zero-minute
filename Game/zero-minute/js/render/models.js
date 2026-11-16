@@ -414,20 +414,33 @@ function silo(T) {
   box(g, T.wall, 12, 2.2, 12, 0, 1.55, 0); box(g, T.roof, 12.4, 0.35, 12.4, 0, 2.8, 0); box(g, T.accent, 12.1, 0.4, 12.1, 0, 2.1, 0);
   cyl(g, M.dark, 3.1, 0.5, 0, 3.1, 0); cyl(g, M.steel, 3.4, 0.3, 0, 2.95, 0);
   for (const s of [-1, 1]) { const d = box(g, M.steel, 3.2, 0.3, 6.6, s * 4.9, 3.2, 0); d.rotation.z = -s * 0.5; box(g, M.red, 0.35, 0.32, 6.6, s * 3.6, 3.75, 0).rotation.z = -s * 0.5; }
-  cyl(g, M.white, 1.05, 6.2, 0, 6.0, 0); add(g, G.dome, M.red, 2.1, 2.6, 2.1, 0, 9.1, 0); cyl(g, M.dark, 1.1, 0.5, 0, 3.2, 0);
-  for (let i = 0; i < 4; i++) { const a = i * 1.5708 + 0.785; box(g, M.gun, 0.12, 1.6, 1.2, Math.cos(a) * 1.25, 3.9, Math.sin(a) * 1.25).rotation.y = -a; }
+  // The missile is its own node: the view lowers it into the shaft after a launch and raises it again as the countdown runs out.
+  const missile = grp(g, 0, 0, 0);
+  cyl(missile, M.white, 1.05, 6.6, 0, 6.2, 0); cyl(missile, M.white, 0.82, 2.2, 0, 10.6, 0); add(missile, G.cone, M.red, 0.82, 2.8, 0.82, 0, 13.1, 0);
+  for (const y of [4.4, 8.2, 9.8]) cyl(missile, M.dark, 1.08, 0.4, 0, y, 0);
+  for (let i = 0; i < 4; i++) { const a = i * 1.5708 + 0.785; box(missile, M.red, 0.12, 1.8, 1.4, Math.cos(a) * 1.4, 3.9, Math.sin(a) * 1.4).rotation.y = -a; }
+  cyl(g, M.dark, 1.1, 0.5, 0, 3.2, 0);
+  for (let i = 0; i < 12; i++) { const a = i * 0.5236; box(g, i % 2 ? M.yellow : M.dark, 0.9, 0.12, 1.75, Math.cos(a) * 3.9, 3.02, Math.sin(a) * 3.9).rotation.y = -a; }   // hazard ring round the shaft
+  box(g, M.red, 0.5, 11, 0.5, 4.3, 8.3, 4.3); box(g, M.white, 0.52, 1.6, 0.52, 4.3, 6.4, 4.3); box(g, M.white, 0.52, 1.6, 0.52, 4.3, 10.4, 4.3);                      // red and white service tower
+  for (const y of [6.0, 9.6, 12.6]) box(g, M.steel, 3.4, 0.18, 0.3, 2.9, y, 2.9).rotation.y = 0.785; add(g, G.sph, T.glow, 0.35, 0.35, 0.35, 4.3, 14.1, 4.3);
   box(g, T.wall, 3, 2.4, 2.4, -5.2, 4.1, -5.2); const spin = grp(g, -5.2, 5.4, -5.2); box(spin, M.steel, 1.8, 0.12, 0.5, 0, 0.3, 0); cyl(spin, M.steel, 0.06, 0.5, 0, 0.05, 0);
-  return { g, spin, top: 12 };
+  return { g, spin, missile, top: 15 };
 }
 // Scud Storm: nine launch rails raked skyward on an improvised sandbagged platform.
 function scud(T) {
   const g = new THREE.Group(); slab(g, 15.4, 15.4, M.sandbag, 0.7);
   box(g, M.wood, 11, 0.5, 11, 0, 0.95, 0); box(g, M.dark, 9, 1.2, 9, 0, 1.6, 0); box(g, T.accent, 9.1, 0.3, 9.1, 0, 2.2, 0);
   const rack = grp(g, 0, 2.3, 0); rack.rotation.z = 0;
-  for (let i = 0; i < 9; i++) { const x = (i % 3 - 1) * 2.6, z = (((i / 3) | 0) - 1) * 2.6; const tube = cyl(rack, M.steel, 0.55, 5.6, x, 2.9, z); tube.rotation.z = 0.32; add(rack, G.dome, M.red, 0.95, 1.5, 0.95, x - 0.95, 5.6, z).rotation.z = 0.32; box(rack, M.gun, 0.2, 2.6, 0.2, x + 0.7, 1.3, z); }
+  const missiles = [];   // one node per rail: the view removes each as it launches and puts them back one by one during the reload
+  for (let i = 0; i < 9; i++) {
+    const x = (i % 3 - 1) * 2.6, z = (((i / 3) | 0) - 1) * 2.6; box(rack, M.gun, 0.2, 2.6, 0.2, x + 0.7, 1.3, z); box(rack, M.steel, 0.3, 5.0, 0.3, x + 0.55, 2.7, z).rotation.z = 0.32;
+    const m = grp(rack, x, 2.9, z); m.rotation.z = 0.32; cyl(m, M.olive, 0.5, 5.0, 0, 0, 0); add(m, G.cone, M.olive, 0.5, 2.6, 0.5, 0, 3.8, 0); cyl(m, M.gun, 0.52, 0.3, 0, -1.8, 0);   // long pointed nose
+    for (const a of [0, 1.5708]) box(m, M.gun, 1.5, 0.8, 0.06, 0, -2.1, 0).rotation.y = a;
+    missiles.push(m);
+  }
   for (let i = 0; i < 8; i++) add(g, G.sph, M.sandbag, 0.9, 0.45, 0.6, -6.3 + i * 1.8, 0.95, 6.6);
   cyl(g, M.wood, 0.07, 3.4, 6.4, 2.4, -6.4); box(g, M.cloth, 1.6, 0.9, 0.05, 5.6, 3.6, -6.4);
-  return { g, top: 9 };
+  return { g, top: 9, missiles };
 }
 const BLDG = { cc, power, supply, barracks, factory, airfield, patriot, gatling, stinger, uplink, tunnel, market, particle, silo, scud };
 

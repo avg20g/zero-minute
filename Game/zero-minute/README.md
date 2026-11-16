@@ -75,9 +75,9 @@ The original brief gave A to both attack-move and camera pan, and G to both
 guard and promotions, so attack-move is F and guard is V.
 
 ## Add-on batch 2
-- **Superweapons** (one per side, $5,000, needs the factory): Particle Cannon,
+- **Superweapons** ($5,000 each, needs the factory; one per side until batch 9, any number since): Particle Cannon,
   Nuclear Missile Silo, Scud Storm. Completion is announced to both players and
-  the building is revealed; the 5:00 countdown is shown to both and pauses on
+  the building is revealed; the countdown (5:00 until batch 9, 3:30 since) is shown to both and pauses on
   low power; launch sounds a klaxon for both. Lobby rule: No superweapons.
 - **General's Powers**: Paratrooper Drop (Vanguard), Cash Hack (Red Hammer,
   only on a supply building you have scouted), Sneak Attack tunnel exit (Sandstorm).
@@ -184,6 +184,33 @@ guard and promotions, so attack-move is F and guard is V.
   usable at 3:00). Cyber now pays 12% more for infantry and tanks; Mass Assault's discount is 8%.
 - Tests: `node test/balance.mjs` (46 checks).
 
+## Batch 9: play notes
+Changes asked for after the first play session.
+- **Friendly fire** (lobby rule, on by default; `friendlyFire` in the match setup): explosions, gas and fire also hurt
+  the side that made them. The unit that fired is spared; direct fire, flashbangs and EMP are unchanged. The AI counts
+  its own troops under a blast against a target before using a power.
+- **Superweapons**: build as many as you can pay for and power. Each building has its own countdown
+  (`b.superReady`), now 3:30 instead of 5:00, and the HUD shows the earliest one and how many you have.
+  You can watch them work: the Particle Cannon fires a beam into the sky, the Nuclear Missile climbs out of its
+  silo (and the next one rises in the shaft as the countdown runs down), the Scud Storm's nine missiles leave their
+  rails one by one and are put back one by one.
+- **United States**: AC-130 Gunship (Rank 5, after Paratrooper Drop): circles the zone for 15 s firing a rotary
+  cannon and a 105 mm howitzer at what you can see. Recon Drone circles its station instead of hovering. F-22 carries
+  four missiles and is the anti-aircraft jet; the F-15E does at least 1.5 times the F-22's damage per sortie to every
+  kind of ground target.
+- **China**: the silo and its missile are redrawn (white two-stage rocket, red warhead, service tower); the blast
+  has a mushroom cloud.
+- **ISIS**: Scud noses are long and pointed. The Scud Launcher raises its missile for 2 s, the missile flies a real
+  arc, and a new one slides on during the 20 s reload. The Technical fires a machine gun at every salvage level
+  (machine gun, heavy machine gun, twin heavy machine guns). Toxin does 1.3 times damage to infantry and 45% damage to light vehicles
+  (it did none before).
+- **Garrisons**: toxin, fire and heat hurt the squads inside a building exactly as fast as squads in the open, where
+  they stand. Nobody is thrown out any more (flashbangs still do that).
+- **Stealth General**: the FPV drone dives onto its target (or climbs to a helicopter), and is strong against
+  infantry, light vehicles and helicopters. The Suicide Bomber is hidden whenever it stands still, sprints the last
+  24 m, and is strong against tanks. Both die in their own blast.
+- Tests: `node test/batch9.mjs` (64 checks).
+
 ## Replays
 A replay is the match setup plus the player's commands with their tick numbers
 (a 20-minute match is a few kilobytes). The AI runs inside the simulation, so
@@ -211,6 +238,7 @@ Node (simulation only):
                               new maps and brushes
     node test/batch7.mjs      garrison size and exit, powers light fog and wreck buildings
     node test/balance.mjs     balance harness: six fixed matches repeat exactly, report is well formed
+    node test/batch9.mjs      friendly fire, many superweapons, AC-130, drone loiter, garrisons, FPV, bomber
     node test/bench.mjs       simulation speed benchmark
     node test/addon.mjs       superweapons, No-Superweapons rule, new powers,
                               King of the Hill, AI use of all of them

@@ -511,7 +511,7 @@ export class AIController {
     const now = this.visible.filter(m => m.tick === tick && tick - m.first >= cfg.react);
     if (!now.length) return;
     const value = (m) => (m.kind === 'bldg' || m.cost >= 900 ? 1.5 : 1);
-    const pick = (id) => { const R = POWERS[id].radius, aim = POWERS[id].aim; let best = null, bs = 0; for (const m of now) { if (aim === 'supply' && !(m.kind === 'bldg' && BLDGS[m.type].role === 'supply')) continue; if (aim === 'supply') { best = m; bs = 99; break; } let s = 0; for (const o of now) if (dist(o, m) <= R) s += value(o); if (s > bs) { bs = s; best = m; } } return { m: best, s: bs }; };
+    const pick = (id) => { const R = POWERS[id].radius, aim = POWERS[id].aim; let best = null, bs = 0; for (const m of now) { if (aim === 'supply' && !(m.kind === 'bldg' && BLDGS[m.type].role === 'supply')) continue; if (aim === 'supply') { best = m; bs = 99; break; } let s = 0; for (const o of now) if (dist(o, m) <= R) s += value(o); if (sim.ff) for (const e of sim.ents) if (e.team === this.team && !e.dead && !(e.kind === 'unit' && e.inB) && dist(e, m) <= R * 0.8) s -= e.kind === 'bldg' ? 2 : 1;   /* friendly fire: its own troops and buildings under the blast count against the target */ if (s > bs) { bs = s; best = m; } } return { m: best, s: bs }; };
     const cast = (id, a) => {
       if (this.aiVisionGrid[cellOf(a.m.x, a.m.z)] !== 1 || powerError(sim, this.team, id, a.m.x, a.m.z)) return false;
       if (!this.act({ t: 'power', id, x: a.m.x, z: a.m.z })) return false;

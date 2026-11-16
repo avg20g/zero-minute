@@ -3,7 +3,7 @@
 // salvage crates, lingering hazards, passive income, tunnels, capture, sabotage.
 import { CELL, NEUTRAL } from './defs.js';
 import { UNITS, BLDGS, WEAPONS, FACTIONS, HORDE, VET, generalOf } from './factionRegistry.js';
-import { applyDamage, clearGarrison, addGeneralXp, rectDist, releaseSlot, stopUnit, freeSpot } from './entities.js';
+import { applyDamage, hurtGarrison, addGeneralXp, rectDist, releaseSlot, stopUnit, freeSpot } from './entities.js';
 
 // ---------------- hazards (firestorm, thermal, toxin) ----------------
 export function addHazard(sim, kind, x, z, r, secs, dps, team, clears) {
@@ -18,13 +18,13 @@ function stepHazards(sim) {
     const src = { team: h.team }, n = sim.ents.length;
     for (let i = 0; i < n; i++) {
       const e = sim.ents[i];
-      if (e.dead || e.team === h.team) continue;
+      if (e.dead || (e.team === h.team && !sim.ff)) continue;   // friendly-fire rule: your own gas and fire hurt your own side too
       if (e.kind === 'unit') {
         if (e.inB || e.air || e.team === NEUTRAL) continue;
         if (Math.hypot(e.x - h.x, e.z - h.z) - e.radius > h.r) continue;
         applyDamage(sim, e, h.dps * 0.5, h.kind, h.x, h.z, src);
-      } else if (h.clears && e.garrison.length && BLDGS[e.type].capacity && rectDist(e, h.x, h.z) <= h.r) {
-        clearGarrison(sim, e, h.dps * 0.5 * 3, src); // heat and gas fill the rooms: occupants are flushed out
+      } else if (e.garrison.length && BLDGS[e.type].capacity && rectDist(e, h.x, h.z) <= h.r) {
+        hurtGarrison(sim, e, h.dps * 0.5, h.kind, h.x, h.z, src); // heat and gas fill the rooms: occupants are hurt exactly as fast as in the open
       } else if (e.team !== NEUTRAL && WEAPONS[h.kind].vs.bldg && rectDist(e, h.x, h.z) <= h.r) {
         applyDamage(sim, e, h.dps * 0.5, h.kind, h.x, h.z, src);
       }

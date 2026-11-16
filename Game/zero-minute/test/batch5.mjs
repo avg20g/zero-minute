@@ -141,8 +141,8 @@ const hold = (u) => { u.order = { t: 'hold' }; return u; };
   const base = bare({ factions: ['sandstorm', 'vanguard'] }); const A = await import('../js/sim/abilities.js'); A.addHazard(base, 'toxin', 100, 100, 5, 5, 10, PLAYER, false); A.addHazard(w, 'toxin', 100, 100, 5, 5, 10, PLAYER, false); const d1 = dps(w);
   TW.upgrades.add('s_anthrax'); A.addHazard(w, 'toxin', 100, 100, 5, 5, 10, PLAYER, false);
   ok(dps(base) === 10 && Math.abs(d1 - 12.5) < 1e-9 && Math.abs(dps(w) - 18.75) < 1e-9, `toxin clouds: 10 damage/s normally, ${d1} for this general, ${dps(w)} with Anthrax Beta`);
-  const sb = makeBldg(w, 's_scud', PLAYER, 60, 60, false); completeBldg(w, sb); ok(Math.abs((TW.powerReady.scud - w.tick) / 20 - 240) < 1, 'Scud Storm is ready in 4:00 instead of 5:00');
-  console.log(`stealth / wmd  : hidden when still | bomber and FPV detonate | Scud at ${dist.toFixed(0)} m | toxin x1.25, x1.875 with Anthrax | Scud Storm 4:00`);
+  const sb = makeBldg(w, 's_scud', PLAYER, 60, 60, false); completeBldg(w, sb); ok(Math.abs((TW.powerReady.scud - w.tick) / 20 - POWERS.scud.cd * 0.8) < 1 && POWERS.scud.cd === 210, 'Scud Storm is ready in 2:48 instead of 3:30');
+  console.log(`stealth / wmd  : hidden when still | bomber and FPV detonate | Scud at ${dist.toFixed(0)} m | toxin x1.25, x1.875 with Anthrax | Scud Storm 2:48`);
 }
 
 // ---------------------------------------------------------------- E. AI plays every general; replays carry them

@@ -71,7 +71,7 @@ const visCells = (sim, team, x, z, r) => { let n = 0; for (let dz = -r; dz <= r;
     const tank = makeUnit(s, 'v_tank', ENEMY, civ.x + 14, civ.z + 6, 0); tank.order = { t: 'hold' };
     s.issue({ t: 'power', id: 'fab', x: civ.x + 4, z: civ.z }); let fab = 0, haz = 0; run(s, 120, k => { for (const e of k.events) { if (e.t === 'fab') fab++; if (e.t === 'hazard' && e.kind === 'thermal') haz++; } });
     ok(fab === 1 && haz === 1 && (tank.dead || tank.hp < tank.maxHp * 0.6), 'Fuel-Air Bomb: one shockwave, one thermal zone, heavy damage');
-    run(s, 60); ok(civ.garrison.length === 0 && !civ.ruined, 'lingering heat emptied the garrison; building still stands (hp ' + Math.round(civ.hp) + '/' + civ.maxHp + ')'); }
+    run(s, 110); ok(civ.garrison.length === 0 && g1.dead && !civ.ruined, 'lingering heat killed the garrison inside; building still stands (hp ' + Math.round(civ.hp) + '/' + civ.maxHp + ')'); }
   { const s = mk('sandstorm'); grant(s, PLAYER, 's_ambush', 's_toxin');
     const watcher = makeUnit(s, 'r_tank', ENEMY, 326, 290, Math.PI); watcher.order = { t: 'hold' }; watcher.cds = [1e9, 1e9, 1e9];
     s.issue({ t: 'power', id: 'ambush', x: 300, z: 280 }); let n = 0, hiddenOnArrival = false; run(s, 30, k => { for (const e of k.events) if (e.t === 'ambush') { n = e.n; const sq = k.ents.filter(u => u.team === PLAYER && u.kind === 'unit' && u.type !== 'v_ranger' && u.x < 320); hiddenOnArrival = k.fog.visAt(ENEMY, 300, 280) && sq.length === 6 && sq.every(u => !k.fog.shouldShow(ENEMY, u) && !k.fog.canSee(ENEMY, u)); } });
@@ -81,8 +81,8 @@ const visCells = (sim, team, x, z, r) => { let n = 0; for (let dz = -r; dz <= r;
     let revealed = 0; run(s, 200, k => { if (squad.some(u => !u.dead && !u.cloaked && k.fog.shouldShow(ENEMY, u))) revealed++; }); ok(revealed > 10 && (watcher.hp < watcher.maxHp || watcher.dead), 'they open fire and that reveals them (' + revealed + ' ticks)');
     const civ = makeBldg(s, 'civ', NEUTRAL, 110, 150); s.nav.rebuild(); const g1 = makeUnit(s, 'v_ranger', ENEMY, civ.x - 9, civ.z, 0), g2 = makeUnit(s, 'v_ranger', ENEMY, civ.x + 19, civ.z + 4, 0), tk = makeUnit(s, 'v_tank', ENEMY, civ.x + 22, civ.z - 6, 0);
     for (const u of [g2, tk]) u.order = { t: 'hold' }; s.issue({ t: 'garrison', team: ENEMY, ids: [g1.id], target: civ.id }); run(s, 80);
-    s.fog.stamp(PLAYER, civ.x, civ.z, 40); s.issue({ t: 'power', id: 'toxinbomb', x: civ.x + 10, z: civ.z }); run(s, 200);
-    ok(civ.garrison.length === 0 && civ.hp === civ.maxHp, 'Toxin Bomb cleared the garrison with zero building damage'); ok(g2.dead || g2.hp < g2.maxHp * 0.6, 'toxin damages infantry'); ok(tk.hp === tk.maxHp, 'toxin does not hurt vehicles');
+    s.fog.stamp(PLAYER, civ.x, civ.z, 40); s.issue({ t: 'power', id: 'toxinbomb', x: civ.x + 10, z: civ.z }); run(s, 260);
+    ok(civ.garrison.length === 0 && g1.dead && civ.hp === civ.maxHp, 'Toxin Bomb killed the garrison inside with zero building damage'); ok(g2.dead || g2.hp < g2.maxHp * 0.6, 'toxin damages infantry'); ok(tk.hp === tk.maxHp, 'toxin does not hurt tanks');
     ok(s.hazards.some(h => h.kind === 'toxin'), 'cloud persists'); run(s, 300); ok(!s.hazards.some(h => h.kind === 'toxin'), 'cloud is gone after 20 s'); }
   console.log('power effects  : EMP, Fuel-Air Bomb, Ambush, Toxin Bomb behave as specified');
 }

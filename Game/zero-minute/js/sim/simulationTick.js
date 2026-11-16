@@ -43,8 +43,9 @@ export class Sim {
       for (const n of FACTIONS[T.faction].tree) { T.promos.add(n.id); if (n.flag) T.flags[n.flag] = true; if (n.power) T.powerReady[n.power] = 0; }
     }
     this.tick = 0; this.winner = -1;
-    this.setup = { factions: f.slice(), money, difficulty: opts.difficulty || 'medium', seed: this.rng, treaty: opts.treaty || 0, noSuper: !!opts.noSuper, koth: !!opts.koth, noEnemy: !!opts.noEnemy, noShroud: !!opts.noShroud, map: opts.map || null, generals: [gens[0] || null, gens[1] || null] }; // everything a replay needs
+    this.setup = { factions: f.slice(), money, difficulty: opts.difficulty || 'medium', seed: this.rng, treaty: opts.treaty || 0, noSuper: !!opts.noSuper, koth: !!opts.koth, noEnemy: !!opts.noEnemy, noShroud: !!opts.noShroud, friendlyFire: !!opts.friendlyFire, map: opts.map || null, generals: [gens[0] || null, gens[1] || null] }; // everything a replay needs
     this.noSuper = !!opts.noSuper;               // lobby rule: superweapons cannot be built
+    this.ff = !!opts.friendlyFire;               // lobby rule: explosions, gas and fire also hurt the side that made them
     this.koth = null;                            // King of the Hill state, set in setupSkirmish when the mode is on
     this.treatyUntil = (opts.treaty || 0) * 20; // peace treaty: nobody can be targeted before this tick
     this.stats = { paths: 0, expanded: 0, teleports: 0 };
@@ -265,7 +266,6 @@ function applyCommand(sim, c) {
       if (T.money < d.cost) { msg(sim, team, 'Insufficient funds'); break; }
       if (d.needs && !hasBldg(sim, team, d.needs)) { msg(sim, team, `Requires ${BLDGS[d.needs].name}`); break; }
       if (d.superPower && sim.noSuper) { msg(sim, team, 'Superweapons are disabled for this match'); break; }
-      if (d.superPower && sim.ents.some(e => e.kind === 'bldg' && e.team === team && e.type === c.type && !e.dead)) { msg(sim, team, 'Only one superweapon per side'); break; }
       if (!canPlace(sim, c.type, c.cx, c.cz, team)) { msg(sim, team, 'Cannot build there'); break; }
       T.money -= d.cost;
       const b = makeBldg(sim, c.type, team, c.cx, c.cz, false);

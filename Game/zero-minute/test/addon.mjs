@@ -23,12 +23,12 @@ const cellOf = (x, z) => Math.floor(z / CELL) * N + Math.floor(x / CELL);
       const ev = []; completeBldg(sim, b); ev.push(...sim.events);
       const T = sim.teams[PLAYER];
       ok(ev.some(e => e.t === 'superbuilt' && e.id === pw) && b.seen[ENEMY] && sim.fog.shouldShow(ENEMY, b), 'completion is announced and the building is revealed to the enemy');
-      ok(hasPower(sim, PLAYER, pw) && T.powerReady[pw] === sim.tick + 6000 && /recharging/.test(powerError(sim, PLAYER, pw, 400, 400)), 'countdown is exactly 5:00 and the weapon cannot fire early');
+      ok(hasPower(sim, PLAYER, pw) && T.powerReady[pw] === sim.tick + POWERS[pw].cd * 20 && b.superReady === T.powerReady[pw] && /recharging/.test(powerError(sim, PLAYER, pw, 400, 400)), 'countdown is exactly 3:30 and the weapon cannot fire early');
       let paused = null;
       if (reactor) { run(sim, 200); paused = T.powerReady[pw] - sim.tick; for (let i = 0; i < 3; i++) makeBldg(sim, reactor, PLAYER, 60 + i * 12, 40); sim.nav.rebuild(); }
       run(sim, 6000);
-      ok(!reactor || paused === 6000, `low power pauses the countdown (${paused} ticks left after 10 s unpowered)`);
-      ok(powerError(sim, PLAYER, pw, 400, 400) === null, 'ready after 5:00 of powered time');
+      ok(!reactor || paused === POWERS[pw].cd * 20, `low power pauses the countdown (${paused} ticks left after 10 s unpowered)`);
+      ok(powerError(sim, PLAYER, pw, 400, 400) === null, 'ready after 3:30 of powered time');
       // targets: a building at the aim point, a tank 8 m off, a tank far outside
       const tb = makeBldg(sim, 'r_barracks', ENEMY, 196, 196), near = makeUnit(sim, 'r_tank', ENEMY, 408, 392, 0), far = makeUnit(sim, 'r_tank', ENEMY, 400 + POWERS[pw].radius + 30, 400, 0); near.order = far.order = { t: 'hold' };
       const hp0 = tb.hp, seen = { launch: 0, hits: 0 };
@@ -36,7 +36,7 @@ const cellOf = (x, z) => Math.floor(z / CELL) * N + Math.floor(x / CELL);
       run(sim, 400, (evs) => { for (const e of evs) { if (e.t === 'superlaunch') seen.launch++; if (e.t === 'nuke' || e.t === 'scudhit' || e.t === 'pbeam') seen.hits++; } });
       ok(seen.launch === 1 && seen.hits === (pw === 'nuke' ? 1 : pw === 'scud' ? 9 : 50), `launch warning sent once; ${seen.hits} impacts`);
       ok((tb.dead || tb.hp < hp0 * 0.5) && far.hp === far.maxHp, `target building ${tb.dead ? 'destroyed' : 'at ' + Math.round(100 * tb.hp / hp0) + '%'}; a tank outside the radius is untouched`);
-      ok(T.powerReady[pw] > sim.tick + 5000 && T.powersUsed === 1, 'countdown restarts after firing');
+      ok(T.powerReady[pw] > sim.tick + POWERS[pw].cd * 20 - 500 && T.powersUsed === 1, 'countdown restarts after firing');
       kill(sim, b); run(sim, 2); ok(!hasPower(sim, PLAYER, pw), 'weapon is gone when its building is destroyed');
       return { hash: sim.hash(), tb: tb.dead ? 0 : tb.hp / hp0, near: near.dead ? 0 : near.hp / near.maxHp, hits: seen.hits };
     };
@@ -44,20 +44,20 @@ const cellOf = (x, z) => Math.floor(z / CELL) * N + Math.floor(x / CELL);
     ok(a.hash === b2.hash, `${pw} is deterministic`);
     console.log(`superweapon    : ${POWERS[pw].name.padEnd(16)} ${a.hits} impact(s) | aim-point building left at ${(a.tb * 100).toFixed(0)}% | tank 8 m away at ${(a.near * 100).toFixed(0)}% | identical across two runs`);
   }
-  // one per side, and the lobby rule
+  // any number per side, and the lobby rule
   const sim = new Sim({ ai: false }); const T = sim.teams[PLAYER]; T.money = 20000; open(sim);
   const dz = sim.ents.find(e => e.team === PLAYER && e.kind === 'unit' && UNITS[e.type].builder), F = FACTIONS[T.faction].roles;
   const fb = makeBldg(sim, F.factory, PLAYER, 20, 190); sim.nav.rebuild();
   const count = () => sim.ents.filter(e => e.type === F.super && e.team === PLAYER).length;
   sim.issue({ t: 'build', id: dz.id, type: F.super, cx: 60, cz: 180 }); run(sim, 2); const first = count();
   sim.issue({ t: 'build', id: dz.id, type: F.super, cx: 84, cz: 180 }); run(sim, 2);
-  ok(first === 1 && count() === 1 && T.money === 15000, 'a second superweapon is refused and not charged');
+  ok(first === 1 && count() === 2 && T.money === 10000, 'a second superweapon can be built and is paid for');
   const ns = new Sim({ ai: false, noSuper: true }); ns.teams[PLAYER].money = 20000; open(ns);
   const d2 = ns.ents.find(e => e.team === PLAYER && e.kind === 'unit' && UNITS[e.type].builder); makeBldg(ns, F.factory, PLAYER, 20, 190); ns.nav.rebuild();
   ns.issue({ t: 'build', id: d2.id, type: F.super, cx: 60, cz: 180 }); run(ns, 2);
   const forced = makeBldg(ns, F.super, PLAYER, 100, 180);
   ok(!ns.ents.some(e => e.type === F.super && e.id !== forced.id) && ns.teams[PLAYER].money === 20000 && !hasPower(ns, PLAYER, superOf(ns, PLAYER)) && ns.setup.noSuper, 'No-Superweapons rule: build refused, nothing charged, power unavailable, rule stored for replays');
-  console.log('super rules    : one per side enforced; No-Superweapons lobby rule blocks building and firing');
+  console.log('super rules    : any number per side; No-Superweapons lobby rule blocks building and firing');
 }
 
 // ---------------------------------------------------------------- B. Paratrooper Drop, Cash Hack, Sneak Attack

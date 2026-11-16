@@ -21,19 +21,20 @@ export const WEAPONS = {
   stinger:     { range: 50, dmg: 40, cd: 30, kind: 'missile', speed: 64, intercept: true, vs: { inf: 0.5, light: 1.1, heavy: 0.9, bldg: 0.3, air: 1.6 } },
   gatling:     { range: 38, dmg: 6,  cd: 2,  kind: 'hitscan', vs: { inf: 1, light: 0.7, heavy: 0.15, bldg: 0.1, air: 1 } },
   inferno:     { range: 72, minRange: 18, dmg: 45, cd: 90, kind: 'lob', speed: 40, arc: 16, splash: 6, clearsGarrison: true, hazard: { kind: 'fire', r: 6, secs: 6, dps: 16 }, vs: { inf: 1, light: 0.8, heavy: 0.3, bldg: 0.6 } },
-  bunker_bomb: { range: 30, dmg: 300, cd: 16, kind: 'missile', speed: 60, splash: 6, vs: { inf: 0.6, light: 0.9, heavy: 1, bldg: 2.2 } },          // F-15E: two per sortie, no use against aircraft
+  bunker_bomb: { range: 30, dmg: 320, cd: 16, kind: 'missile', speed: 60, splash: 6, vs: { inf: 0.8, light: 1.1, heavy: 1.2, bldg: 2.2 } },         // F-15E: two per sortie, the ground-attack specialist; no use against aircraft
   lav_gun:     { range: 30, dmg: 9, cd: 3, kind: 'hitscan', vs: { inf: 1, light: 0.9, heavy: 0.25, bldg: 0.2, air: 0.5 } },                          // 25 mm chain gun
   tow:         { range: 46, dmg: 170, cd: 110, kind: 'missile', speed: 60, intercept: true, vs: { inf: 0.2, light: 1, heavy: 1.9, bldg: 0.9 } },      // TOW upgrade: built to kill tanks
   vest:        { range: 2.6, dmg: 1, cd: 999, kind: 'hitscan', vs: { inf: 1, light: 1, heavy: 1, bldg: 1 } },                                        // suicide units: reaching this range triggers the blast
-  scud_missile: { range: 120, dmg: 320, cd: 400, kind: 'shell', speed: 55, splash: 10, hazard: { kind: 'toxin', r: 7, secs: 10, dps: 16 }, vs: { inf: 1, light: 1, heavy: 0.7, bldg: 1.1 } },
-  raptor_missile: { range: 46, dmg: 115, cd: 20, kind: 'missile', speed: 95, burst: 2, burstGap: 4, intercept: true, splash: 4, vs: { inf: 0.6, light: 1, heavy: 1.1, bldg: 0.9, air: 1.4 } },
+  fpv_dive:    { range: 9, dmg: 1, cd: 999, kind: 'hitscan', noJets: true, vs: { inf: 1, light: 1, heavy: 0.4, bldg: 0.3, air: 1 } },                 // FPV drone: inside this range it dives; helicopters yes, jets in flight no
+  scud_missile: { range: 120, dmg: 320, cd: 400, kind: 'shell', speed: 55, arc: 36, windup: 40, splash: 10, hazard: { kind: 'toxin', r: 7, secs: 10, dps: 16 }, vs: { inf: 1, light: 1, heavy: 0.7, bldg: 1.1 } },
+  raptor_missile: { range: 46, dmg: 80, cd: 20, kind: 'missile', speed: 95, burst: 2, burstGap: 4, intercept: true, splash: 4, vs: { inf: 0.5, light: 0.9, heavy: 0.8, bldg: 0.6, air: 1.6 } },   // F-22: four per sortie, best against aircraft
   mig_missile: { range: 44, dmg: 110, cd: 20, kind: 'missile', speed: 90, burst: 2, burstGap: 4, intercept: true, splash: 5, hazard: { kind: 'fire', r: 4.5, secs: 4, dps: 16 }, vs: { inf: 0.8, light: 1, heavy: 1, bldg: 1 } },
   tech_mg:     { range: 30, dmg: 6,  cd: 4,  kind: 'hitscan', vs: { inf: 1, light: 0.6, heavy: 0.12, bldg: 0.12, air: 0.6 } },
-  tech_cannon: { range: 32, dmg: 30, cd: 24, kind: 'shell', speed: 100, vs: { inf: 0.5, light: 1, heavy: 0.8, bldg: 0.8 } },
-  tech_rocket: { range: 40, dmg: 44, cd: 40, kind: 'rocket', speed: 52, burst: 2, burstGap: 5, intercept: true, vs: { inf: 0.3, light: 1, heavy: 1.5, bldg: 1.1, air: 1 } },
+  tech_hmg:    { range: 32, dmg: 8,  cd: 3,  kind: 'hitscan', vs: { inf: 1, light: 0.8, heavy: 0.18, bldg: 0.15, air: 0.7 } },   // Technical, first salvage: heavy machine gun
+  tech_twin:   { range: 34, dmg: 8,  cd: 2,  kind: 'hitscan', vs: { inf: 1, light: 0.9, heavy: 0.3, bldg: 0.2, air: 0.9 } },     // Technical, second salvage: twin heavy machine guns
   toxin_shell: { range: 34, dmg: 42, cd: 46, kind: 'shell', speed: 100, hazard: { kind: 'toxin', r: 3.5, secs: 3, dps: 12 }, vs: { inf: 1, light: 1, heavy: 0.85, bldg: 0.8 } },
   scorp_rocket:{ range: 40, dmg: 60, cd: 110, kind: 'rocket', speed: 50, intercept: true, vs: { inf: 0.2, light: 1, heavy: 1.5, bldg: 1 } },
-  toxin_spray: { range: 18, dmg: 7,  cd: 2,  kind: 'spray', clearsGarrison: true, vs: { inf: 1, light: 0.15, heavy: 0.04, bldg: 0.08 } },
+  toxin_spray: { range: 18, dmg: 7,  cd: 2,  kind: 'spray', clearsGarrison: true, vs: { inf: 1.25, light: 0.4, heavy: 0.05, bldg: 0.08 } },
   // damage profiles for off-map strikes and lingering hazards (never equipped)
   a10gun:    { vs: { inf: 1, light: 1, heavy: 1, bldg: 0.4 } },      // 30 mm depleted-uranium burst
   a10rocket: { vs: { inf: 0.8, light: 1.2, heavy: 1, bldg: 0.6 } },   // armor-piercing rockets
@@ -44,7 +45,11 @@ export const WEAPONS = {
   scud:      { vs: { inf: 1, light: 1, heavy: 0.6, bldg: 0.9 } },
   fire:      { vs: { inf: 1, light: 0.5, heavy: 0.15 } },
   thermal:   { vs: { inf: 1, light: 0.6, heavy: 0.25, bldg: 0.15 } },
-  toxin:     { vs: { inf: 1 } },
+  toxin:     { vs: { inf: 1.3, light: 0.45 } },                          // gas: fast against infantry, a decent amount against light armor
+  bombvest:  { vs: { inf: 0.7, light: 1, heavy: 1.7, bldg: 1.1 } },     // Suicide Bomber: shaped charge, built to break tanks
+  fpvblast:  { vs: { inf: 1.2, light: 1.3, heavy: 0.35, bldg: 0.3, air: 1.2 } }, // FPV drone: small warhead for people, light vehicles and helicopters
+  ac130gun:  { vs: { inf: 1, light: 0.7, heavy: 0.15, bldg: 0.1 } },    // AC-130 25 mm rotary cannon
+  ac130shell:{ vs: { inf: 0.8, light: 1, heavy: 0.9, bldg: 1 } },       // AC-130 105 mm howitzer
 };
 
 // ---------------------------------------------------------------- units
@@ -66,20 +71,20 @@ export const UNITS = {
   v_tank:       { ...TANK, model: 'abrams', name: 'Sentinel Battle Tank', faction: 'vanguard', pdlUpgrade: true },
   v_avenger:    { model: 'avenger', name: 'Avenger Laser Tank', faction: 'vanguard', cost: 1200, secs: 12, hp: 380, speed: 10, turn: 1.9, radius: 2.0, cls: 1, sight: 40, armor: 'heavy',
                   weapon: 'laser', turret: 4.5, fireMoving: true, dirArmor: true, pdl: 20, detector: 22 },
-  v_drone:      { model: 'drone', name: 'Recon Drone', faction: 'vanguard', cost: 400, secs: 6, hp: 90, speed: 24, turn: 3.2, radius: 1.2, cls: 1, sight: 46, armor: 'air', air: true, alt: 18, scout: true },
+  v_drone:      { model: 'drone', name: 'Recon Drone', faction: 'vanguard', cost: 400, secs: 6, hp: 90, speed: 24, turn: 3.2, radius: 1.2, cls: 1, sight: 46, armor: 'air', air: true, alt: 18, scout: true, loiter: 11 },   // loiter: circles its station (radius in metres) instead of hovering
   v_comanche:   { model: 'comanche', name: 'Comanche Gunship', faction: 'vanguard', cost: 1500, secs: 14, hp: 260, speed: 16, turn: 2.6, radius: 2.2, cls: 1, sight: 44, armor: 'air',
                   weapon: 'chaingun', weapon2: 'heli_rocket', turret: 5, air: true, alt: 13, fireMoving: true, heli: true },
   v_raptor:     { model: 'raptor', name: 'F-22 Raptor', faction: 'vanguard', cost: 1400, secs: 12, hp: 220, speed: 36, turn: 2.3, radius: 2.4, cls: 1, sight: 40, armor: 'air',
-                  weapon: 'raptor_missile', air: true, alt: 20, fireMoving: true, based: true, ammo: 2, reload: 110 },
+                  weapon: 'raptor_missile', air: true, alt: 20, fireMoving: true, based: true, ammo: 4, reload: 140 },
   // ---- Red Hammer Pact
   r_dozer:      { ...DOZER, name: 'Dozer', faction: 'redhammer' },
   r_truck:      { ...TRUCK, name: 'Supply Truck', faction: 'redhammer' },
-  r_conscript:  { ...SQUAD, name: 'Conscript Squad', faction: 'redhammer', cost: 250, hp: 260 },
+  r_conscript:  { ...SQUAD, name: 'Conscript Squad', faction: 'redhammer', cost: 250, hp: 290 },
   r_hacker:     { model: 'hacker', name: 'Hacker Squad', faction: 'redhammer', cost: 600, secs: 8, hp: 100, speed: 5.5, turn: 9, radius: 0.9, cls: 0, sight: 24, armor: 'inf',
                   infantry: true, canCapture: true, deploy: { income: 6, every: 20 } },
   r_scout:      { model: 'scoutcar', name: 'Scout Car', faction: 'redhammer', cost: 450, secs: 6, hp: 170, speed: 18, turn: 3.0, radius: 1.6, cls: 1, sight: 42, armor: 'light',
                   weapon: 'tech_mg', turret: 4.5, fireMoving: true, scout: true },
-  r_tank:       { ...TANK, model: 'battlemaster', name: 'Battlemaster Tank', faction: 'redhammer', cost: 750, hp: 440, nuke: true },
+  r_tank:       { ...TANK, model: 'battlemaster', name: 'Battlemaster Tank', faction: 'redhammer', cost: 750, hp: 470, nuke: true },
   r_overlord:   { model: 'overlord', name: 'Overlord Heavy Tank', faction: 'redhammer', cost: 2000, secs: 18, hp: 1100, speed: 6, turn: 1.2, radius: 2.7, cls: 1, sight: 36, armor: 'heavy',
                   weapon: 'dual_cannon', turret: 2.2, fireMoving: true, dirArmor: true, tank: true, nuke: true,
                   hardpoints: { gatling: { name: 'Gatling Cannon', cost: 500, secs: 8, weapon: 'gatling' }, bunker: { name: 'Battle Bunker', cost: 400, secs: 8, capacity: 1 } } },
@@ -94,9 +99,9 @@ export const UNITS = {
   v_lav:        { model: 'lav25', name: 'LAV-25', faction: 'vanguard', cost: 850, secs: 9, hp: 340, speed: 13, turn: 2.8, radius: 2.0, cls: 1, sight: 34, armor: 'light',
                   weapon: 'lav_gun', upWeapon: { v_tow: 'tow' }, turret: 4, fireMoving: true, amph: true },
   s_bomber:     { model: 'bomber', name: 'Suicide Bomber', faction: 'sandstorm', cost: 300, secs: 5, hp: 70, speed: 9.5, turn: 9, radius: 0.8, cls: 0, sight: 26, armor: 'inf',
-                  weapon: 'vest', infantry: true, suicide: { r: 7, dmg: 280 } },
+                  weapon: 'vest', infantry: true, stealth: 'still', suicide: { r: 7, dmg: 270, w: 'bombvest', charge: { r: 24, mult: 1.6 } } },   // sprints the last 24 m
   s_fpv:        { model: 'fpv', name: 'FPV Attack Drone', faction: 'sandstorm', cost: 350, secs: 6, hp: 40, speed: 24, turn: 4, radius: 1.0, cls: 1, sight: 34, armor: 'air',
-                  weapon: 'vest', air: true, alt: 8, fireMoving: true, suicide: { r: 5, dmg: 230 } },
+                  weapon: 'fpv_dive', air: true, alt: 8, fireMoving: true, suicide: { r: 5, dmg: 210, w: 'fpvblast', dive: true } },
   s_scudtruck:  { model: 'scudtel', name: 'Scud Launcher', faction: 'sandstorm', cost: 1500, secs: 16, hp: 260, speed: 7, turn: 1.4, radius: 2.8, cls: 1, sight: 30, armor: 'light',
                   weapon: 'scud_missile' },
   // ---- Sandstorm Front
@@ -106,7 +111,7 @@ export const UNITS = {
   s_rpg:        { model: 'rpg', name: 'RPG Trooper', faction: 'sandstorm', cost: 300, secs: 6, hp: 160, speed: 6, turn: 9, radius: 0.9, cls: 0, sight: 36, armor: 'inf', weapon: 'rpg', infantry: true, canGarrison: true, canCapture: true },
   s_saboteur:   { model: 'saboteur', name: 'Saboteur', faction: 'sandstorm', cost: 700, secs: 10, hp: 90, speed: 7, turn: 9, radius: 0.9, cls: 0, sight: 30, armor: 'inf', infantry: true, stealth: 'always', infiltrator: true, promo: 's_saboteur' },
   s_technical:  { model: 'technical', name: 'Technical Pickup', faction: 'sandstorm', cost: 450, secs: 6, hp: 150, speed: 18, turn: 3.2, radius: 1.6, cls: 1, sight: 38, armor: 'light',
-                  weapon: 'tech_mg', turret: 4.5, fireMoving: true, salvage: true, salvageWeapons: ['tech_mg', 'tech_cannon', 'tech_rocket'] },
+                  weapon: 'tech_mg', turret: 4.5, fireMoving: true, salvage: true, salvageWeapons: ['tech_mg', 'tech_hmg', 'tech_twin'] },   // always a machine gun; salvage fits a heavier one
   s_buggy:      { model: 'buggy', name: 'Rocket Buggy', faction: 'sandstorm', cost: 900, secs: 8, hp: 160, speed: 17, turn: 3.2, radius: 1.6, cls: 1, sight: 40, armor: 'light', weapon: 'rocket', turret: 4.0, fireMoving: true, salvage: true },
   s_scorpion:   { model: 'scorpion', name: 'Scorpion Light Tank', faction: 'sandstorm', cost: 700, secs: 9, hp: 320, speed: 11, turn: 2.2, radius: 1.8, cls: 1, sight: 36, armor: 'heavy',
                   weapon: 'toxin_shell', weapon2: 'scorp_rocket', turret: 3.6, fireMoving: true, dirArmor: true, salvage: true },
@@ -148,7 +153,7 @@ export const BLDGS = {
   s_factory:  { ...FACTORY, name: 'Arms Dealer', faction: 'sandstorm', power: 0, cost: 1500, trains: ['s_technical', 's_scorpion', 's_tractor', 's_buggy'], needs: 's_supply' },
   s_stinger:  { model: 'stinger', role: 'defense', name: 'Stinger Site', faction: 'sandstorm', cost: 900, secs: 8, hp: 900, w: 4, h: 4, power: 0, sight: 48, weapon: 'stinger', turret: 3.2, detector: 28, needs: 's_barracks' },
   s_tunnel:   { model: 'tunnel', role: 'tunnel', name: 'Tunnel Network', faction: 'sandstorm', cost: 800, secs: 8, hp: 1000, w: 4, h: 4, power: 0, sight: 32, tunnel: true, repair: 10, needs: 's_barracks' },
-  // Superweapons: one per side, announced to both players, 5-minute countdown from completion.
+  // Superweapons: build as many as you can pay for and power. Each is announced to both players and runs its own countdown from completion.
   v_particle: { model: 'particle', role: 'super', name: 'Particle Cannon', faction: 'vanguard', cost: 5000, secs: 45, hp: 2400, w: 8, h: 8, power: -10, sight: 30, needs: 'v_factory', superPower: 'particle' },
   r_silo:     { model: 'silo', role: 'super', name: 'Nuclear Missile Silo', faction: 'redhammer', cost: 5000, secs: 45, hp: 2600, w: 8, h: 8, power: -10, sight: 30, needs: 'r_factory', superPower: 'nuke' },
   s_scud:     { model: 'scud', role: 'super', name: 'Scud Storm', faction: 'sandstorm', cost: 5000, secs: 45, hp: 2200, w: 8, h: 8, power: 0, sight: 30, needs: 's_factory', superPower: 'scud' },
@@ -178,17 +183,19 @@ export const POWERS = {
              gun: { dmg: 80, r: 4.5, step: 3.5 }, rockets: { n: 6, dmg: 270, r: 7, flight: 16, seek: 7 } },
   emp:     { name: 'EMP Pulse Bomb', cd: 210, radius: 22, desc: 'Disables enemy vehicles and defenses in the area for 12 s.' },
   barrage: { name: 'Artillery Barrage', cd: 150, radius: 16, desc: '12 high-explosive shells fall on the target zone.' },
-  fab:     { name: 'Fuel-Air Bomb', cd: 240, radius: 24, desc: 'Massive shockwave, then lingering heat that also empties garrisons.' },
+  fab:     { name: 'Fuel-Air Bomb', cd: 240, radius: 24, desc: 'Massive shockwave, then lingering heat that burns infantry, including garrisons.' },
   ambush:  { name: 'Ambush Squad', cd: 180, radius: 8, desc: '6 stealthed guerrillas appear at the target.' },
-  toxinbomb: { name: 'Toxin Bomb', cd: 210, radius: 15, desc: 'Green cloud for 20 s: kills infantry and clears garrisons.' },
+  toxinbomb: { name: 'Toxin Bomb', cd: 210, radius: 15, desc: 'Green cloud for 20 s: kills infantry in the open and inside buildings, and hurts light vehicles.' },
   b2: { name: 'B-2 Carpet Bomb', cd: 240, radius: 14, line: 60, n: 10, dmg: 190, r: 8, desc: 'A B-2 Spirit lays ten bombs along a 60 m line.' },
   paradrop: { name: 'Paratrooper Drop', cd: 240, radius: 9, n: 5, unit: 'v_ranger', desc: 'A transport drops 5 Ranger squads at the target.' },
   cashhack: { name: 'Cash Hack', cd: 240, radius: 14, amount: 1500, aim: 'supply', desc: 'Steals up to $1,500 from the enemy. Aim at an enemy supply building you have scouted.' },
   sneaktunnel: { name: 'Sneak Attack', cd: 300, radius: 6, delay: 5, aim: 'site', desc: 'A Tunnel Network exit breaks ground at the target after 5 s. Needs clear, explored ground.' },
-  // Superweapons. `super` is the building that owns the power; cd is the 5-minute countdown.
-  particle: { name: 'Particle Cannon', cd: 300, radius: 12, super: 'v_particle', beam: { ticks: 100, every: 2, dmg: 55, r: 6, sweep: 24 }, desc: 'Orbital beam burns along a 24 m line for 5 s.' },
-  nuke:     { name: 'Nuclear Missile', cd: 300, radius: 34, super: 'r_silo', flight: 120, dmg: 1400, fallout: { r: 20, secs: 12, dps: 40 }, desc: 'One warhead. Levels everything within 34 m and leaves fallout.' },
-  scud:     { name: 'Scud Storm', cd: 300, radius: 24, super: 's_scud', n: 9, dmg: 280, r: 9, toxin: { r: 7, secs: 10, dps: 18 }, desc: 'Nine toxin-tipped missiles rain over a 24 m zone.' },
+  ac130: { name: 'AC-130 Gunship', cd: 240, radius: 18, reveal: 24, secs: 15, orbit: 44, alt: 30,
+           gun: { every: 2, dmg: 14, r: 2.2 }, cannon: { every: 26, dmg: 160, r: 6 }, desc: 'A gunship circles the zone for 15 s, raking it with a rotary cannon and a 105 mm howitzer.' },
+  // Superweapons. `super` is the building that owns the power; cd is each building's own countdown in seconds.
+  particle: { name: 'Particle Cannon', cd: 210, radius: 12, super: 'v_particle', beam: { ticks: 100, every: 2, dmg: 55, r: 6, sweep: 24 }, desc: 'Orbital beam burns along a 24 m line for 5 s.' },
+  nuke:     { name: 'Nuclear Missile', cd: 210, radius: 34, super: 'r_silo', flight: 120, dmg: 1400, fallout: { r: 20, secs: 12, dps: 40 }, desc: 'One warhead. Levels everything within 34 m and leaves fallout.' },
+  scud:     { name: 'Scud Storm', cd: 210, radius: 24, super: 's_scud', n: 9, dmg: 280, r: 9, toxin: { r: 7, secs: 10, dps: 18 }, desc: 'Nine toxin-tipped missiles rain over a 24 m zone.' },
 };
 
 // ---------------------------------------------------------------- general
@@ -213,6 +220,7 @@ export const FACTIONS = {
       { id: 'v_para', tier: 3, req: 'v_pathfinder', name: 'Paratrooper Drop', desc: POWERS.paradrop.desc, power: 'paradrop' },
       { id: 'v_fastpdl', tier: 3, req: 'v_vet', name: 'Rapid Point Defense', desc: 'Point-defense lasers recharge 40% faster.', flag: 'fastPdl' },
       { id: 'v_emp', tier: 5, req: 'v_a10', name: 'EMP Pulse Bomb', desc: POWERS.emp.desc, power: 'emp' },
+      { id: 'v_ac130', tier: 5, req: 'v_para', name: 'AC-130 Gunship', desc: POWERS.ac130.desc, power: 'ac130' },
       { id: 'v_a10x2', tier: 5, req: 'v_a10', name: 'A-10 Wingman', desc: 'A second A-10 follows the first.', flag: 'a10x2' },
     ],
   },
@@ -282,7 +290,7 @@ export const GENERALS = {
     spy: 18, grant: ['r_hack'], hack: { amount: 2000, cd: 180 }, discount: { infantry: 1.12, tank: 1.12 } },
   mass: { faction: 'redhammer', name: 'General Tsao, Chicken', title: 'Mass Assault General', desc: 'Tanks and infantry cost 8% less.',
     discount: { infantry: 0.92, tank: 0.92 } },
-  stealth: { faction: 'sandstorm', name: 'EWSAMA BEN ALLADIN', title: 'Stealth General', desc: 'Infantry and light vehicles vanish when they stand still. Adds Suicide Bombers and FPV Attack Drones.',
+  stealth: { faction: 'sandstorm', name: 'EWSAMA BEN ALLADIN', title: 'Stealth General', desc: 'Infantry and light vehicles vanish when they stand still. Adds Suicide Bombers that charge and break tanks, and FPV Attack Drones that dive on infantry, light vehicles and helicopters.',
     trains: { s_barracks: ['s_bomber', 's_fpv'] }, cloak: true },
   wmd: { faction: 'sandstorm', name: 'Nuclear Nadal', title: 'WMD General', desc: 'Scud Launchers, stronger toxin clouds, the Anthrax Beta upgrade, and a faster Scud Storm.',
     trains: { s_factory: ['s_scudtruck'] }, upgrades: { s_market: ['s_anthrax'] }, toxin: 1.25, superCd: 0.8 },

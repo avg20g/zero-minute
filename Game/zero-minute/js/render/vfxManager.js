@@ -261,6 +261,23 @@ export class VFX {
     this.flash(x, y + 10, z, 260, 0.5); this.crater(x, z, R * 0.9);
     for (let i = 0; i < 6; i++) { const a = r() * 6.283, d = 4 + r() * R * 0.5; this.crater(x + Math.cos(a) * d, z + Math.sin(a) * d, 5 + r() * 4); }
   }
+  // Nuclear mushroom: a white flash, a fat stem of rising smoke and a rolling cap that hangs over the crater.
+  mushroom(x, z, R) {
+    const r = this.rnd, y = this.h(x, z);
+    this.flash(x, y + 20, z, 520, 0.9);
+    for (let i = 0; i < 44; i++) { const a = r() * 6.283, d = r() * R * 0.13, g = 0.16 + r() * 0.1; this.smoke.spawn(x + Math.cos(a) * d, y + 2 + r() * R * 0.9, z + Math.sin(a) * d, 0, 6 + r() * 5, 0, 5 + r() * 3, 7, 12, g, g * 0.9, g * 0.8, 0.7, -0.4, 0.4); }
+    for (let i = 0; i < 56; i++) {
+      const a = r() * 6.283, d = Math.sqrt(r()) * R * 0.4, px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d, py = y + R * 0.95 + r() * R * 0.28;
+      if (i % 3 === 0) this.fire.spawn(px, py, pz, Math.cos(a) * 3, 4 + r() * 3, Math.sin(a) * 3, 1.6 + r(), 12, 10, 1, 0.55, 0.15, 0.9, -0.2, 0.5);
+      else { const g = 0.2 + r() * 0.1; this.smoke.spawn(px, py, pz, Math.cos(a) * 3, 4 + r() * 3, Math.sin(a) * 3, 6 + r() * 3, 11, 14, g, g * 0.92, g * 0.85, 0.75, -0.2, 0.5); }
+    }
+  }
+  // Rocket motor: flame at the nozzle and a thick white smoke trail behind it.
+  exhaust(x, y, z, size) {
+    const r = this.rnd, g = 0.82 + r() * 0.12;
+    this.fire.spawn(x, y, z, 0, 0, 0, 0.08, 2.4 * size, 0, 1, 0.8, 0.4, 1, 0, 0); this.fire.spawn(x, y, z, 0, 0, 0, 0.05, 1.2 * size, 0, 1, 1, 0.9, 1, 0, 0);
+    this.smoke.spawn(x + (r() - 0.5) * 0.4, y, z + (r() - 0.5) * 0.4, (r() - 0.5), 0.3, (r() - 0.5), 1.6 + r() * 1.2, 1.4 * size, 3.2 * size, g, g, g, 0.42, -0.1, 0.8);
+  }
   empBlast(x, z, R) {
     const r = this.rnd, y = this.h(x, z);
     this.shock(x, y + 0.7, z, R, 0.7, 0x66ccff); this.shock(x, y + 1.2, z, R * 0.6, 0.45, 0xbfeaff);

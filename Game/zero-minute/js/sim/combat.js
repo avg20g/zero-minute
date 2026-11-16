@@ -25,7 +25,8 @@ export function slotsOf(e) {
 export const groundTarget = (x, z) => ({ id: 0, ground: true, kind: 'ground', x, z, radius: 0, dead: false, air: false, landed: false, team: -1 });
 const groundOK = (w) => !w.garrisonOnly && ((w.vs.inf || 0) + (w.vs.light || 0) + (w.vs.heavy || 0) + (w.vs.tank || 0) + (w.vs.bldg || 0)) > 0;
 const GROUND_HIT = 1.8;   // metres: a direct-fire weapon aimed at the ground hurts whatever stands this close to the spot
-const canUse = (w, t) => t.ground ? groundOK(w) : (w.garrisonOnly ? t.kind === 'bldg' && t.garrison.length > 0 : (w.vs[armorOf(t)] || 0) > 0);
+const canUse = (w, t) => t.ground ? groundOK(w) : (w.garrisonOnly ? t.kind === 'bldg' && t.garrison.length > 0 :
+  (w.vs[armorOf(t)] || 0) > 0 && !(w.noJets && t.kind === 'unit' && UNITS[t.type].based && !t.landed));   // noJets: cannot catch a strike aircraft in flight
 // Can this unit be given a force-attack order at all?
 export function canForce(sim, u) { _sim = sim; const d = UNITS[u.type]; if (d.suicide) return false; for (const n of slotsOf(u)) if (groundOK(WEAPONS[n])) return true; return false; }
 // Which slot leads against t. A garrison-clearing weapon is used on its own so
@@ -111,6 +112,7 @@ function fireSlots(sim, s, slots, ox, oz, t, dist, lead, bonus) {
       continue;
     }
     if (s.cds[i] > 0) continue;
+    if (w.windup && s.kind === 'unit') { if (isMoving(s)) { s.windup = 0; continue; } if (++s.windup < w.windup) continue; s.windup = 0; }   // erect the launcher first (Scud)
     fire(sim, s, i, slots[i], ox, oz, t);
     if (w.burst) { s.bursts[i] = w.burst - 1; s.burstCd[i] = w.burstGap; }
   }
@@ -136,14 +138,15 @@ function unitCombat(sim, u, d, slots) {
     if (!targetable(sim, u.team, t) || leadSlot(slots, t) < 0) { u.order = null; u.target = 0; stopUnit(u); u.guardX = u.x; u.guardZ = u.z; return; }
     u.target = t.id;
   } else {
-    const canAuto = !o || o.t === 'amove' || (o.t === 'move' && d.fireMoving);
+    const canAuto = !o || o.t === 'amove' || (o.t === 'move' && d.fireMoving && !d.suicide);   // a suicide unit told to move just moves
     const acqR = (!o || o.t === 'amove') ? Math.max(maxR, d.sight) : maxR;
     t = u.target ? sim.byId.get(u.target) : null;
     if (t && (!canAuto || !targetable(sim, u.team, t) || edgeDist(u.x, u.z, t) > acqR + 4 || leadSlot(slots, t) < 0)) { t = null; u.target = 0; }
     if (!t && canAuto && (sim.tick + u.id) % 5 === 0) { t = acquire(sim, u.team, u.x, u.z, acqR, slots); u.target = t ? t.id : 0; }
   }
   if (!t) {
-    u.bursts[0] = u.bursts[1] = u.bursts[2] = 0;
+    u.bursts[0] = u.bursts[1] = u.bursts[2] = 0; u.windup = 0;
+    if (d.suicide) standDown(u, d);
     if (d.turret) turn(u, 'turret', u.facing, d.turret);
     // return to post after a chase
     if (!o && !d.based && !isMoving(u) && Math.hypot(u.x - u.guardX, u.z - u.guardZ) > 6) moveTo(sim, u, u.guardX, u.guardZ);
@@ -151,10 +154,8 @@ function unitCombat(sim, u, d, slots) {
   }
   const lead = leadSlot(slots, t), W = WEAPONS[slots[lead >= 100 ? lead - 100 : lead]];
   const dist = edgeDist(u.x, u.z, t), a = Math.atan2(t.z - u.z, t.x - u.x);
+  if (d.suicide && (suicideRun(sim, u, d, t, dist, W) || u.dive)) return;   // gone, or committed to its dive
   if (dist <= W.range) {
-    if (d.suicide) { // suicide units: reaching the target is the attack
-      splashDamage(sim, u.x, u.z, d.suicide.r, d.suicide.dmg, 'fab', { team: u.team }); sim.events.push({ t: 'suicide', x: u.x, z: u.z, r: d.suicide.r, team: u.team, air: !!u.air }); kill(sim, u); return;
-    }
     const holdGround = forced || !o || o.t === 'amove';
     if (holdGround && !d.based && isMoving(u) && dist <= W.range * 0.92) stopUnit(u);
     let aimed;
@@ -171,6 +172,30 @@ function unitCombat(sim, u, d, slots) {
     if (d.based) return; // flight logic steers strike aircraft
     if (!u.pathReq && (!isMoving(u) || (sim.tick + u.id) % 12 === 0)) moveTo(sim, u, t.x, t.z);
   }
+}
+
+// Suicide units. A Suicide Bomber sprints the last stretch and blows up on contact. An FPV drone that gets inside
+// its weapon range tips over and dives onto the target (or climbs to a helicopter), then blows up. Either way the
+// blast kills the unit itself. Returns true when the unit is gone.
+function standDown(u, d) { if (u.charging || u.dive) { u.charging = false; u.dive = 0; u.hoverLow = false; u.ms = d.speed; } }
+function suicideRun(sim, u, d, t, dist, W) {
+  const S = d.suicide, tAir = !!t.air && !t.landed;
+  if (S.charge && !u.charging && dist <= S.charge.r) { u.charging = true; u.ms = d.speed * S.charge.mult; sim.events.push({ t: 'charge', id: u.id, x: u.x, z: u.z, team: u.team }); }
+  let boom = false;
+  if (S.dive) {
+    if (!u.dive && dist > W.range) return false;
+    const want = tAir ? UNITS[t.type].alt * t.altK / d.alt : 0.15;                     // the height to hit at, as a fraction of the drone's own cruise height
+    if (!u.dive) { u.ms = d.speed * 1.5; sim.events.push({ t: 'dive', id: u.id, x: u.x, z: u.z, team: u.team }); }
+    u.dive++; u.hoverLow = true; u.goal = { x: t.x, z: t.z };
+    u.altK += Math.max(-0.085, Math.min(0.085, want - u.altK));
+    boom = (dist <= 1.6 && Math.abs(want - u.altK) < 0.12) || u.dive > 60;
+  } else boom = dist <= W.range;
+  if (!boom) return false;
+  const y = u.air ? d.alt * u.altK : 0;
+  splashDamage(sim, u.x, u.z, S.r, S.dmg, S.w || 'fab', { team: u.team }, u.x, u.z, S.dive ? (tAir ? 'air' : 'ground') : null);
+  sim.events.push({ t: 'suicide', x: u.x, z: u.z, y, r: S.r, team: u.team, air: !!u.air });
+  kill(sim, u);
+  return true;
 }
 
 // Occupants fire from the wall (or hull) of their container, with a range bonus.

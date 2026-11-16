@@ -4,6 +4,7 @@ import { CELL, DT, LOAD_TICKS, UNLOAD_TICKS, angDiff } from './defs.js';
 import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS, generalOf } from './factionRegistry.js';
 import { rectDist, reqPath, moveTo, stopUnit, releaseSlot, spawnNear, makeUnit } from './entities.js';
 import { claimPad } from './air.js';
+import { syncSuper, superCd } from './powers.js';
 
 export function stepPower(sim) {
   for (const t of sim.teams) { t.prod = 0; t.use = 0; }
@@ -13,17 +14,21 @@ export function stepPower(sim) {
     if (p > 0) { if (e.disabledUntil <= sim.tick) sim.teams[e.team].prod += p; } else sim.teams[e.team].use -= p;
   }
   for (const t of sim.teams) t.low = FACTIONS[t.faction].usesPower && t.use > t.prod;
-  for (const t of sim.teams) if (t.low) { const sp = FACTIONS[t.faction].roles.super && BLDGS[FACTIONS[t.faction].roles.super].superPower; if (sp && t.powerReady[sp] > sim.tick) t.powerReady[sp]++; } // low power pauses the superweapon countdown
+  for (let i = 0; i < 2; i++) { // superweapons: low power pauses every countdown; the team's entry follows its earliest building
+    const t = sim.teams[i], sb = FACTIONS[t.faction].roles.super, sp = sb && BLDGS[sb].superPower; if (!sp) continue;
+    if (t.low) for (const e of sim.ents) if (e.kind === 'bldg' && e.team === i && e.type === sb && e.done && !e.dead && e.superReady > sim.tick) e.superReady++;
+    syncSuper(sim, i, sp);
+  }
 }
 
 export function completeBldg(sim, b) {
   b.done = true; b.progress = 1;
   sim.events.push({ t: 'done', id: b.id, team: b.team, type: b.type, x: b.x, z: b.z });
   const sp = BLDGS[b.type].superPower;
-  if (sp) { // superweapon online: the 5-minute countdown starts, and by rule BOTH sides are told where it is
-    const G = generalOf(sim.teams[b.team]);
-    sim.teams[b.team].powerReady[sp] = sim.tick + Math.round(POWERS[sp].cd * 20 * (G && G.superCd || 1)); b.seen[0] = b.seen[1] = true;
-    sim.events.push({ t: 'superbuilt', id: sp, bid: b.id, team: b.team, x: b.x, z: b.z });
+  if (sp) { // superweapon online: its own countdown starts, and by rule BOTH sides are told where it is
+    b.superCd = superCd(sim, b.team, sp); b.superReady = sim.tick + b.superCd; b.seen[0] = b.seen[1] = true;
+    syncSuper(sim, b.team, sp);
+    sim.events.push({ t: 'superbuilt', id: sp, bid: b.id, team: b.team, x: b.x, z: b.z, secs: Math.round(b.superCd / 20) });
   }
   if (BLDGS[b.type].role === 'supply') { // every Supply Center comes with one free collector
     const tk = FACTIONS[sim.teams[b.team].faction].roles.truck;

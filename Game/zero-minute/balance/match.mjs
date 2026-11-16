@@ -37,7 +37,7 @@ const bump = (o, k, n = 1) => { o[k] = (o[k] || 0) + n; };
 
 export function runMatch(job) {
   const A = loadout(job.a), B = loadout(job.b);
-  const sim = new Sim({ ai: 'both', difficulty: [job.difficulty, job.difficulty], factions: [A.faction, B.faction], generals: [A.general, B.general], map: mapSpec(job.map) || undefined, seed: job.seed });
+  const sim = new Sim({ ai: 'both', difficulty: [job.difficulty, job.difficulty], factions: [A.faction, B.faction], generals: [A.general, B.general], map: mapSpec(job.map) || undefined, seed: job.seed, friendlyFire: process.env.ZM_FF !== '0' });   // friendly fire is on by default in the lobby, so it is on here (ZM_FF=0 turns it off for a comparison)
   const side = () => ({ built: {}, lost: {}, bldgs: {}, bldgsLost: {}, powers: {}, upgrades: {}, supers: 0, valueLost: 0, moneySum: 0, samples: 0 });
   const tel = [side(), side()];
   let why = 'eliminated';

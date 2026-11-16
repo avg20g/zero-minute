@@ -6,14 +6,14 @@ import THREE from '../lib/three.js';
 import { N, CELL, PLAYER, NEUTRAL, angDiff } from '../sim/defs.js';
 import { UNITS, BLDGS, WEAPONS, POWERS } from '../sim/factionRegistry.js';
 import { heightAt, WATER_Y } from '../sim/map.js';
-import { strikeVisible, fxVisible } from '../sim/powers.js';
+import { strikeVisible, fxVisible, SCUD_GAP } from '../sim/powers.js';
 import { fowUniforms } from './gfx.js';
 import { buildTerrain, buildRocks, buildWater, buildBridges, buildTrees } from './terrain.js';
 import { Environment, makeTerrainTextures, terrainMaterial } from './environmentFX.js';
-import { createModel, createPlane, createRocket, buildGhost, buildCrate, buildBomb, bakeStats } from './modelFactory.js';
+import { createModel, createPlane, createRocket, createMissile, buildGhost, buildCrate, buildBomb, bakeStats } from './modelFactory.js';
 import { VFX, VET_TRACER } from './vfxManager.js';
 
-const AIR_Y = 13, LASER = [0.4, 0.9, 1], PDL = [0.6, 1, 1];
+const AIR_Y = 13, LASER = [0.4, 0.9, 1], PDL = [0.6, 1, 1], PBEAM = [0.56, 0.85, 1];
 const TEAM_HEX = TEAM.light; // lobby colours
 
 export class View {
@@ -49,6 +49,7 @@ export class View {
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) this.fx.shakeOn = false;
     this.setLighting(opts.lighting || 'noon');
     this.rocketDrawn = new Map(); // rocket id -> last point its smoke trail reached
+    this.skyBeams = [];           // Particle Cannon buildings firing into the sky right now
     this.views = new Map(); this.props = new Map(); // props: crates, strike aircraft, bombs
     this.rings = []; this.ringGeo = new THREE.RingGeometry(0.86, 1, 28); this.ringGeo.rotateX(-Math.PI / 2);
     this.sqGeo = new THREE.RingGeometry(0.93, 1, 4, 1, Math.PI / 4); this.sqGeo.rotateX(-Math.PI / 2);
@@ -107,6 +108,7 @@ export class View {
           const v = this.views.get(e.sid), len = v && v.muzzle ? v.muzzle : 2, my = v && v.muzzleY !== undefined ? v.muzzleY : 1.6, alt = v && v.alt ? v.alt : 0;
           fx.muzzle(e.x + Math.cos(e.a) * len, fx.h(e.x, e.z) + my + alt, e.z + Math.sin(e.a) * len, e.a, e.k === 'shell' || e.w === 'inferno');
           if (v) v.recoil = 1;
+          if (e.w === 'scud_missile') { const y = fx.h(e.x, e.z); fx.dust(e.x, y, e.z, 18, 5, 2.6, 0.4); fx.flash(e.x, y + 3, e.z, 40, 0.25); }   // launch blast round the truck
           break;
         }
         case 'impact': {
@@ -163,12 +165,26 @@ export class View {
         }
         case 'strafe': if (see(e)) { const y = fx.h(e.x, e.z); fx.explosion(e.x, y, e.z, 0.55); fx.dust(e.x, y, e.z, 5, 4, 1.6, 0.4); fx.crater(e.x, e.z, 3.4); } break;
         case 'shellhit': if (see(e)) { fx.explosion(e.x, fx.h(e.x, e.z), e.z, 1.5); fx.crater(e.x, e.z, 7.5); fx.shock(e.x, fx.h(e.x, e.z) + 0.4, e.z, 8, 0.35, 0xffd9a0); } break;
-        case 'suicide': if (see(e)) { const y = fx.h(e.x, e.z) + (e.air ? 6 : 0); fx.explosion(e.x, y, e.z, 2.0); if (!e.air) fx.crater(e.x, e.z, 6); fx.shock(e.x, y + 0.4, e.z, e.r * 1.3, 0.4, 0xffd9a0); fx.shake(e.x, e.z, 0.7); } break;
+        case 'gunship': { // AC-130 fire: a line of tracers or one howitzer shell from the aircraft down to the ground
+          if (!see(e)) break;
+          const y = fx.h(e.x, e.z), sy = y + e.sy - 0.5;
+          if (e.k === 'gun') { fx.tracer(e.sx, sy, e.sz, e.x, y + 0.3, e.z, 420, VET_TRACER[1], 1.5); fx.dust(e.x, y, e.z, 2, 1.5, 1.2, 0.35); if (fx.rnd() < 0.25) { fx.explosion(e.x, y, e.z, 0.4); fx.crater(e.x, e.z, 2.6); } }
+          else { fx.tracer(e.sx, sy, e.sz, e.x, y + 0.3, e.z, 520, [1, 0.8, 0.45], 2.4); fx.flash(e.sx, sy, e.sz, 24, 0.1); fx.explosion(e.x, y, e.z, 1.7); fx.crater(e.x, e.z, 7.5); fx.shock(e.x, y + 0.4, e.z, 8, 0.35, 0xffd9a0); fx.shake(e.x, e.z, 0.35); }
+          break;
+        }
+        case 'superlaunch': { // what the launching building does; shown only if you can see that building right now
+          if (!(this.reveal || e.team === PLAYER || fog.visAt(PLAYER, e.bx, e.bz))) break;
+          const y = fx.h(e.bx, e.bz);
+          if (e.id === 'particle') { this.skyBeams.push({ x: e.bx, y: y + 14, z: e.bz, until: this.time + POWERS.particle.beam.ticks / 20 }); fx.flash(e.bx, y + 15, e.bz, 120, 0.5); }
+          else { fx.dust(e.bx, y, e.bz, 26, 9, 3, 0.45); fx.flash(e.bx, y + 4, e.bz, e.id === 'nuke' ? 160 : 70, 0.6); fx.shake(e.bx, e.bz, e.id === 'nuke' ? 0.9 : 0.4); }
+          break;
+        }
+        case 'suicide': if (see(e)) { const up = e.y !== undefined ? e.y : e.air ? 6 : 0, y = fx.h(e.x, e.z) + up; fx.explosion(e.x, y, e.z, 2.0); if (up < 2.5) fx.crater(e.x, e.z, 6); fx.shock(e.x, y + 0.4, e.z, e.r * 1.3, 0.4, 0xffd9a0); fx.shake(e.x, e.z, 0.7); } break;
         case 'touchdown': if (see(e)) { const y = fx.h(e.x, e.z) + 0.5; fx.dust(e.x, y, e.z, 8, 3, 1.2, 0.3); } break; // tyre smoke
         case 'fab': if (see(e)) fx.megaBlast(e.x, e.z, e.r); break;
-        case 'nuke': if (see(e)) { fx.megaBlast(e.x, e.z, e.r); fx.megaBlast(e.x, e.z, e.r * 0.55); fx.smokeColumn(e.x, e.z, 9); fx.shake(e.x, e.z, 2.2); } else fx.shake(e.x, e.z, 0.5); break; // the ground shakes for everyone
+        case 'nuke': if (see(e)) { fx.megaBlast(e.x, e.z, e.r); fx.megaBlast(e.x, e.z, e.r * 0.55); fx.mushroom(e.x, e.z, e.r); fx.smokeColumn(e.x, e.z, 12); fx.shake(e.x, e.z, 2.2); } else fx.shake(e.x, e.z, 0.5); break; // the ground shakes for everyone
         case 'scudhit': if (see(e)) { const y = fx.h(e.x, e.z); fx.streak(e.x - 14, y + 70, e.z - 6, e.x, y + 1, e.z); fx.explosion(e.x, y, e.z, 2.2); fx.crater(e.x, e.z, 9); fx.toxinBurst(e.x, e.z, e.r); fx.shake(e.x, e.z, 0.7); } break;
-        case 'pbeam': if (see(e)) { const y = fx.h(e.x, e.z); fx.beam(e.x + 6, y + 150, e.z - 10, e.x, y + 0.2, e.z, 0x8fd8ff, 0.16); fx.spark(e.x, y + 0.5, e.z); if (e.k % 6 === 0) { fx.explosion(e.x, y, e.z, 0.8); fx.crater(e.x, e.z, 5); } if (e.k % 10 === 0) fx.shake(e.x, e.z, 0.35); } break;
+        case 'pbeam': if (see(e)) { const y = fx.h(e.x, e.z); fx.beam(e.x + 6, y + 150, e.z - 10, e.x, y + 0.2, e.z, PBEAM, 0.16); fx.spark(e.x, y + 0.5, e.z); if (e.k % 6 === 0) { fx.explosion(e.x, y, e.z, 0.8); fx.crater(e.x, e.z, 5); } if (e.k % 10 === 0) fx.shake(e.x, e.z, 0.35); } break;
         case 'paradrop': if (see(e)) fx.dust(e.x, fx.h(e.x, e.z), e.z, 22, 7, 2.2, 0.36); break;
         case 'sneak': if (see(e)) { const y = fx.h(e.x, e.z); fx.dust(e.x, y, e.z, 30, 9, 3, 0.45); fx.shock(e.x, y + 0.4, e.z, 10, 0.6, 0xd9b27a); fx.shake(e.x, e.z, 0.5); } break;
         case 'emp': if (see(e)) fx.empBlast(e.x, e.z, e.r); break;
@@ -201,6 +217,24 @@ export class View {
     return v;
   }
   rocketY(p, u) { return this.fx.h(p.tx, p.tz) + p.sy * (1 - u) * (1 - u * 0.25); }
+  // Nuclear Missile and Scud Storm missiles. Each is drawn twice: climbing out of its launcher (if you can see the
+  // launcher) and coming down on the target (if you can see the target). In between it is too high to see.
+  drawMissile(p, alpha, stamp, dt) {
+    const fog = this.sim.fog, fx = this.fx, nuke = p.kind === 'nuke', own = this.reveal || p.team === PLAYER;
+    const el = p.T - p.t + alpha - (p.lift || 0), left = p.t - alpha, UP = nuke ? 56 : 30, DOWN = nuke ? 44 : 26, H = nuke ? 190 : 150;
+    let x, y, z, pitch, hdg;
+    if (el >= 0 && el < UP && (own || fog.visAt(PLAYER, p.sx, p.sz))) {
+      const u = el / UP, d = (nuke ? 9 : 5) + H * u * u, lean = nuke ? 0 : 0.32;            // Scud rails are raked back; the silo is vertical
+      x = p.sx - Math.sin(lean) * d; z = p.sz; y = fx.h(p.sx, p.sz) + Math.cos(lean) * d; hdg = Math.PI; pitch = Math.PI / 2 - lean;
+    } else if (left < DOWN && (own || fog.visAt(PLAYER, p.x, p.z))) {
+      const u = Math.max(0, left / DOWN) * H;
+      x = p.x - 0.2 * u; z = p.z - 0.085 * u; y = fx.h(p.x, p.z) + u; hdg = Math.atan2(0.085, 0.2); pitch = -1.36;
+    } else return;
+    const m = this.prop(p.id, () => { const r = createMissile(nuke ? 'nuke' : 'scud'); r.g.userData.rig = r; return r.g; }, stamp);
+    m.position.set(x, y, z); m.rotation.y = -hdg; m.userData.rig.body.rotation.z = pitch;
+    const back = nuke ? 4.2 : 2.6, c = Math.cos(pitch);
+    if (fx.rnd() < dt * 70) fx.exhaust(x - c * Math.cos(hdg) * back, y - Math.sin(pitch) * back, z - c * Math.sin(hdg) * back, nuke ? 2.4 : 1.1);
+  }
   prop(id, make, stamp) {
     let m = this.props.get(id);
     if (!m) { m = make(); this.scene.add(m); this.props.set(id, m); }
@@ -250,6 +284,7 @@ export class View {
           if (v.rotorTail) v.rotorTail.rotation.z += dt * 55;
           if (v.rotor2) v.rotor2.rotation.y -= dt * (e.landed ? (e.as === 'spool' ? 3 + e.reloadT * 0.9 : 3) : 30);                  // tandem rotors turn opposite ways
           if (v.prop) v.prop.rotation.x += dt * 60;
+          if (e.dive) v.body.rotation.z = -Math.min(1.0, e.dive * 0.2);                                  // FPV drone tips its nose at the target
           if (ak > 0.5 && d.based && fx.rnd() < dt * 40) { const g = 0.85; fx.smoke.spawn(x - c * 3, y, z - s * 3, 0, 0, 0, 0.5, 0.6, 1.4, g, g, g, 0.25, 0, 0.5); }
         } else {
           const L = e.radius * 0.9;
@@ -271,6 +306,13 @@ export class View {
         if (v.blade) v.blade.position.y = 0.55 + (e.working ? Math.sin(this.time * 12) * 0.18 : 0);
         if (v.addons) { v.addons.gatling.visible = e.addon === 'gatling'; v.addons.bunker.visible = e.addon === 'bunker'; }
         if (v.tiers) for (let i = 0; i < 3; i++) v.tiers[i].visible = i === e.tier;
+        if (v.stores) for (let i = 0; i < v.stores.length; i++) v.stores[i].visible = i < e.ammo;      // missiles and bombs come off the aircraft as they are fired
+        if (v.arm) { // Scud Launcher: the erector lifts the missile upright before a launch, drops afterwards, and a new missile slides on during the reload
+          const W = WEAPONS[d.weapon], cd = e.cds[0], up = Math.max(e.windup / W.windup, cd > W.cd - 30 ? (cd - (W.cd - 30)) / 30 : 0), k = up * up * (3 - 2 * up);
+          v.arm.rotation.z = 0.12 + 1.3 * k;
+          const back = Math.max(0, Math.min(1, (cd - W.cd * 0.3) / (W.cd * 0.25)));                    // 1 = not loaded yet, 0 = fully on the cradle
+          v.round.visible = cd < W.cd * 0.55; v.round.position.x = -3.4 * back;
+        }
         if (e.emp && fx.rnd() < dt * 7) fx.spark(x, y + 1.6, z);
         // tread / wheel dust
         if (!e.air && e.cls === 1 && e.spd > 1.5) {
@@ -287,6 +329,11 @@ export class View {
         if (v.turret) { const tf = e.pturret + angDiff(e.turret, e.pturret) * alpha; v.turret.rotation.y = -tf; }
         if (d.weapon && e.done && !sim.teams[e.team]?.low) env.searchlight(e.x, v.g.position.y + 5.5, e.z, this.time * 0.45 + e.id * 1.7 + Math.sin(this.time * 0.31 + e.id) * 0.8);
         if (v.spin && !e.offline) v.spin.rotation.y += dt * 1.2;
+        if (d.superPower && e.done && (v.missile || v.missiles)) { // superweapon reload you can watch: 0 = ready, 1 = just fired
+          const left = e.superCd ? Math.max(0, Math.min(1, (e.superReady - sim.tick) / e.superCd)) : 0;
+          if (v.missile) { v.missile.visible = left < 0.6; v.missile.position.y = -11 * Math.min(1, left / 0.6); }               // the next missile rises out of the shaft as the countdown runs down
+          else { const n = Math.floor(9 * (1 - left) + 1e-6); for (let i = 0; i < 9; i++) v.missiles[i].visible = i < n || sim.tick < e.superShot + i * SCUD_GAP; }   // rails empty one by one, then refill one by one
+        }
         if (v.pump) v.pump.rotation.z = Math.sin(this.time * 2.2) * 0.3;
         if (v.crates) { const n = e.maxSupplies ? Math.ceil(v.crates.length * e.supplies / e.maxSupplies) : 0; if (n !== v.nCrates) { v.nCrates = n; for (let i = 0; i < v.crates.length; i++) v.crates[i].visible = i >= v.crates.length - n; } }
         if (v.rub && e.ruined !== v.wasRuined) { v.wasRuined = e.ruined; v.main.visible = !e.ruined; v.rub.visible = e.ruined; }
@@ -314,7 +361,8 @@ export class View {
     }
     // off-map strikes: enemy aircraft and shells are drawn only where the player has vision
     for (const p of sim.strikes) {
-      if (!strikeVisible(sim, PLAYER, p)) continue;
+      if (p.kind === 'nuke' || p.kind === 'scud') { this.drawMissile(p, alpha, stamp, dt); continue; }
+      if (!this.reveal && !strikeVisible(sim, PLAYER, p)) continue;
       const x = p.px + (p.x - p.px) * alpha, z = p.pz + (p.z - p.pz) * alpha;
       if (p.kind === 'plane') {
         const m = this.prop(p.id, () => { const r = createPlane(p.model, sim.teams[p.team].faction, p.team); r.g.userData.rig = r; return r.g; }, stamp);
@@ -327,6 +375,11 @@ export class View {
           if (fx.rnd() < dt * 50) { const k = 18 + fx.rnd() * 10; fx.tracer(nx, ny, nz, x + p.dx * k, fx.h(x + p.dx * k, z + p.dz * k) + 0.5, z + p.dz * k, 340, VET_TRACER[1], 1.6); }
           if (fx.rnd() < dt * 30) { const g = 0.8; fx.smoke.spawn(nx, ny, nz, p.dx * 20, 0, p.dz * 20, 0.5, 0.9, 2.6, g, g, g, 0.3, 0, 1.5); fx.flash(nx, ny, nz, 14, 0.05); }
         }
+      } else if (p.kind === 'gunship') { // AC-130: level flight in, port wing low while it circles, level again on the way out
+        const m = this.prop(p.id, () => { const r = createPlane('ac130', sim.teams[p.team].faction, p.team); r.g.userData.rig = r; return r.g; }, stamp), rig = m.userData.rig;
+        const turning = p.s >= 0 && p.n < POWERS.ac130.secs * 20;
+        rig.bank = (rig.bank || 0) + ((turning ? -0.36 : 0) - (rig.bank || 0)) * Math.min(1, dt * 1.8);
+        m.position.set(x, fx.h(p.cx, p.cz) + p.y, z); m.rotation.y = -(p.phdg + angDiff(p.hdg, p.phdg) * alpha); rig.body.rotation.x = rig.bank;
       } else if (p.kind === 'rocket') {
         // rockets streak from the wing pylon down to the aim point, laying smoke the whole way
         const m = this.prop(p.id, () => { const r = createRocket(); r.g.userData.rig = r; return r.g; }, stamp);
@@ -343,7 +396,15 @@ export class View {
         const m = this.prop(p.id, buildBomb, stamp); m.position.set(p.x, fx.h(p.x, p.z) + (p.t - alpha) * 2.8, p.z); m.rotation.z = Math.PI;
       }
     }
-    for (const [id, m] of this.props) if (m.userData.stamp !== stamp) { this.scene.remove(m); this.props.delete(id); }
+    // Particle Cannon: the building itself fires a beam straight up for as long as the orbital beam burns
+    if (this.skyBeams.length) {
+      for (const b of this.skyBeams) if (fx.rnd() < dt * 30) {
+        fx.beam(b.x, b.y, b.z, b.x, b.y + 320, b.z, PBEAM, 0.14); fx.spark(b.x, b.y + 1, b.z);
+        fx.fire.spawn(b.x, b.y + 0.5, b.z, 0, 0, 0, 0.14, 6, 0, PBEAM[0], PBEAM[1], PBEAM[2], 0.9, 0, 0);                                   // glow at the emitter
+        for (let i = 0; i < 10; i++) fx.fire.spawn(b.x, b.y + 4 + i * 9 + fx.rnd() * 6, b.z, 0, 40, 0, 0.16, 2.0, 0, PBEAM[0], PBEAM[1], PBEAM[2], 0.85, 0, 0);   // a thick column for the first 100 m
+      }
+      if (this.skyBeams[0].until < this.time) this.skyBeams = this.skyBeams.filter(b => b.until >= this.time);
+    }
     // lingering hazards
     for (const h of sim.hazards) if (h.team === PLAYER || fog.visAt(PLAYER, h.x, h.z)) fx.hazard(h.kind, h.x, h.z, h.r, dt);
 
@@ -352,10 +413,18 @@ export class View {
       const x = p.px + (p.x - p.px) * alpha, z = p.pz + (p.z - p.pz) * alpha;
       if (!fog.visAt(PLAYER, x, z)) continue;
       const tot = Math.hypot(p.tx - p.sx, p.tz - p.sz) || 1, u = Math.min(1, Math.hypot(x - p.sx, z - p.sz) / tot);
-      const arc = p.kind === 'lob' ? (WEAPONS[p.w].arc || 10) : p.kind === 'shell' ? 0.4 : p.kind === 'rocket' ? 2.2 : 5;
-      const y = (fx.h(p.sx, p.sz) + (p.sAir ? AIR_Y : 1.7)) * (1 - u) + (fx.h(p.tx, p.tz) + (p.tAir ? AIR_Y : 1.0)) * u + Math.sin(u * Math.PI) * arc;
+      const W = WEAPONS[p.w], big = p.w === 'scud_missile';
+      const arc = W.arc || (p.kind === 'lob' ? 10 : p.kind === 'shell' ? 0.4 : p.kind === 'rocket' ? 2.2 : 5);
+      const y0 = fx.h(p.sx, p.sz) + (p.sAir ? AIR_Y : big ? 6 : 1.7), y1 = fx.h(p.tx, p.tz) + (p.tAir ? AIR_Y : 1.0), y = y0 * (1 - u) + y1 * u + Math.sin(u * Math.PI) * arc;
+      if (big) { // a Scud Launcher's missile is a real missile: it climbs off the erector, arcs over and comes down nose first
+        const m = this.prop(p.id, () => { const r = createMissile('scud'); r.g.userData.rig = r; return r.g; }, stamp), pitch = Math.atan2(y1 - y0 + Math.cos(u * Math.PI) * Math.PI * arc, tot);
+        m.position.set(x, y, z); m.rotation.y = -p.a; m.userData.rig.body.rotation.z = pitch;
+        if (fx.rnd() < dt * 70) fx.exhaust(x - Math.cos(pitch) * Math.cos(p.a) * 2.6, y - Math.sin(pitch) * 2.6, z - Math.cos(pitch) * Math.sin(p.a) * 2.6, 1.1);
+        continue;
+      }
       fx.trail(p.kind, x, y, z, p.a, p.w);
     }
+    for (const [id, m] of this.props) if (m.userData.stamp !== stamp) { this.scene.remove(m); this.props.delete(id); }   // props whose crate, aircraft or missile is gone
 
     // support-power reticle
     const pw = ui.power;

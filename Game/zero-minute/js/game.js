@@ -53,7 +53,7 @@ function start(o) {
   const canvas = document.getElementById('gl'), app = document.getElementById('app'), audio = o.audio;
   let sim, player = null, rec = null;
   if (o.replay) { player = new ReplayPlayer(o.replay); sim = player.sim; }
-  else { sim = new Sim({ factions: o.factions, difficulty: o.level || 'medium', money: o.money, treaty: o.treaty || 0, noSuper: o.noSuper, koth: o.koth, noEnemy: o.noEnemy, noShroud: true, map: o.map || undefined, generals: o.generals }); rec = new ReplayRecorder(sim); }
+  else { sim = new Sim({ factions: o.factions, difficulty: o.level || 'medium', money: o.money, treaty: o.treaty || 0, noSuper: o.noSuper, friendlyFire: o.friendlyFire, koth: o.koth, noEnemy: o.noEnemy, noShroud: true, map: o.map || undefined, generals: o.generals }); rec = new ReplayRecorder(sim); }
 
   const ui = {
     selection: new Set(), groups: [], place: null, amove: false, guard: false, power: null, hover: 0, promoOpen: false, paused: false, toast: null, togglePromo: null,

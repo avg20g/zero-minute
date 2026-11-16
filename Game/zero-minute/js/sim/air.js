@@ -20,6 +20,7 @@ export const SPOOL = 14, LIFT = 30; // helicopter: ticks of rotor spool-up, then
 export const HELI_REPAIR = 0.06;    // fraction of full health a helicopter regains per second while sitting on a helipad
 export const LOITER = 600;        // ticks an aircraft holds over its destination before going home (30 s)
 export const ORBIT = 22;          // metres: radius of the holding circle
+export const LOITER_SPEED = 0.5;  // a loitering drone circles at this fraction of its top speed
 const ON_RUNWAY = { taxi: 1, backtaxi: 1, lineup: 1, roll: 1, final: 1, rollout: 1, taxiin: 1, park: 1 };
 const clampW = (v) => Math.min(WORLD - 6, Math.max(6, v));
 
@@ -222,6 +223,9 @@ export function stepAir(sim) {
       const dx = g.x - u.x, dz = g.z - u.z, dist = Math.hypot(dx, dz);
       if (!d.based && dist < 1.5) { u.goal = null; u.arrived = true; }
       else { const sp = d.based ? u.ms : Math.min(u.ms, Math.max(2, dist * 1.5)); dvx = dx / (dist || 1) * sp; dvz = dz / (dist || 1) * sp; }
+    } else if (d.loiter && !u.order) { // nothing to do: fly a slow circle around its station instead of hanging in the air (u.goal stays empty, so it still counts as idle)
+      const a = Math.atan2(u.z - u.guardZ, u.x - u.guardX) + 0.8, tx = u.guardX + Math.cos(a) * d.loiter, tz = u.guardZ + Math.sin(a) * d.loiter, dist = Math.hypot(tx - u.x, tz - u.z) || 1;
+      dvx = (tx - u.x) / dist * u.ms * LOITER_SPEED; dvz = (tz - u.z) / dist * u.ms * LOITER_SPEED;
     }
     for (const o of airs) { // keep aircraft from stacking
       if (o === u || o.landed || o.altK < 1) continue;

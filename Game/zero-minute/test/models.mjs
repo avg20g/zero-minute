@@ -138,9 +138,9 @@ const R = globalThis.__rigs;
   ok(named(ps, 'wheel').length === 4, 'Technical: four road wheels');
   ok(bed.x + bed.sx / 2 <= ext(cab, 0)[0] + 0.05 && named(ps, 'bedside').every(p => p.y + p.sy / 2 < ext(cab, 1)[1] - 0.3), 'Technical: open flatbed behind the cab, sides well below the roof line');
   const pin = named(ps, 'pintle')[0]; ok(pin && pin.x > bed.x - bed.sx / 2 && pin.x < bed.x + bed.sx / 2 && pin.y > bed.y, 'Technical: pintle mount standing in the bed');
-  const [mg, cn, rk] = r.tiers, count = (g, n) => { let c = 0; g.traverse(o => { if (o.isMesh && o.name === n) c++; }); return c; };
-  ok(count(mg, 'barrel') === 1 && count(cn, 'barrel') === 2 && count(rk, 'tube') === 12, 'Technical: HMG (1 barrel), twin autocannon, 12-tube rocket pod');
-  ok(mg.visible && !cn.visible && !rk.visible && mg.parent === r.turret, 'Technical: starts with the HMG; other fits appear with salvage tiers');
+  const [mg, hm, cn] = r.tiers, count = (g, n) => { let c = 0; g.traverse(o => { if (o.isMesh && o.name === n) c++; }); return c; };
+  ok(count(mg, 'barrel') === 1 && count(hm, 'barrel') === 1 && count(cn, 'barrel') === 2 && r.tiers.every(g => count(g, 'tube') === 0), 'Technical: machine gun, heavy machine gun, twin machine guns; no rocket pod');
+  ok(mg.visible && !hm.visible && !cn.visible && mg.parent === r.turret, 'Technical: starts with the machine gun; heavier fits appear with salvage tiers');
   console.log('Technical      : pickup cab + open flatbed, pintle mount with gunner, 3 weapon fits (HMG / twin cannon / 12-tube pod)');
 }
 // ---------------------------------------------------------------- 6. Attack helicopter

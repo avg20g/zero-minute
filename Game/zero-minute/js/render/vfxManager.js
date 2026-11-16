@@ -6,7 +6,8 @@
 //   rings, flash lights, tracers, smoke emitters: fixed-size pools, recycled oldest-first
 // Purely cosmetic: own RNG, never feeds back into the sim.
 import THREE from '../lib/three.js';
-import { heightAt } from '../sim/map.js';
+import { heightAt, WATER_Y } from '../sim/map.js';
+import { CELL } from '../sim/defs.js';
 import { patchFow, makeParticleTexture, makeCraterTexture } from './gfx.js';
 import { prismPositions } from './meshdata.js';
 
@@ -160,7 +161,15 @@ export class VFX {
     this.emitters = []; for (let i = 0; i < EMITTERS; i++) this.emitters.push({ t: 0, x: 0, z: 0, size: 1, acc: 0 }); // lingering smoke columns (pooled)
     this._e = new THREE.Euler();
   }
-  h(x, z) { return heightAt(this.map, Math.min(511, Math.max(0, x)), Math.min(511, Math.max(0, z))); }
+  // Height effects sit on: the ground, or the water surface where the ground is under water.
+  h(x, z) { const W = this.map.N * CELL - 1, y = heightAt(this.map, Math.min(W, Math.max(0, x)), Math.min(W, Math.max(0, z))); return this.map.hasWater && y < WATER_Y ? WATER_Y : y; }
+  wet(x, z) { const m = this.map, W = m.N - 1; return m.hasWater && m.water[Math.min(W, Math.max(0, Math.floor(z / CELL))) * m.N + Math.min(W, Math.max(0, Math.floor(x / CELL)))] === 1; }
+  // Foam: a ship's wake, and the splash when something hits the water.
+  wake(x, z, size = 1) { this.smoke.spawn(x + (this.rnd() - 0.5) * size, WATER_Y + 0.06, z + (this.rnd() - 0.5) * size, 0, 0, 0, 1.6, 0.9 * size, 1.5 * size, 0.92, 0.96, 1, 0.5, 0, 2); }
+  splash(x, z, size = 1) {
+    for (let i = 0; i < 10 * size; i++) { const a = this.rnd() * 6.283, r = this.rnd() * 2 * size; this.smoke.spawn(x + Math.cos(a) * r, WATER_Y + 0.2, z + Math.sin(a) * r, Math.cos(a) * 2, 5 + this.rnd() * 7 * size, Math.sin(a) * 2, 0.9 + this.rnd() * 0.6, 1.2 * size, 2.2 * size, 0.9, 0.95, 1, 0.75, -14, 1); }
+    this.shock(x, WATER_Y + 0.1, z, 5 * size, 0.9, 0xdfeef5);
+  }
 
   flash(x, y, z, peak, dur) {
     let best = this.lights[0];

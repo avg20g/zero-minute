@@ -1,8 +1,8 @@
 // Lobby map builder. Edits a map "spec" (see sim/map.js) on a top-down canvas. Everything placed is
 // mirrored through the map centre by the generator, so both sides always get the same ground.
 // No Three.js here: the preview is a 2D picture drawn from the same generateMap() the match uses.
-import { N } from '../sim/defs.js';
-import { DEFAULT_MAP, OPEN_MAP, FOREST_MAP, URBAN_MAP, ARCTIC_MAP, BIOMES, CIV_KINDS, FOOT, MAP_LIMITS, cloneSpec, validateMap } from '../sim/map.js';
+import { N, setMapSize } from '../sim/defs.js';
+import { DEFAULT_MAP, MAPS, BIOMES, CIV_KINDS, FOOT, MAP_LIMITS, cloneSpec, validateMap, scaleSpec } from '../sim/map.js';
 
 export const MAP_KEY = 'cz-map';
 export const TOOLS = [
@@ -25,7 +25,9 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const mir = (p) => [N - p[0], N - p[1]];
 const segDist = (px, pz, a, b, c, d) => { const vx = c - a, vz = d - b, l2 = vx * vx + vz * vz || 1, t = clamp(((px - a) * vx + (pz - b) * vz) / l2, 0, 1); return Math.hypot(px - a - vx * t, pz - b - vz * t); };
 
-export function loadSavedMap() { try { const s = JSON.parse(localStorage.getItem(MAP_KEY) || 'null'); return s && validateMap(s).ok ? s : null; } catch (e) { return null; } }
+// A map saved before maps had a size was drawn on the old 512 m square: it is doubled, like the five built-in maps were.
+export function upgradeSaved(s) { return s && !s.size ? scaleSpec(s, 2) : s; }
+export function loadSavedMap() { try { const s = upgradeSaved(JSON.parse(localStorage.getItem(MAP_KEY) || 'null')); return s && validateMap(s).ok ? s : null; } catch (e) { return null; } }
 
 // Pure edit operations (also used by the tests). Each returns true if the spec changed.
 export function applyTool(spec, tool, a, b, opt = {}) {
@@ -68,12 +70,12 @@ export function applyTool(spec, tool, a, b, opt = {}) {
   return false;
 }
 export const BRUSH = { paintrock: 0, painthill: 1, paintwater: 2 };
-const normalise = (s) => { const o = cloneSpec(s); for (const k of ['mesas', 'ramps', 'roads', 'docks', 'derricks', 'civs', 'water', 'bridges', 'paint']) o[k] = o[k] || []; o.biome = o.biome || 'desert'; o.name = 'Custom map'; return o; };
+const normalise = (s) => { const o = cloneSpec(s); for (const k of ['mesas', 'ramps', 'roads', 'docks', 'derricks', 'civs', 'water', 'bridges', 'paint']) o[k] = o[k] || []; o.biome = o.biome || 'desert'; o.size = o.size || 256; o.name = 'Custom map'; return o; };
 
 export function openMapBuilder(initial, onDone) {
-  const root = $('mapbuilder'), cv = $('mb-canvas'), g = cv.getContext('2d'), base = document.createElement('canvas'); base.width = base.height = N;
-  const S = cv.width / N;
-  let spec = normalise(initial || DEFAULT_MAP), tool = 'rock', drag = null, result = null; const undo = [];
+  const root = $('mapbuilder'), cv = $('mb-canvas'), g = cv.getContext('2d'), base = document.createElement('canvas');
+  let S = 1;   // canvas pixels per map cell: follows the size of the map being edited (see rebuild)
+  let spec = normalise(initial || MAPS[0].spec), tool = 'rock', drag = null, result = null; const undo = [];
   $('mb-tools').innerHTML = TOOLS.map(([id, n, d]) => `<label class="fchip lvl"><input type="radio" name="mb-tool" value="${id}"${id === tool ? ' checked' : ''}><span><b>${n}</b><small>${d}</small></span></label>`).join('');
 
   const paint = () => { // overlay: features and the live drag on top of the cached terrain picture
@@ -98,6 +100,7 @@ export function openMapBuilder(initial, onDone) {
     }
   };
   const rebuild = () => { // regenerate the terrain picture and the validation messages
+    setMapSize(spec.size); base.width = base.height = N; S = cv.width / N;
     result = validateMap(spec);
     const m = result.map, bg = base.getContext('2d'), img = bg.createImageData(N, N), px = img.data;
     if (m) for (let z = 0; z < N; z++) for (let x = 0; x < N; x++) {
@@ -121,17 +124,20 @@ export function openMapBuilder(initial, onDone) {
   const move = (ev) => { if (drag) { drag.b = cell(ev); const l = drag.pts[drag.pts.length - 1]; if (tool in BRUSH && Math.hypot(drag.b[0] - l[0], drag.b[1] - l[1]) >= size() * 0.6) drag.pts.push(drag.b); paint(); } };   // a brush stroke drops a stamp every 0.6 brush-widths
   const up = (ev) => { if (!drag) return; const d = drag; drag = null; d.b = cell(ev); edit(() => applyTool(spec, tool, d.a, d.b, { pts: d.pts, size: size() })); paint(); };
   const tools = (ev) => { if (ev.target.name === 'mb-tool') tool = ev.target.value; };
-  const load = (s) => { edit(() => { spec = normalise(s); }); $('mb-biome').value = spec.biome || 'desert'; };
-  const H = { 'mb-undo': () => { if (undo.length) { spec = JSON.parse(undo.pop()); rebuild(); } }, 'mb-canyon': () => load(DEFAULT_MAP), 'mb-open': () => load(OPEN_MAP), 'mb-forest': () => load(FOREST_MAP), 'mb-urban': () => load(URBAN_MAP), 'mb-arctic': () => load(ARCTIC_MAP), 'mb-clear': () => load({ mesas: [], ramps: [], roads: [], docks: [], derricks: [], civs: [], start: spec.start, biome: spec.biome }),
+  const syncSize = () => { const el = $('mb-mapsize'); if (el) el.value = String(spec.size); };
+  const load = (s) => { edit(() => { spec = normalise(s); }); $('mb-biome').value = spec.biome || 'desert'; syncSize(); };
+  const resize = () => { const to = +$('mb-mapsize').value; if (to !== spec.size) edit(() => { spec = normalise(scaleSpec(spec, to / spec.size)); }); };   // everything on the map is stretched or shrunk to the new size
+  const H = { 'mb-undo': () => { if (undo.length) { spec = JSON.parse(undo.pop()); rebuild(); } }, 'mb-canyon': () => load(MAPS[0].spec), 'mb-open': () => load(MAPS[1].spec), 'mb-forest': () => load(MAPS[2].spec), 'mb-urban': () => load(MAPS[3].spec), 'mb-arctic': () => load(MAPS[4].spec), 'mb-strait': () => load(MAPS[5].spec), 'mb-isles': () => load(MAPS[6].spec), 'mb-clear': () => load({ mesas: [], ramps: [], roads: [], docks: [], derricks: [], civs: [], start: spec.start, biome: spec.biome, size: spec.size }),
     'mb-use': () => { if (!result || !result.ok) return; try { localStorage.setItem(MAP_KEY, JSON.stringify(spec)); } catch (e) { /* storage unavailable: the map still works for this match */ } close(); onDone(spec); }, 'mb-cancel': () => { close(); onDone(null); } };
   const click = (ev) => { const b = ev.target.closest('button'); if (b && H[b.id]) H[b.id](); };
   const key = (ev) => { if (ev.key === 'Escape') H['mb-cancel'](); };
-  function close() { root.hidden = true; cv.removeEventListener('pointerdown', down); cv.removeEventListener('pointermove', move); cv.removeEventListener('pointerup', up); $('mb-biome').removeEventListener('change', setBiome); $('mb-tools').removeEventListener('change', tools); root.removeEventListener('click', click); window.removeEventListener('keydown', key); }
+  function close() { root.hidden = true; cv.removeEventListener('pointerdown', down); cv.removeEventListener('pointermove', move); cv.removeEventListener('pointerup', up); $('mb-biome').removeEventListener('change', setBiome); if ($('mb-mapsize')) $('mb-mapsize').removeEventListener('change', resize); $('mb-tools').removeEventListener('change', tools); root.removeEventListener('click', click); window.removeEventListener('keydown', key); }
   cv.addEventListener('pointerdown', down); cv.addEventListener('pointermove', move); cv.addEventListener('pointerup', up); $('mb-tools').addEventListener('change', tools); root.addEventListener('click', click); window.addEventListener('keydown', key);
   $('mb-kind').innerHTML = CIV_KINDS.map((n, i) => `<option value="${i}">${n}</option>`).join('');
   $('mb-biome').innerHTML = Object.entries(BIOMES).map(([id, b]) => `<option value="${id}">${b.name}</option>`).join('');
   const biome = $('mb-biome'), setBiome = () => edit(() => { spec.biome = biome.value; }); biome.addEventListener('change', setBiome);
   const syncBiome = () => { biome.value = spec.biome || 'desert'; };
-  root.hidden = false; rebuild(); syncBiome();
+  const ms = $('mb-mapsize'); if (ms) { ms.innerHTML = '<option value="512">1 km x 1 km</option><option value="1024">2 km x 2 km</option>' + (spec.size === 256 ? '<option value="256">0.5 km (old size)</option>' : ''); ms.addEventListener('change', resize); }
+  root.hidden = false; rebuild(); syncBiome(); syncSize();
   return { get spec() { return spec; }, get result() { return result; } }; // for tests
 }

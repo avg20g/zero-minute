@@ -227,7 +227,7 @@ export class Environment {
     this.dir.set(p.sun[0], p.sun[1], p.sun[2]).normalize();
     this.sun.color.setHex(p.sunColor); this.sun.intensity = p.sunI; this.sun.shadow.normalBias = p.normalBias;
     this.hemi.color.setHex(p.sky); this.hemi.groundColor.setHex(p.ground); this.hemi.intensity = p.hemiI;
-    this.scene.background.setHex(p.fog); this.scene.fog.color.setHex(p.fog); this.scene.fog.near = p.fogNear; this.scene.fog.far = p.fogFar;
+    this.scene.background.setHex(p.fog); this.scene.fog.color.setHex(p.fog); this.scene.fog.near = p.fogNear; this.scene.fog.far = p.fogFar; this.fogNear = p.fogNear; this.fogFar = p.fogFar;
     this.renderer.toneMappingExposure = p.exposure;
     if (this.envs[this.id]) this.scene.environment = this.envs[this.id];
     if (vfx) { vfx.smoke.uniforms.uTint.value.setScalar(p.smoke); vfx.flashGain = p.flash; }

@@ -1,6 +1,6 @@
 // Deterministic 256x256 desert / urban canyon skirmish map.
 // Layout is point-mirrored (x,z) -> (N-x, N-z) so both sides are fair.
-import { N, CELL, MESA_H } from './defs.js';
+import { N, CELL, MESA_H, setMapSize } from './defs.js';
 
 function hash2(x, z, s) {
   let h = Math.imul(x, 374761393) + Math.imul(z, 668265263) + Math.imul(s, 1274126177) | 0;
@@ -48,6 +48,11 @@ const mirrorRect = (x, z, w, h) => [N - x - w, N - z - h];
 //   water (half)    [x0, z0, x1, z1, halfWidth]       river segments: blocked for everything except amphibious units and aircraft
 //   bridges (half)  [x0, z0, x1, z1, halfWidth]       crossings: the river is not cut inside a bridge strip
 //   paint (half)    [x, z, radius, kind]              free-hand brush stamps: kind 0 rock, 1 gentle hill (units drive over it), 2 water
+//   islands (half)  [cx, cz, radiusX, radiusZ]        sea maps: when present, everything outside these ellipses is water
+//   coast           cells                             how far the shoreline of islands and wide water wanders (0 = smooth)
+//   rim             false                             no rock wall round the map edge (open sea to the horizon)
+//   naval           true                              the map has sea for fleets: the AI builds a shipyard here
+//   size            256 | 512 | 1024                  cells per side (2 m each); default 256
 //   biome           'desert' | 'woods' | 'urban' | 'snow'   ground textures; woods and snow grow trees (trees: 0..1 density)
 //   start           [x, z]                            your Command Center (10 x 10); the enemy gets the mirror
 export const DEFAULT_MAP = {
@@ -90,13 +95,87 @@ export const ARCTIC_MAP = {
   derricks: [[92, 150], [112, 138], [140, 156], [58, 96], [30, 150]],
   civs: [[100, 172, 8], [124, 160, 4], [84, 136, 9], [150, 176, 4], [112, 122, 8], [136, 136, 9], [70, 176, 5]], start: [30, 196],
 };
+// ---------------------------------------------------------------- the lobby's maps
+// The five specs above are the original 512 m layouts (256 cells). They are kept as small, fast fixtures for the test
+// suites. The game plays them at twice the width and length: scaleSpec() doubles every position and the size of rock,
+// rivers and roads, but not the footprints of buildings, and keeps the first Supply Dock at its old distance from the
+// Command Center so the opening economy is unchanged. `extra` then adds what the new room is for (already in big-map
+// cells): an expansion dock, flank derricks, villages, more road.
+export function scaleSpec(S, k = 2, extra = {}) {
+  const c = (v, half) => (v + half) * k - half;   // scale a footprint by its centre, keeping its size
+  const seg = (r, wk) => [r[0] * k, r[1] * k, r[2] * k, r[3] * k, r[4] * wk];
+  const st = S.start, o = { ...S, size: (S.size || 256) * k, name: S.name };
+  o.start = [c(st[0], 5), c(st[1], 5)];
+  o.mesas = (S.mesas || []).map(m => m.map(v => v * k));
+  o.ramps = (S.ramps || []).map(r => ({ x: r.x * k, z: r.z * k, dx: r.dx, dz: r.dz, len: r.len * k, hw: r.hw * k }));
+  o.water = (S.water || []).map(r => seg(r, k)); o.bridges = (S.bridges || []).map(r => seg(r, 1.4));
+  o.paint = (S.paint || []).map(p => [p[0] * k, p[1] * k, p[2] * k, p[3]]);
+  o.roads = (S.roads || []).map(r => seg(r, 1.25));
+  o.docks = (S.docks || []).map((d, i) => i ? { x: c(d.x, 4), z: c(d.z, 3), amount: d.amount } : { x: o.start[0] + d.x - st[0], z: o.start[1] + d.z - st[1], amount: d.amount });
+  o.derricks = (S.derricks || []).map(d => [c(d[0], 2), c(d[1], 2)]);
+  o.civs = (S.civs || []).map(v => [c(v[0], 3), c(v[1], 3), v[2]]);
+  if (S.civsFixed) o.civsFixed = S.civsFixed.map(v => [c(v[0], 3), c(v[1], 3), v[2]]);
+  if (S.rampTop) o.rampTop = [S.rampTop[0] * k, S.rampTop[1] * k];
+  if (S.islands) o.islands = S.islands.map(q => q.map(v => v * k));
+  for (const key of ['docks', 'derricks', 'civs', 'roads', 'paint', 'water', 'bridges', 'mesas']) if (extra[key]) o[key] = o[key].concat(extra[key]);
+  return o;
+}
+const D3 = 30000;   // every Supply Dock holds the same
+export const CANYON_BIG = scaleSpec(DEFAULT_MAP, 2, {   // third dock up on the ridge plateau; derricks in the far corner and the south gap; a farm village in the east basin
+  docks: [{ x: 150, z: 248, amount: D3 }], derricks: [[468, 468], [250, 470]],
+  civs: [[440, 380, 5], [454, 394, 7], [472, 378, 6], [486, 366, 4], [470, 408, 8]], roads: [[330, 400, 446, 388, 3.75]],
+});
+export const OPEN_BIG = scaleSpec(OPEN_MAP, 2, {        // third dock in the far corner with a village; a small town either side of the centre
+  docks: [{ x: 400, z: 440, amount: D3 }], derricks: [[60, 250], [300, 470]],
+  civs: [[212, 262, 0], [232, 282, 1], [198, 286, 4], [424, 404, 5], [440, 418, 7], [408, 420, 6], [428, 386, 9]], roads: [[256, 256, 404, 432, 3.75], [100, 430, 300, 466, 3.5]],
+});
+export const FOREST_BIG = scaleSpec(FOREST_MAP, 2, {    // third dock on the west bank; derricks by the river and in the south woods; a logging village
+  docks: [{ x: 40, z: 200, amount: D3 }], derricks: [[60, 156], [200, 470]],
+  civs: [[150, 334, 6], [168, 348, 5], [134, 352, 7], [156, 368, 6]], roads: [[98, 200, 50, 204, 3.5]],
+});
+export const URBAN_BIG = scaleSpec(URBAN_MAP, 2, {      // third dock in the south-east; more city on the edges
+  docks: [{ x: 450, z: 470, amount: D3 }], derricks: [[474, 330], [228, 484]],
+  civs: [[150, 350, 2], [124, 474, 0], [160, 474, 1], [196, 474, 2], [474, 400, 0], [474, 432, 4]],
+});
+export const ARCTIC_BIG = scaleSpec(ARCTIC_MAP, 2, {    // third dock on the west flank; a trappers' village in the south
+  docks: [{ x: 30, z: 340, amount: D3 }], derricks: [[250, 484]],
+  civs: [[112, 470, 6], [128, 486, 5], [146, 470, 7], [162, 486, 6]], roads: [[100, 430, 150, 462, 3.5]],
+});
+// ---- the two sea maps: 2 km x 2 km (1,024 cells). Both keep a land route between the bases; the sea is for fleets.
+// Strait of Sand: a channel about 550 m wide runs corner to corner between the bases and stops short of both far corners,
+// which leaves a neck of land at each end. Each base has a harbour inlet off the channel.
+export const STRAIT_MAP = {
+  name: 'Strait of Sand', size: 1024, biome: 'desert', naval: true, coast: 12,
+  water: [[262, 262, 762, 762, 135], [420, 604, 290, 730, 55]], bridges: [],
+  mesas: [[205, 470, 26, 16, 9], [84, 330, 20, 14, 8], [70, 940, 34, 14, 8], [470, 860, 28, 14, 8], [330, 990, 30, 10, 7]], ramps: [],
+  roads: [[155, 805, 120, 500, 4.5], [120, 500, 96, 300, 4.5], [96, 300, 110, 130, 4.5], [165, 815, 324, 904, 4.5], [324, 904, 624, 934, 4.5], [624, 934, 914, 894, 4.5], [165, 800, 236, 748, 3.5]],
+  docks: [{ x: 182, z: 826, amount: D3 }, { x: 56, z: 700, amount: D3 }, { x: 330, z: 826, amount: D3 }, { x: 50, z: 372, amount: D3 }],
+  derricks: [[116, 640], [250, 866], [56, 520], [150, 384], [430, 936], [650, 962]],
+  civs: [[196, 694, 5], [210, 710, 4], [184, 712, 6], [200, 728, 9], [172, 694, 8], [70, 180, 5], [86, 196, 7], [60, 210, 6], [100, 172, 4], [150, 430, 0], [166, 446, 1], [136, 452, 3], [160, 468, 4]],
+  start: [150, 800],
+};
+// Emerald Isles: each base on its own large island, open sea all round. A central island joins the two by long
+// causeways (the land route: narrow, and in reach of ships' guns). Two small wooded islets are scenery and cover.
+export const ISLES_MAP = {
+  name: 'Emerald Isles', size: 1024, biome: 'woods', trees: 0.4, naval: true, coast: 14, rim: false,
+  islands: [[232, 800, 190, 168], [512, 512, 108, 108], [215, 260, 62, 46]], water: [],
+  bridges: [[330, 698, 452, 572, 8]],
+  mesas: [[306, 846, 16, 11, 6], [130, 706, 14, 10, 6], [214, 258, 20, 12, 6]], ramps: [],
+  roads: [[215, 805, 330, 698, 4], [330, 698, 452, 572, 6], [452, 572, 512, 512, 4], [215, 810, 130, 866, 3.5]],
+  docks: [{ x: 237, z: 821, amount: D3 }, { x: 110, z: 858, amount: D3 }, { x: 196, z: 676, amount: D3 }, { x: 462, z: 536, amount: D3 }],
+  derricks: [[300, 906], [96, 770], [346, 770], [168, 924], [548, 566]],
+  civs: [[270, 716, 6], [286, 732, 5], [254, 734, 7], [290, 750, 6], [120, 730, 5], [104, 748, 8], [136, 750, 4], [498, 498, 0], [482, 478, 1], [470, 506, 3]],
+  start: [205, 795],
+};
 // The maps the lobby offers, in order. `id` is what the lobby and saved settings use.
 export const MAPS = [
-  { id: 'canyon', name: 'Desert Canyon', desc: 'Ridges, ramps and a walled base', spec: null },
-  { id: 'open', name: 'Open Desert', desc: 'No rock: wide open ground', spec: OPEN_MAP },
-  { id: 'forest', name: 'Forest River', desc: 'Woods, a river and three bridges', spec: FOREST_MAP },
-  { id: 'urban', name: 'Urban Megacity', desc: 'Street grid, city blocks, 48 buildings', spec: URBAN_MAP },
-  { id: 'arctic', name: 'Arctic Refinery', desc: 'Snow, a frozen inlet, ten oil derricks', spec: ARCTIC_MAP },
+  { id: 'canyon', name: 'Desert Canyon', desc: '1 km. Ridges, ramps and a walled base', spec: CANYON_BIG },
+  { id: 'open', name: 'Open Desert', desc: '1 km. No rock: wide open ground', spec: OPEN_BIG },
+  { id: 'forest', name: 'Forest River', desc: '1 km. Woods, a river and three bridges', spec: FOREST_BIG },
+  { id: 'urban', name: 'Urban Megacity', desc: '1 km. Street grid, city blocks, towns to garrison', spec: URBAN_BIG },
+  { id: 'arctic', name: 'Arctic Refinery', desc: '1 km. Snow, a frozen inlet, oil fields', spec: ARCTIC_BIG },
+  { id: 'strait', name: 'Strait of Sand', desc: '2 km. A sea channel between the bases, harbours, two land necks', spec: STRAIT_MAP },
+  { id: 'isles', name: 'Emerald Isles', desc: '2 km. Island bases, open sea, one long causeway road', spec: ISLES_MAP },
 ];
 // Ground types: name for the lobby, flat colours for the minimap and the map builder (open ground, rock), and whether trees grow.
 export const BIOMES = {
@@ -110,6 +189,7 @@ export const cloneSpec = (s) => JSON.parse(JSON.stringify(s));
 
 export function generateMap(spec) {
   const S = spec || DEFAULT_MAP;
+  setMapSize(S.size || 256);   // every size-dependent array below, and in the Nav and Fog built next, follows from this
   const mesas = [], ramps = [], rivers = [], bridges = [];
   const seg2 = (r, mir) => mir ? [N - r[0], N - r[1], N - r[2], N - r[3], r[4]] : r.slice();
   for (const r of S.water || []) { rivers.push(seg2(r, false)); rivers.push(seg2(r, true)); }
@@ -118,6 +198,8 @@ export function generateMap(spec) {
   for (const p of S.paint || []) for (const q of [[p[0], p[1], p[2]], [N - p[0], N - p[1], p[2]]]) { if (p[3] === 2) rivers.push([q[0], q[1], q[0], q[1], q[2]]); else (p[3] === 1 ? hills : rocks).push(q); }
   const segD = (px, pz, q) => { const vx = q[2] - q[0], vz = q[3] - q[1], l2 = vx * vx + vz * vz || 1, t = Math.min(1, Math.max(0, ((px - q[0]) * vx + (pz - q[1]) * vz) / l2)); return Math.hypot(px - q[0] - vx * t, pz - q[1] - vz * t); };
   for (const m of S.mesas || []) { mesas.push(m); mesas.push([N - m[0], N - m[1], m[2], m[3], m[4]]); }
+  const isles = []; for (const q of S.islands || []) { isles.push(q); isles.push([N - q[0], N - q[1], q[2], q[3]]); }
+  const coast = S.coast || 0, rim = S.rim !== false;
   for (const r of S.ramps || []) { ramps.push(r); ramps.push({ x: N - r.x, z: N - r.z, dx: -r.dx, dz: -r.dz, len: r.len, hw: r.hw }); }
 
   const V = N + 1;
@@ -127,7 +209,7 @@ export function generateMap(spec) {
 
   for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
     const en = (fbm(i * 0.085, j * 0.085, 3) - 0.5) * 5.0; // wobble canyon walls
-    let m = sstep(1.3, -1.3, Math.min(i, j, N - i, N - j) - 8 + en);
+    let m = rim ? sstep(1.3, -1.3, Math.min(i, j, N - i, N - j) - 8 + en) : 0;
     for (const q of mesas) {
       const qx = Math.abs(i - q[0]) - (q[2] - q[4]), qz = Math.abs(j - q[1]) - (q[3] - q[4]);
       if (qx > q[4] + 6 || qz > q[4] + 6) continue;       // far outside this mesa: it cannot raise the ground here
@@ -150,18 +232,24 @@ export function generateMap(spec) {
     const dune = (fbm(i * 0.045, j * 0.045, 11) - 0.5) * 1.6;
     height[j * V + i] = MESA_H * e + dune * (1 - 0.7 * e) + hill * (1 - e);
     rock[j * V + i] = e;
-    if (rivers.length) { // cut the river bed, except under bridges (a bridge is a causeway with a deck on top)
-      let w = 0; for (const q of rivers) { if (Math.abs(i - (q[0] + q[2]) / 2) > Math.abs(q[2] - q[0]) / 2 + q[4] + 6 || Math.abs(j - (q[1] + q[3]) / 2) > Math.abs(q[3] - q[1]) / 2 + q[4] + 6) continue; w = Math.max(w, sstep(q[4] + 4.5, q[4] - 0.5, segD(i, j, q))); } // gentle banks: steep ones would count as cliffs and wall the river off
+    if (rivers.length || isles.length) { // cut the river bed or sea bed, except under bridges (a bridge is a causeway with a deck on top)
+      const wob = coast ? (fbm(i * 0.021, j * 0.021, 21) + fbm((N - i) * 0.021, (N - j) * 0.021, 21) - 1) * 1.4 * coast + (fbm(i * 0.09, j * 0.09, 23) + fbm((N - i) * 0.09, (N - j) * 0.09, 23) - 1) * coast * 0.3 : 0;   // a wandering shoreline, the same for both sides
+      let w = 0;
+      if (isles.length) { // sea everywhere except on the islands
+        let land = -1e9; for (const q of isles) { const e = Math.hypot((i - q[0]) / q[2], (j - q[1]) / q[3]); land = Math.max(land, (1 - e) * Math.min(q[2], q[3])); }   // cells inside the nearest shore (negative: out at sea)
+        w = sstep(4.5, -0.5, land + wob);
+      }
+      for (const q of rivers) { const wb = q[4] > 30 ? wob : 0; const pad = q[4] + 6 + (q[4] > 30 ? coast * 1.4 : 0); if (Math.abs(i - (q[0] + q[2]) / 2) > Math.abs(q[2] - q[0]) / 2 + pad || Math.abs(j - (q[1] + q[3]) / 2) > Math.abs(q[3] - q[1]) / 2 + pad) continue; w = Math.max(w, sstep(q[4] + 4.5, q[4] - 0.5, segD(i, j, q) + wb)); } // gentle banks: steep ones would count as cliffs and wall the river off
       if (w > 0) { for (const q of bridges) w *= 1 - sstep(q[4] + 0.6, q[4] - 0.6, segD(i, j, q)); wetV[j * V + i] = w; height[j * V + i] = (height[j * V + i] * (1 - 0.6 * w)) - WATER_DEPTH * w; }
     }
   }
 
-  const blocked = new Uint8Array(N * N), water = new Uint8Array(N * N);
+  const blocked = new Uint8Array(N * N), water = new Uint8Array(N * N), wet = rivers.length > 0 || isles.length > 0;
   for (let z = 0; z < N; z++) for (let x = 0; x < N; x++) {
     const a = height[z * V + x], b = height[z * V + x + 1], c = height[(z + 1) * V + x], d = height[(z + 1) * V + x + 1];
     const steep = Math.max(a, b, c, d) - Math.min(a, b, c, d) > 1.5;
     if (steep || x < 3 || z < 3 || x >= N - 3 || z >= N - 3) blocked[z * N + x] = 1;
-    if (rivers.length && (wetV[z * V + x] + wetV[z * V + x + 1] + wetV[(z + 1) * V + x] + wetV[(z + 1) * V + x + 1]) > 2.2) { water[z * N + x] = 1; if (!steep) blocked[z * N + x] = 2; } // 2 = blocked by water only: amphibious units may cross
+    if (wet && (wetV[z * V + x] + wetV[z * V + x + 1] + wetV[(z + 1) * V + x] + wetV[(z + 1) * V + x + 1]) > 2.2) { water[z * N + x] = 1; if (!steep) blocked[z * N + x] = 2; } // 2 = blocked by water only: amphibious units may cross
   }
 
   // Features (top-left cell of each footprint), mirrored through the centre
@@ -170,6 +258,12 @@ export function generateMap(spec) {
   const docks = both(S.docks, 8, 6, (d, mir) => { if (!mir) return { x: d.x, z: d.z, amount: d.amount }; const [mx, mz] = mirrorRect(d.x, d.z, 8, 6); return { x: mx, z: mz, amount: d.amount }; });
   const roads = both(S.roads, 0, 0, (r, mir) => mir ? [N - r[0], N - r[1], N - r[2], N - r[3], r[4]] : r.slice());
   const derricks = both(S.derricks, 4, 4, (d, mir) => mir ? mirrorRect(d[0], d[1], 4, 4) : d.slice());
+  // Road mask: ground vehicles are faster on a road or a bridge deck (see stepMovement).
+  const road = new Uint8Array(N * N);
+  for (const r of roads.concat(bridges)) {
+    const hw = r[4] * 0.9, x0 = Math.max(0, Math.floor(Math.min(r[0], r[2]) - hw)), x1 = Math.min(N - 1, Math.ceil(Math.max(r[0], r[2]) + hw)), z0 = Math.max(0, Math.floor(Math.min(r[1], r[3]) - hw)), z1 = Math.min(N - 1, Math.ceil(Math.max(r[1], r[3]) + hw));
+    for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) if (!blocked[z * N + x] && segD(x + 0.5, z + 0.5, r) <= hw) road[z * N + x] = 1;
+  }
   const st = S.start, sc = [st[0] + 5, st[1] + 5];
   // choke point the AI watches: the top of the first ramp, or (no ramps) a point a third of the way to the centre
   const rt = S.rampTop || (S.ramps && S.ramps[0] ? [S.ramps[0].x, S.ramps[0].z] : [sc[0] + (N / 2 - sc[0]) / 3, sc[1] + (N / 2 - sc[1]) / 3]);
@@ -188,12 +282,12 @@ export function generateMap(spec) {
       if (!near) for (const r of rivers) if (segD(gx, gz, r) < r[4] + 3.5) { near = true; break; }
       if (near) continue;
       const tx = gx + hash2(gx, gz, 78) * 1.6, tz = gz + hash2(gx, gz, 79) * 1.6, tk = Math.floor(tz) * N + Math.floor(tx);
-      if (blocked[tk] || water[tk]) continue;                       // the jittered spot itself must be dry, open ground
+      if (blocked[tk] || water[tk] || wetV[Math.floor(tz) * V + Math.floor(tx)] > 0.15) continue;                       // the jittered spot itself must be dry, open ground
       trees.push(tx * CELL, tz * CELL, 0.75 + hash2(gx, gz, 80) * 0.7);
     }
   }
   return {
-    N, V, height, rock, blocked, water, hasWater: rivers.length > 0, bridges, trees, biome: S.biome || 'desert', civs, docks, derricks, roads, ramps, mirrorRect, custom: !!spec, name: S.name || 'Custom',
+    N, V, height, rock, blocked, water, road, naval: !!S.naval, hasWater: wet, bridges, trees, biome: S.biome || 'desert', civs, docks, derricks, roads, ramps, mirrorRect, custom: !!spec, name: S.name || 'Custom',
     start: [{ cc: [st[0], st[1]] }, { cc: mirrorRect(st[0], st[1], 10, 10) }],
     rampTop: [{ x: rt[0] * CELL, z: rt[1] * CELL }, { x: (N - rt[0]) * CELL, z: (N - rt[1]) * CELL }],
   };
@@ -201,7 +295,7 @@ export function generateMap(spec) {
 
 // Checks a spec before a match starts. Errors stop the match; warnings do not.
 // Returns { ok, errors, warnings, map } with the generated map so the caller can draw a preview.
-export const MAP_LIMITS = { mesas: 24, docks: 6, derricks: 8, civs: 24, roads: 24, water: 12, bridges: 8, paint: 400 };
+export const MAP_LIMITS = { mesas: 24, docks: 8, derricks: 12, civs: 40, roads: 32, water: 24, bridges: 12, paint: 400, islands: 16 };
 export function validateMap(spec) {
   const errors = [], warnings = [];
   const S = spec; let map = null;

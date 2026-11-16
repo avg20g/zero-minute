@@ -7,7 +7,7 @@ export class CameraRig {
     this.map = map;
     this.tx = WORLD / 2; this.tz = WORLD / 2; this.ty = 0;
     this.dist = 88; this.goalDist = 88; this.yaw = 0; this.pitch = 0.93;
-    this.minDist = 26; this.maxDist = 190;
+    this.minDist = 26; this.maxDist = WORLD <= 512 ? 190 : WORLD <= 1024 ? 240 : 290;   // bigger maps let you pull back further
   }
   focus(x, z) { this.tx = Math.min(WORLD - 8, Math.max(8, x)); this.tz = Math.min(WORLD - 8, Math.max(8, z)); }
   // Pan in screen space: right = +sx, up/forward = +sy

@@ -30,7 +30,7 @@ export class Fog {
       else this.stamp(e.team, e.x, e.z, sightOf(e));
     }
     // Cyber General: a permanent watch on every enemy building and the ground around it
-    for (let t = 0; t < 2; t++) { const g = sim.teams[t].general && GENERALS[sim.teams[t].general]; if (g && g.spy) for (const e of sim.ents) if (e.kind === 'bldg' && !e.dead && e.team === 1 - t) this.stamp(t, e.x, e.z, g.spy); }
+    for (let t = 0; t < 2; t++) { const g = sim.teams[t].general && GENERALS[sim.teams[t].general]; if (g && g.spy && sim.tick >= (g.spyFrom || 0) * 20) for (const e of sim.ents) if (e.kind === 'bldg' && !e.dead && e.team === 1 - t && (!g.spySeen || e.seen[t])) this.stamp(t, e.x, e.z, g.spy); }   // spyFrom: seconds into the match before the watch starts; spySeen: only buildings this side has already found
     // areas lit by a support power: visible to that team until the timer runs out
     if (sim.reveals && sim.reveals.length) { sim.reveals = sim.reveals.filter(r => r.until > sim.tick); for (const r of sim.reveals) this.stamp(r.team, r.x, r.z, r.r); }
     // sticky "last seen" flag for structures

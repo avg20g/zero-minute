@@ -101,13 +101,20 @@ const hold = (u) => { u.order = { t: 'hold' }; return u; };
 {
   const s = new Sim({ ai: false, factions: ['redhammer', 'vanguard'], generals: ['cyber', null] }), T = s.teams[0], E = s.teams[1];
   const ecc = s.ents.find(e => e.kind === 'bldg' && e.team === ENEMY), eb = s.ents.find(e => e.kind === 'unit' && e.team === ENEMY && UNITS[e.type].builder);
-  run(s, 8); ok(s.fog.canSee(PLAYER, ecc) && s.fog.visAt(PLAYER, ecc.x + 14, ecc.z), 'sees the enemy Command Center and the ground beside it from the first second');
+  run(s, 8); ok(!s.fog.canSee(PLAYER, ecc), 'at the start the Cyber General sees no more of the enemy base than anyone else');
   const far = makeUnit(s, 'v_tank', ENEMY, ecc.x - 120, ecc.z + 40, 0); run(s, 8); ok(!s.fog.canSee(PLAYER, far), 'but not enemy units away from their buildings');
   const n = new Sim({ ai: false, factions: ['redhammer', 'vanguard'] }); run(n, 8); ok(!n.fog.canSee(PLAYER, n.ents.find(e => e.kind === 'bldg' && e.team === ENEMY)), 'other generals see nothing of the enemy base');
   const sup = makeBldg(s, 'v_supply', ENEMY, ecc.cx - 14, ecc.cz + 2); s.nav.rebuild(); run(s, 8);
+  const spy = makeUnit(s, 'r_scout', PLAYER, ecc.x - 30, ecc.z + 30, 0); spy.order = { t: 'hold' }; run(s, 8);   // a scout finds the base, then is lost
+  ok(ecc.seen[PLAYER] && sup.seen[PLAYER], 'a scout finds the enemy Command Center and Supply Center'); spy.dead = true; run(s, 8);
+  ok(!s.fog.canSee(PLAYER, ecc), 'before 5:00 the watch is not running: with the scout gone the base is out of sight again');
   ok(T.promos.has('r_hack') && hasPower(s, PLAYER, 'cashhack') && powerError(s, PLAYER, 'cashhack', sup.x, sup.z) !== null && Math.abs(T.powerReady.cashhack / 20 - 180) < 1, 'starts with Cash Hack, which begins the match on its 180 s recharge');
   run(s, 180 * 20); E.money = 9000; const m0 = T.money;
-  ok(powerError(s, PLAYER, 'cashhack', sup.x, sup.z) === null, 'after 3:00 it can aim at once because it already sees the enemy supply building');
+  run(s, 125 * 20);
+  ok(s.tick >= 300 * 20 && s.fog.canSee(PLAYER, ecc) && s.fog.visAt(PLAYER, ecc.x + 14, ecc.z) && s.fog.canSee(PLAYER, sup), 'from 5:00 on it sees every enemy building it has found, and the ground beside it, with nobody there');
+  const hidden = makeBldg(s, 'v_power', ENEMY, ecc.cx + 40, ecc.cz - 30); s.nav.rebuild(); run(s, 8);
+  ok(!s.fog.canSee(PLAYER, hidden), 'a building it has never found stays hidden');
+  ok(powerError(s, PLAYER, 'cashhack', sup.x, sup.z) === null, 'so it can aim Cash Hack at once: it already sees the enemy supply building');
   s.issue({ t: 'power', id: 'cashhack', x: sup.x, z: sup.z }); run(s, 2);
   ok(T.money === m0 + 2000 && E.money === 7000, 'Cash Hack takes $2,000 (others take $1,500)');
   ok(Math.abs((T.powerReady.cashhack - s.tick) / 20 - 180) < 1, 'and recharges in 180 s (others: 240 s)');
@@ -116,7 +123,7 @@ const hold = (u) => { u.order = { t: 'hold' }; return u; };
   ok(unitCost(TM, 'r_tank') === 690 && unitCost(TN, 'r_tank') === 750 && unitCost(TM, 'r_overlord') === 1840 && unitCost(TM, 'r_conscript') < unitCost(TN, 'r_conscript') && unitCost(TM, 'r_mig') === UNITS.r_mig.cost, 'tanks and infantry cost 8% less; aircraft do not');
   const fac = makeBldg(M, 'r_factory', PLAYER, 60, 180); M.nav.rebuild(); TM.money = 5000; M.issue({ t: 'train', id: fac.id, type: 'r_tank' }); run(M, 2);
   ok(TM.money === 4310, 'the discounted price is what is charged'); M.issue({ t: 'cancel', id: fac.id, idx: 0 }); run(M, 2); ok(TM.money === 5000 && fac.queue.length === 0, 'and what is refunded');
-  console.log(`cyber / mass   : permanent watch on enemy buildings; Cash Hack $2,500 / 150 s | tank $${unitCost(TM, 'r_tank')} (normal $${unitCost(TN, 'r_tank')}), Overlord $${unitCost(TM, 'r_overlord')}`);
+  console.log(`cyber / mass   : from 5:00 a permanent watch on enemy buildings it has found; Cash Hack $2,000 / 180 s | tank $${unitCost(TM, 'r_tank')} (normal $${unitCost(TN, 'r_tank')}), Overlord $${unitCost(TM, 'r_overlord')}`);
 }
 
 // ---------------------------------------------------------------- D5. Stealth General and D6. WMD General

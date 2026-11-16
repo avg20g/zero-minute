@@ -143,7 +143,7 @@ const open = () => { const s = new Sim({ empty: true, ai: false }); s.fog.exp[0]
   const { generateMap, validateMap, heightAt, URBAN_MAP, ARCTIC_MAP, OPEN_MAP, MAPS, BIOMES, MAP_LIMITS, cloneSpec } = await import('../js/sim/map.js');
   const { applyTool, TOOLS } = await import('../js/ui/mapBuilder.js');
   const { BIOME_SURFACES, SURFACES } = await import('../js/render/environmentFX.js').catch(() => ({}));
-  ok(MAPS.map(m => m.id).join() === 'canyon,open,forest,urban,arctic' && MAPS.every(m => !m.spec || validateMap(m.spec).ok), 'the lobby offers five maps and every one passes the map checker');
+  ok(MAPS.map(m => m.id).join() === 'canyon,open,forest,urban,arctic,strait,isles' && MAPS.every(m => m.spec && validateMap(m.spec).ok), 'the lobby offers seven maps (five at 1 km, two sea maps at 2 km) and every one passes the map checker');
   const U = validateMap(URBAN_MAP), A = validateMap(ARCTIC_MAP), count = (m, f) => { let n = 0; for (let i = 0; i < N * N; i++) if (f(i, m)) n++; return n; };
   ok(U.ok && U.map.biome === 'urban' && U.map.civs.length === 48 && !U.map.hasWater && U.map.trees.length === 0 && U.map.roads.length >= 12, 'Urban Megacity: paved, 48 buildings, a street grid, no water and no trees');
   ok(new Set(U.map.civs.map(c => c[2])).size >= 6, 'with at least six different building types');

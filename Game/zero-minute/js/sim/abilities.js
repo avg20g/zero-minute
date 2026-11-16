@@ -106,7 +106,7 @@ export function stepUpkeep(sim) {
         for (const b of sim.ents) {
           if (b.kind !== 'bldg' || b.team !== e.team || !b.done || b.offline) continue;
           const rr = BLDGS[b.type].repair;
-          if (rr && rectDist(b, e.x, e.z) <= rr) { e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.02); e.repairing = tick; break; }
+          if (rr && !!BLDGS[b.type].shore === !!d.ship && rectDist(b, e.x, e.z) <= rr) { e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.02); e.repairing = tick; break; }
         }
       }
       if (FACTIONS[T.faction].horde && d.weapon) {

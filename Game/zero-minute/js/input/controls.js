@@ -5,7 +5,7 @@ import THREE from '../lib/three.js';
 import { CELL, WORLD, PLAYER, NEUTRAL } from '../sim/defs.js';
 import { UNITS, BLDGS } from '../sim/factionRegistry.js';
 import { heightAt } from '../sim/map.js';
-import { canPlace, capacityOf } from '../sim/entities.js';
+import { placeError, capacityOf, isTransport, canRide } from '../sim/entities.js';
 import { canAttack } from '../sim/combat.js';
 import { powerError } from '../sim/powers.js';
 
@@ -130,9 +130,9 @@ export class Controls {
       else if (t.type === 'civ' && !t.ruined) give((u, d) => d.canGarrison, { t: 'garrison', target: t.id }, '#4aa3ff');
       else if (t.type === 'dock' || (td && td.role === 'supply' && t.team === PLAYER && t.done)) give((u, d) => d.harvester, { t: 'harvest', target: t.id }, '#f2a93b');
       else if (td && td.pads && t.team === PLAYER && t.done) { give((u, d) => d.heli, { t: 'landrepair', target: t.id }, '#7dffa0'); give((u, d) => d.based, { t: 'rtb' }, '#7dffa0'); }   // aircraft: home for repairs
-      else if (td && td.repair && !td.tunnel && t.team === PLAYER && t.done) give((u) => u.cls === 1 && !u.air, { t: 'repairat', target: t.id }, '#7dffa0');                                 // vehicles: to the repair bay
-      else if (td && td.tunnel && t.team === PLAYER && t.done) give((u) => !u.air, { t: 'tunnel', target: t.id }, '#c9a26b');
-      else if (t.kind === 'unit' && t.team === PLAYER && capacityOf(t)) give((u, d) => d.canGarrison && u !== t, { t: 'garrison', target: t.id }, '#4aa3ff');
+      else if (td && td.repair && !td.tunnel && t.team === PLAYER && t.done) give((u, d) => u.cls === 1 && !u.air && !!d.ship === !!td.shore, { t: 'repairat', target: t.id }, '#7dffa0');                                 // vehicles: to the repair bay
+      else if (td && td.tunnel && t.team === PLAYER && t.done) give((u, d) => !u.air && !d.ship, { t: 'tunnel', target: t.id }, '#c9a26b');
+      else if (t.kind === 'unit' && t.team === PLAYER && capacityOf(t)) give((u, d) => (isTransport(t) ? canRide(u) : d.canGarrison) && u !== t, { t: 'garrison', target: t.id }, '#4aa3ff');   // into a bunker, or aboard a Landing Craft
       if (t.kind === 'bldg' && t.team === PLAYER && td.faction && (!t.done || t.hp < t.maxHp)) give((u, d) => d.builder, { t: 'construct', target: t.id }, '#f2a93b');
     }
     // hold R while right-clicking: vehicles back up to the point, keeping their front armour toward the fight
@@ -144,11 +144,12 @@ export class Controls {
     const g = this.ground(this.mouse.x, this.mouse.y); if (!g) { pl.ok = false; return; }
     const d = BLDGS[pl.type];
     pl.cx = Math.round(g.x / CELL - d.w / 2); pl.cz = Math.round(g.z / CELL - d.h / 2);
-    pl.ok = canPlace(this.sim, pl.type, pl.cx, pl.cz, PLAYER) && this.sim.teams[PLAYER].money >= d.cost;
+    pl.why = placeError(this.sim.use(), pl.type, pl.cx, pl.cz, PLAYER);   // '' when the building fits; otherwise the reason, shown in the status line
+    pl.ok = !pl.why && this.sim.teams[PLAYER].money >= d.cost;
   }
   confirmPlace(keep) {
     const pl = this.ui.place, sim = this.sim; this.updatePlace();
-    if (!pl.ok) { this.ui.toast && this.ui.toast(sim.teams[PLAYER].money < BLDGS[pl.type].cost ? 'Insufficient funds' : 'Cannot build there', 'warn'); return; }
+    if (!pl.ok) { this.ui.toast && this.ui.toast(sim.teams[PLAYER].money < BLDGS[pl.type].cost ? 'Insufficient funds' : (pl.why || 'Cannot build there'), 'warn'); return; }
     const builders = this.selectedOwn('unit').filter(u => UNITS[u.type].builder); if (!builders.length) { this.ui.place = null; return; }
     const gx = (pl.cx + BLDGS[pl.type].w / 2) * CELL, gz = (pl.cz + BLDGS[pl.type].h / 2) * CELL;
     builders.sort((a, b) => Math.hypot(a.x - gx, a.z - gz) - Math.hypot(b.x - gx, b.z - gz));

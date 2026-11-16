@@ -12,11 +12,13 @@ import { UNITS, BLDGS, FACTIONS, POWERS, UPGRADES, WEAPONS, trainsOf, upgradesOf
 import { hasBldg } from './entities.js';
 import { powerError, hasPower, superOf } from './powers.js';
 import { padCount } from './air.js';
+import { placeError } from './entities.js';
+import { NAV_BOAT, NAV_WARSHIP } from './pathfinding.js';
 
 export const DIFFICULTY = {
-  easy:   { label: 'Easy',   apm: 25,  react: 50, counters: false, retreat: false, focus: false, flank: false, combo: false, reverse: false, superweapon: false, derrickAfter: 420, armyCap: 14, attackAt: 3400, firstAttack: 5400, castAt: 3.5 },
-  medium: { label: 'Medium', apm: 60,  react: 20, counters: true,  retreat: true,  focus: false, flank: false, combo: false, reverse: false, superweapon: true,  derrickAfter: 180, armyCap: 20, attackAt: 3200, firstAttack: 4200, castAt: 2.5 },
-  hard:   { label: 'Hard',   apm: 120, react: 6,  counters: true,  retreat: true,  focus: true,  flank: true,  combo: true,  reverse: true,  superweapon: true,  derrickAfter: 40,  armyCap: 26, attackAt: 3000, firstAttack: 3000, castAt: 2.5 },
+  easy:   { label: 'Easy',   apm: 25,  react: 50, counters: false, retreat: false, focus: false, flank: false, combo: false, reverse: false, superweapon: false, derrickAfter: 420, armyCap: 14, attackAt: 3400, firstAttack: 5400, castAt: 3.5, fleet: 2 },
+  medium: { label: 'Medium', apm: 60,  react: 20, counters: true,  retreat: true,  focus: false, flank: false, combo: false, reverse: false, superweapon: true,  derrickAfter: 180, armyCap: 20, attackAt: 3200, firstAttack: 4200, castAt: 2.5, fleet: 4 },
+  hard:   { label: 'Hard',   apm: 120, react: 6,  counters: true,  retreat: true,  focus: true,  flank: true,  combo: true,  reverse: true,  superweapon: true,  derrickAfter: 40,  armyCap: 26, attackAt: 3000, firstAttack: 3000, castAt: 2.5, fleet: 6 },
 };
 const ARM = ['inf', 'light', 'heavy', 'air'];
 const SCOUT_STALE = 75 * 20;
@@ -74,7 +76,10 @@ export class AIController {
     this.homeDock = m.docks.map(d => ({ x: d.x + 4, z: d.z + 3 })).sort((a, b) => Math.hypot(a.x - this.home.x, a.z - this.home.z) - Math.hypot(b.x - this.home.x, b.z - this.home.z))[0];
     const Tm = sim.teams[team], can = new Set(this.F.build.flatMap(b => trainsOf(Tm, b)));   // what this side's general lets it build
     this.roster = Object.keys(UNITS).filter(k => UNITS[k].faction === this.F.id && can.has(k));
-    this.combat = this.roster.filter(k => UNITS[k].weapon && !UNITS[k].harvester && !UNITS[k].builder && !UNITS[k].scout && !UNITS[k].hero);
+    this.combat = this.roster.filter(k => UNITS[k].weapon && !UNITS[k].harvester && !UNITS[k].builder && !UNITS[k].scout && !UNITS[k].hero && !UNITS[k].ship);
+    // The fleet (maps flagged `naval` only): which ships to build, and the open sea they must be able to reach.
+    this.navy = sim.map.naval ? (this.F.aiNavy || []).filter(k => can.has(k)) : []; this.navRot = 0; this.sea = -2; this.yardSite = null; this.yardTry = -1e9;
+    this.fleet = { mode: 'guard', next: 0, target: null, raids: 0, shots: 0 };
     this.heroType = this.roster.find(k => UNITS[k].hero) || null; this.heroAI = { last: -1e9, hunt: 0, solo: 0, army: 0 };   // one hero per side: trained once, played on its own schedule
     this.scout = { id: 0, route: null, i: 0, leg: 0, lastSweep: -1e9, asked: -1e9, lost: -1e9, sweeps: 0 };
     this.op = { mode: 'gather', ids: [], groups: null, wps: null, target: null, since: 0, strength0: 0, wave: 0, lastPush: 0, hunt: 0 };
@@ -163,7 +168,7 @@ export class AIController {
   // ------------------------------------------------------------ own forces (full knowledge of own side is fair)
   census() {
     const sim = this.sim, team = this.team, tick = sim.tick, S = this.scout, R = this.F.roles;
-    const c = { builders: [], trucks: 0, army: [], types: {}, bl: {}, prod: [], undone: [], queued: {}, deployers: [], scout: null, strength: 0, mine: [], hero: null };
+    const c = { builders: [], trucks: 0, army: [], types: {}, bl: {}, prod: [], undone: [], queued: {}, deployers: [], scout: null, strength: 0, mine: [], hero: null, fleet: [] };
     const live = sim.byId.get(S.id); const haveScout = live && !live.dead && live.team === team;
     if (!haveScout) { if (S.id) S.lost = tick; S.id = 0; }
     const cap = sim.byId.get(this.capId);
@@ -179,7 +184,8 @@ export class AIController {
       }
       if (e.inB || e.inert || e.temp) continue;                          // resigned units take no orders; called-in units already have theirs
       const d = UNITS[e.type];
-      if (d.hero) { c.hero = e; c.strength += d.cost; }
+      if (d.ship) c.fleet.push(e);                                        // ships are run by navalOps, never by the land army code
+      else if (d.hero) { c.hero = e; c.strength += d.cost; }
       else if (d.builder) c.builders.push(e);
       else if (d.harvester) c.trucks++;
       else if (e.id === S.id) c.scout = e;
@@ -215,7 +221,7 @@ export class AIController {
     for (let r = r0; r <= r1; r += 2) {
       const n = Math.max(8, Math.round(r * 1.2));
       for (let k = 0; k < n; k++) {
-        const a = k * 6.2831853 / n + r * 0.37;
+        const a = k * 6.2831853 / n + r * 0.37 + (this.team ? 0 : Math.PI);   // the map is mirrored through its centre, so the two sides search in mirrored order: both lay their bases out the same way (first choice: behind the Command Center, away from the enemy)
         const cx = Math.round(ax + Math.cos(a) * r - d.w / 2), cz = Math.round(az + Math.sin(a) * r - d.h / 2);
         if (cx < 6 || cz < 6 || cx + d.w > N - 6 || cz + d.h > N - 6 || this.badSites.has(type + cx + ',' + cz)) continue;
         let ok = true;
@@ -269,7 +275,7 @@ export class AIController {
 
     // --- housekeeping orders (cost actions, not money)
     for (const b of c.undone) if (builder && !c.builders.some(k => k.order && k.order.t === 'construct' && k.order.id === b.id)) { this.act({ t: 'construct', ids: [builder.id], target: b.id }); break; }
-    for (const b of c.prod) if (!this.rallied.has(b.id) && BLDGS[b.type].role !== 'supply' && BLDGS[b.type].role !== 'cc') { if (this.act({ t: 'rally', id: b.id, x: this.rally.x, z: this.rally.z })) this.rallied.add(b.id); break; }
+    for (const b of c.prod) if (!this.rallied.has(b.id) && BLDGS[b.type].role !== 'supply' && BLDGS[b.type].role !== 'cc' && BLDGS[b.type].role !== 'shipyard') { if (this.act({ t: 'rally', id: b.id, x: this.rally.x, z: this.rally.z })) this.rallied.add(b.id); break; }
     for (const u of c.deployers) if (!u.deployed && !u.order && dist(u, this.rally) < 40) { this.act({ t: 'deploy', ids: [u.id] }); break; }
 
     // --- economy
@@ -319,6 +325,18 @@ export class AIController {
     if (R.tunnel && cfg.retreat && n('tunnel') < 1 && nd('barracks') && c.strength >= 1500) bld('tunnel', R.tunnel, 42, 'front');
     for (const b of c.prod) for (const id of upgradesOf(T, b.type)) if (!T.upgrades.has(id) && !q('up:' + id) && b.queue.length < 2 && c.strength >= 3000) add('upgrade ' + id, 32, UPGRADES[id].cost + 1500, () => this.act({ t: 'train', id: b.id, type: 'up:' + id }));
     for (const type of this.roster) if (UNITS[type].deploy && c.deployers.length + q(type) < 2 && c.strength >= 2000) train(type, type, 31);
+    // --- navy (sea maps): one shipyard on the nearest usable shore, then a fleet sized by difficulty
+    if (this.navy.length && R.shipyard && nd('factory') && c.strength >= 1500) {
+      if (!n('shipyard')) {
+        if (builder && tick >= this.buildHold && tick - this.yardTry > 400) { this.yardTry = tick; this.yardSite = this.shoreSite(R.shipyard); }
+        const s = this.yardSite;
+        add('shipyard', s ? 60 : 0, BLDGS[R.shipyard].cost, () => { if (!this.act({ t: 'build', id: builder.id, type: R.shipyard, cx: s[0], cz: s[1] })) return false; this.lastBuild = { key: R.shipyard + s[0] + ',' + s[1], tick, id: builder.id }; this.buildHold = tick + 60; this.stats.builds++; this.yardSite = null; return true; }, !!builder && !!s && tick >= this.buildHold && !c.undone.some(b => b.type === R.shipyard), true);
+      } else if (nd('shipyard')) {
+        let queued = 0, afloat = 0; for (const type of this.navy) { queued += q(type); afloat += q(type) * UNITS[type].cost; } for (const u of c.fleet) afloat += UNITS[u.type].cost;
+        // the fleet never outgrows the army: at most 60% of the land force's value, so a lost fleet is not rebuilt at the army's expense
+        if (c.fleet.length + queued < cfg.fleet && afloat < 1000 + c.strength * 0.6 && tick - (this.fleet.lastLoss || -1e9) > 600) { const type = this.navy[this.navRot % this.navy.length], b = this.trainer(c, type); add('ship ' + type, 57, unitCost(T, type), () => { if (this.act({ t: 'train', id: b.id, type })) { this.navRot++; this.stats.trained++; return true; } return false; }, !!b); }
+      }
+    }
     if (this.heroType && !c.hero && !q(this.heroType) && nd('factory') && c.strength >= 3500 && tick >= 3600) train('hero', this.heroType, 72);   // worth saving up for once there is an army
     // --- army: counter what has been seen
     let queuedArmy = 0; for (const type of this.combat) queuedArmy += q(type);
@@ -339,6 +357,72 @@ export class AIController {
     this.scouting(c);
     this.operations(c);
     this.heroPlay(c);
+    if (c.fleet.length) this.navalOps(c);
+  }
+  // The open sea: the largest body of water a boat can sail. Counted once (map data, like reading the minimap).
+  seaComp() {
+    if (this.sea !== -2) return this.sea;
+    const cm = this.sim.nav.comp[NAV_BOAT], cnt = new Map(); let best = -1, bn = 0;
+    for (let i = 0; i < N * N; i += 3) { const k = cm[i]; if (k < 0) continue; const v = (cnt.get(k) || 0) + 1; cnt.set(k, v); if (v > bn) { bn = v; best = k; } }
+    return (this.sea = bn >= 400 ? best : -1);
+  }
+  // Where to put the shipyard: the nearest spot to the Command Center, on explored shore, that passes the placement
+  // rule and opens onto the main sea. Returns [cx, cz] or null.
+  shoreSite(type) {
+    const sim = this.sim, nav = sim.nav, d = BLDGS[type], exp = this.aiExplored, sea = this.seaComp(); if (sea < 0) return null;
+    let best = null, bd = 1e9;
+    for (let r = 14; r <= 190 && !best; r += 3) {
+      const n = Math.max(12, Math.round(r * 1.6));
+      for (let k = 0; k < n; k++) {
+        const a = k * 6.2831853 / n + (this.team ? 0 : Math.PI), cx = Math.round(this.home.x + Math.cos(a) * r - d.w / 2), cz = Math.round(this.home.z + Math.sin(a) * r - d.h / 2);
+        if (cx < 6 || cz < 6 || cx + d.w > N - 6 || cz + d.h > N - 6 || this.badSites.has(type + cx + ',' + cz)) continue;
+        if (!exp[(cz + (d.h >> 1)) * N + cx + (d.w >> 1)] || nav.stat[cz * N + cx] === 1) continue;
+        if (placeError(sim, type, cx, cz, this.team)) continue;
+        let wx = 0, wz = 0, wn = 0; for (let z = cz; z < cz + d.h; z++) for (let x = cx; x < cx + d.w; x++) if (nav.stat[z * N + x] === 2) { wx += x; wz += z; wn++; }
+        const mx = cx + d.w / 2, mz = cz + d.h / 2, fx = wx / wn - mx, fz = wz / wn - mz, fl = Math.hypot(fx, fz) || 1;
+        const front = nav.nearest(Math.round(mx + fx / fl * 13), Math.round(mz + fz / fl * 13), NAV_BOAT, sea, 6); if (front < 0) continue;   // must open onto the main sea, not a pond
+        const s = Math.hypot(mx - this.home.x, mz - this.home.z); if (s < bd) { bd = s; best = [cx, cz]; }
+      }
+    }
+    return best;
+  }
+  // Fleet orders, every few seconds. Guard: stay off the home shipyard. With a full fleet: sail for what the AI has
+  // seen of the enemy within reach of the water (ships first, then anything on the coast); with nothing seen, sweep
+  // the sea off the enemy's start. Badly damaged ships go back to the yard. Memory and public map data only.
+  navalOps(c) {
+    const sim = this.sim, tick = sim.tick, nav = sim.nav, O = this.fleet, cfg = this.cfg, sea = this.seaComp(); if (tick < O.next || sea < 0) return;
+    O.next = tick + 120;
+    if (c.fleet.length < (O.count || 0)) O.lastLoss = tick; O.count = c.fleet.length;   // a ship was lost: the yard waits 30 s before replacing it
+    const yard = (c.bl.shipyard || []).find(b => b.done), ships = c.fleet.filter(u => UNITS[u.type].weapon);
+    if (cfg.retreat && yard) { const hurt = ships.filter(u => u.hp < u.maxHp * 0.35 && !(u.order && u.order.t === 'move' && dist(u, yard) < 60) && !UNITS[u.type].suicide); if (hurt.length) this.act({ t: 'repairat', ids: hurt.map(u => u.id), target: yard.id }); }
+    const fit = ships.filter(u => u.hp >= u.maxHp * 0.35 || UNITS[u.type].suicide); if (!fit.length) return;
+    const waterNear = (x, z, r) => { const k = nav.nearest(Math.floor(x / CELL), Math.floor(z / CELL), NAV_WARSHIP, -1, r); return k < 0 ? null : { x: ((k % N) + 0.5) * CELL, z: (((k / N) | 0) + 0.5) * CELL }; };
+    // the best thing seen that a ship can get to: enemy ships first, then whatever stands within gun range of the water
+    let tg = null, ts = 1e9; const cx = fit.reduce((a, u) => a + u.x, 0) / fit.length, cz = fit.reduce((a, u) => a + u.z, 0) / fit.length;
+    for (const m of this.aiMemoryMap.values()) {
+      if (tick - m.tick > 1800 || tick - m.first < cfg.react) continue;
+      const isShip = m.kind === 'unit' && UNITS[m.type].ship, w = isShip ? null : waterNear(m.x, m.z, 22); if (!isShip && !w) continue;
+      const s = Math.hypot(m.x - cx, m.z - cz) * (isShip ? 0.5 : 1) * (m.weapon ? 0.8 : 1); if (s < ts) { ts = s; tg = { m, at: isShip ? { x: m.x, z: m.z } : w, isShip }; }
+    }
+    const full = fit.length >= Math.min(cfg.fleet, 3);
+    if (tg && (full || ts < 160)) {
+      O.mode = 'strike'; O.target = tg.m.id;
+      const rams = fit.filter(u => UNITS[u.type].suicide), guns = fit.filter(u => !UNITS[u.type].suicide), e = sim.byId.get(tg.m.id);
+      if (guns.length) this.act({ t: 'move', ids: guns.map(u => u.id), x: tg.at.x, z: tg.at.z, attack: true });
+      if (rams.length && tg.isShip && e && !e.dead && sim.fog.canSee(this.team, e)) this.act({ t: 'attack', ids: rams.map(u => u.id), target: e.id });   // drone boats are spent on ships they can see
+      else if (rams.length && guns.length) this.act({ t: 'move', ids: rams.map(u => u.id), x: tg.at.x, z: tg.at.z });
+      O.shots++; return;
+    }
+    if (full && tick - (O.lastRaid || -1e9) > 1800) { // nothing known: sweep the water off the enemy's start
+      const w = waterNear(WORLD - this.homeW.x, WORLD - this.homeW.z, 120);
+      if (w && this.act({ t: 'move', ids: fit.map(u => u.id), x: w.x, z: w.z, attack: true })) { O.mode = 'raid'; O.lastRaid = tick; O.raids++; }
+      return;
+    }
+    if (O.mode !== 'raid' && yard) { // guard: idle ships gather off the yard
+      const idle = fit.filter(u => !u.order && dist(u, { x: yard.rallyX, z: yard.rallyZ }) > 40);
+      if (idle.length) this.act({ t: 'move', ids: idle.map(u => u.id), x: yard.rallyX, z: yard.rallyZ, attack: true });
+      O.mode = 'guard';
+    } else if (O.mode === 'raid' && fit.every(u => !u.order)) O.mode = 'guard';
   }
   // The hero either goes with the army or works alone. With an attack under way it follows the army's target. Otherwise
   // it hunts by itself: the nearest enemy unit this AI has seen in the last 30 s (unarmed ones first), else the next

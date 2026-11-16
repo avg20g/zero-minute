@@ -417,7 +417,164 @@ function fpv(P) {
   ball(b, s.glass, 0.07, 0.07, 0.07, 0.5, 0.05, 0, 'camera');
   return { g, body: b, muzzle: 0, muzzleY: 0 };
 }
-export const ASSEMBLY = { abrams, battlemaster, overlord: (P) => sovietTank(P, true), technical, scoutcar: scoutCar, comanche, drone, raptor, f15e, j11, lav25, scudtel, fpv, chinook, z10 };
+// ---------------------------------------------------------------- ships
+// y = 0 is the waterline and the bow points along +X. Lengths follow the real vessels at the game's scale for big
+// machines (SHIPS: real metres and the scale used). A hull is a plan-view outline (pointed bow, slightly narrower
+// stern) extruded from the keel up to the deck; a darker boot-topping band sits at the waterline.
+export const SHIPS = {
+  rhib: { real: 11, length: 5.4, beam: 1.9 },        // 11 m Naval Special Warfare RHIB
+  mkv: { real: 25, length: 10, beam: 2.4 },          // Mk V Special Operations Craft
+  frigate: { real: 151, length: 30, beam: 4.2 },     // Constellation-class frigate
+  corvette: { real: 90, length: 24, beam: 3.6 },     // Type 056 corvette
+  lcraft: { real: 23, length: 10, beam: 3.4 },       // mechanised landing craft
+  mboat: { real: 38, length: 11, beam: 2.7 },        // Osa-size fast attack craft, here an armed fishing boat hull
+  dboat: { real: 5.5, length: 4.2, beam: 1.3 },      // uncrewed explosive boat
+};
+function shipHull(p, mat, L, B, free, draft, bow = 0.3, name = 'hull') {
+  const h = B / 2, x0 = -L / 2, xb = L / 2 - L * bow;
+  prism(p, shared().track, [[x0, -h * 0.8], [xb, -h * 0.98], [L / 2 - 0.02, 0], [xb, h * 0.98], [x0, h * 0.8]], 0.3, 'plan', 0, 0.02, 0, 'boottop');
+  return prism(p, mat, [[x0, -h * 0.82], [xb, -h], [L / 2, 0], [xb, h], [x0, h * 0.82]], free + draft, 'plan', 0, (free - draft) / 2 + 0.16, 0, name);
+}
+// A small gun on a pintle with a crew shield: twin or single barrel. Returns the group so it can be the turret.
+function deckGun(p, x, y, z, barrels, len, name = 'turret') {
+  const s = shared(), t = grp(p, x, y, z, name);
+  cyl(t, s.gunmetal, 0.05, 0.6, 0, 0.3, 0, 'y', 'pintle'); box(t, s.gunmetal, 0.4, 0.15, 0.12 + barrels * 0.1, 0.05, 0.66, 0, 'receiver');
+  for (let i = 0; i < barrels; i++) cyl(t, s.gunmetal, 0.03, len, 0.2 + len / 2, 0.67, (i - (barrels - 1) / 2) * 0.16, 'x', 'barrel');
+  box(t, s.greyDark, 0.03, 0.4, 0.5 + barrels * 0.1, 0.22, 0.7, 0, 'gunshield');
+  return t;
+}
+function rotaryGun(p, x, y, z, len, name = 'minigun') {
+  const s = shared(), q = grp(p, x, y, z, name);
+  for (const [dy, dz] of [[0.05, 0.05], [0.05, -0.05], [-0.05, 0.05], [-0.05, -0.05]]) cyl(q, s.gunmetal, 0.022, len, len / 2, dy, dz, 'x', 'barrel');
+  cyl(q, s.gunmetal, 0.09, 0.3, -0.05, 0, 0, 'x', 'motor'); return q;
+}
+// RHIB: grey inflatable collar round a deep-V hull, centre console, twin machine guns on the bow, two outboards.
+function rhib(P) {
+  const s = shared(), g = new THREE.Group(), b = grp(g), D = SHIPS.rhib;
+  shipHull(b, s.greyDark, D.length - 0.4, 1.4, 0.3, 0.3, 0.34);
+  for (const k of [-1, 1]) { cyl(b, s.rubber, 0.28, 3.7, -0.75, 0.5, k * 0.74, 'x', 'collar'); cyl(b, s.rubber, 0.28, 1.75, 1.83, 0.5, k * 0.37, 'x', 'collar').rotation.y = -k * 0.45; }
+  ball(b, s.rubber, 0.3, 0.28, 0.3, 2.62, 0.5, 0, 'collar');
+  box(b, s.grey, 3.6, 0.06, 1.2, -0.7, 0.38, 0, 'deck');
+  box(b, P.hull, 0.8, 0.85, 0.8, -0.5, 0.82, 0, 'console'); box(b, s.glass, 0.04, 0.3, 0.72, -0.08, 1.38, 0, 'windscreen').rotation.z = 0.3;
+  box(b, P.id, 0.7, 0.03, 0.7, -0.5, 1.26, 0, 'idpanel');
+  for (const k of [-1, 1]) { box(b, s.cloth, 0.2, 0.5, 0.26, -1.15, 0.9, k * 0.3, 'crew'); ball(b, s.skin, 0.11, 0.12, 0.11, -1.15, 1.26, k * 0.3, 'crew'); }
+  for (const k of [-1, 1]) { box(b, s.gunmetal, 0.4, 0.62, 0.26, -2.62, 0.62, k * 0.3, 'outboard'); box(b, s.gunmetal, 0.14, 0.5, 0.1, -2.72, 0.1, k * 0.3, 'outboard'); }
+  cyl(b, s.gunmetal, 0.03, 0.9, -1.9, 1.1, 0, 'y', 'mast'); box(b, s.grey, 0.3, 0.06, 0.5, -1.9, 1.56, 0, 'radar');
+  const t = deckGun(b, 1.25, 0.4, 0, 2, 0.9);
+  return { g, body: b, turret: t, turretX: 1.25, muzzle: 2.3, muzzleY: 1.05, noRecoil: true, ship: true };
+}
+// Mk V Special Operations Craft: long low aluminium hull, angular cabin with a raked windscreen, radar arch, and an
+// open after deck with the weapons: twin miniguns, two grenade launchers and a Hellfire launcher on the cabin roof.
+function mkv(P) {
+  const s = shared(), g = new THREE.Group(), b = grp(g), D = SHIPS.mkv;
+  shipHull(b, s.greyDark, D.length, D.beam, 0.62, 0.4, 0.36);
+  box(b, s.grey, 5.4, 0.05, 2.0, -2.0, 0.8, 0, 'deck');
+  prism(b, s.grey, [[-0.9, 0.78], [2.2, 0.78], [1.5, 1.7], [-0.9, 1.7]], 1.9, 'side', 0, 0, 0, 'cabin');
+  box(b, s.glass, 0.04, 0.52, 1.7, 1.83, 1.38, 0, 'windscreen').rotation.z = 0.65; for (const k of [-1, 1]) box(b, s.glass, 1.4, 0.3, 0.03, 0.4, 1.42, k * 0.96, 'window');
+  box(b, P.id, 1.3, 0.03, 1.3, 0.1, 1.72, 0, 'idpanel');
+  for (const k of [-1, 1]) box(b, s.gunmetal, 0.07, 0.9, 0.07, -1.0, 2.1, k * 0.85, 'arch'); box(b, s.gunmetal, 0.07, 0.07, 1.78, -1.0, 2.55, 0, 'arch');
+  box(b, s.grey, 0.5, 0.08, 0.9, -1.0, 2.64, 0, 'radar'); cyl(b, s.gunmetal, 0.02, 1.1, -1.0, 3.1, 0.5, 'y', 'antenna');
+  const hf = grp(b, 0.9, 1.74, -0.5, 'hellfire'); box(hf, s.gunmetal, 0.9, 0.3, 0.34, 0, 0.2, 0, 'launcher'); cyl(hf, s.ordnance, 0.07, 0.9, 0.05, 0.22, 0, 'x', 'missile');
+  for (const k of [-1, 1]) { const q = grp(b, -3.9, 0.84, k * 0.8, 'mk19'); cyl(q, s.gunmetal, 0.04, 0.5, 0, 0.25, 0, 'y'); box(q, s.gunmetal, 0.44, 0.2, 0.24, 0.05, 0.56, 0); cyl(q, s.gunmetal, 0.035, 0.36, 0.42, 0.56, 0, 'x', 'barrel'); }
+  for (const k of [-1, 1]) { box(b, s.steel, 0.5, 0.3, 0.5, -4.75, 0.2, k * 0.6, 'waterjet'); }
+  const t = grp(b, -2.6, 0.84, 0, 'turret');
+  cyl(t, s.gunmetal, 0.32, 0.06, 0, 0.03, 0, 'y', 'ring'); cyl(t, s.gunmetal, 0.05, 0.6, 0, 0.3, 0, 'y', 'pintle');
+  for (const k of [-1, 1]) rotaryGun(t, 0.1, 0.68, k * 0.22, 0.9); box(t, s.greyDark, 0.03, 0.45, 0.9, 0.2, 0.7, 0, 'gunshield');
+  box(t, s.cloth, 0.2, 0.55, 0.3, -0.35, 0.3, 0, 'gunner'); ball(t, s.skin, 0.11, 0.12, 0.11, -0.35, 0.7, 0, 'gunner');
+  return { g, body: b, turret: t, turretX: -2.6, muzzle: 1.1, muzzleY: 1.55, noRecoil: true, ship: true };
+}
+// Frigate: flared bow, deck gun forward, missile cells, a slab-sided bridge with an enclosed mast, funnel, a laser
+// turret on the hangar roof and a helicopter deck aft.
+function frigate(P) {
+  const s = shared(), g = new THREE.Group(), b = grp(g), D = SHIPS.frigate, L = D.length, B = D.beam;
+  shipHull(b, s.grey, L, B, 1.5, 0.9, 0.26);
+  box(b, s.greyDark, L * 0.96, 0.05, B * 0.8, -0.4, 1.68, 0, 'deck');
+  box(b, s.greyDark, 1.6, 0.3, 1.8, 8.0, 1.8, 0, 'vls'); for (const x of [7.5, 8.0, 8.5]) for (const z of [-0.5, 0, 0.5]) box(b, s.gunmetal, 0.36, 0.04, 0.36, x, 1.97, z, 'cell');
+  prism(b, s.grey, [[1.2, 1.66], [6.6, 1.66], [5.8, 4.3], [1.2, 4.3]], 3.5, 'side', 0, 0, 0, 'bridge');
+  box(b, s.glass, 0.05, 0.4, 3.0, 6.05, 3.7, 0, 'bridgewindows').rotation.z = 0.3;
+  prism(b, s.grey, [[2.2, 4.3], [4.4, 4.3], [3.9, 7.4], [2.7, 7.4]], 1.5, 'side', 0, 0, 0, 'mast'); box(b, s.greyDark, 1.3, 0.9, 1.9, 3.3, 6.3, 0, 'radarface');
+  cyl(b, s.gunmetal, 0.04, 1.6, 3.3, 8.2, 0, 'y', 'pole'); box(b, s.grey, 0.2, 0.3, 1.6, 3.3, 8.0, 0, 'yard');
+  box(b, s.grey, 9.0, 1.9, 3.4, -3.4, 2.62, 0, 'superstructure');
+  prism(b, s.greyDark, [[-3.4, 3.56], [-0.6, 3.56], [-1.0, 5.3], [-3.0, 5.3]], 1.7, 'side', 0, 0, 0, 'funnel'); box(b, s.track, 1.6, 0.12, 1.3, -2.0, 5.34, 0, 'funnelcap');
+  box(b, s.grey, 3.6, 2.3, 3.5, -6.8, 2.82, 0, 'hangar'); box(b, s.gunmetal, 0.06, 1.8, 2.6, -8.62, 2.6, 0, 'hangardoor');
+  const lz = grp(b, -6.4, 3.98, 0, 'laser'); cyl(lz, s.greyDark, 0.6, 0.5, 0, 0.25, 0, 'y'); ball(lz, s.white, 0.55, 0.55, 0.55, 0, 0.8, 0, 'dome', s.dome); box(lz, s.glass, 0.1, 0.34, 0.34, 0.5, 0.86, 0, 'lens');
+  box(b, s.greyDark, 5.4, 0.06, B * 0.78, -11.6, 1.7, 0, 'helideck'); box(b, s.white, 2.0, 0.02, 0.2, -11.6, 1.74, 0, 'marking'); box(b, s.white, 0.2, 0.02, 1.6, -11.6, 1.74, 0, 'marking');
+  box(b, P.id, 1.6, 0.03, 1.6, -13.4, 1.74, 0, 'idpanel');
+  for (const k of [-1, 1]) for (const x of [-9, -4, 1, 6, 10]) box(b, s.gunmetal, 0.04, 0.4, 0.04, x, 1.88, k * (B / 2 - 0.25) * (x > 8 ? 0.6 : 1), 'stanchion');
+  const t = grp(b, 10.6, 1.7, 0, 'turret');
+  cyl(t, s.greyDark, 0.9, 0.2, 0, 0.1, 0, 'y', 'ring'); prism(t, s.grey, [[-0.9, 0.2], [1.0, 0.2], [0.5, 1.3], [-0.9, 1.3]], 1.5, 'side', 0, 0, 0, 'gunhouse');
+  cyl(t, s.gunmetal, 0.1, 2.9, 2.0, 0.85, 0, 'x', 'barrel'); cyl(t, s.gunmetal, 0.14, 0.4, 3.3, 0.85, 0, 'x', 'muzzle');
+  return { g, body: b, turret: t, turretX: 10.6, muzzle: 14, muzzleY: 2.6, ship: true };
+}
+// Type 056 corvette: sloped stealth sides, 76 mm gun forward, one block of superstructure with an integrated mast,
+// a rotary close-in gun aft of the funnel, flight deck at the stern. Red boot-topping, as on the real ships.
+function corvette(P) {
+  const s = shared(), g = new THREE.Group(), b = grp(g), D = SHIPS.corvette, L = D.length, B = D.beam;
+  shipHull(b, s.radome, L, B, 1.3, 0.8, 0.28);
+  box(b, s.red, L * 0.9, 0.12, B * 0.84, -0.6, 0.12, 0, 'waterline');
+  box(b, s.greyDark, L * 0.95, 0.05, B * 0.8, -0.3, 1.48, 0, 'deck');
+  prism(b, s.radome, [[-5.0, 1.46], [4.6, 1.46], [3.6, 3.7], [-4.4, 3.7]], 3.0, 'side', 0, 0, 0, 'superstructure');
+  box(b, s.glass, 0.05, 0.36, 2.5, 3.85, 3.2, 0, 'bridgewindows').rotation.z = 0.42;
+  prism(b, s.radome, [[0.2, 3.7], [2.4, 3.7], [1.8, 6.6], [0.8, 6.6]], 1.3, 'side', 0, 0, 0, 'mast'); ball(b, s.white, 0.5, 0.5, 0.5, 1.3, 7.0, 0, 'radome');
+  prism(b, s.greyDark, [[-3.8, 3.7], [-1.6, 3.7], [-2.0, 4.9], [-3.4, 4.9]], 1.5, 'side', 0, 0, 0, 'funnel');
+  const cw = grp(b, -5.6, 2.2, 0, 'ciws'); cyl(cw, s.white, 0.36, 1.0, 0, 0.5, 0, 'y', 'drum'); ball(cw, s.white, 0.36, 0.4, 0.36, 0, 1.0, 0, 'dome', s.dome); rotaryGun(cw, 0.2, 0.55, 0, 0.9);
+  box(b, s.greyDark, 5.2, 0.06, B * 0.76, -9.0, 1.5, 0, 'helideck'); box(b, s.white, 1.8, 0.02, 0.18, -9.0, 1.54, 0, 'marking'); box(b, s.white, 0.18, 0.02, 1.4, -9.0, 1.54, 0, 'marking');
+  box(b, P.id, 1.4, 0.03, 1.4, -10.8, 1.54, 0, 'idpanel');
+  for (const k of [-1, 1]) { const c = grp(b, -0.4, 3.72, k * 0.9, 'canisters'); for (const z of [-0.2, 0.2]) cyl(c, s.greyDark, 0.18, 1.8, 0, 0.3, z, 'x', 'canister').rotation.y = k * 0.6; }
+  const t = grp(b, 7.6, 1.5, 0, 'turret');
+  cyl(t, s.greyDark, 0.75, 0.16, 0, 0.08, 0, 'y', 'ring'); ball(t, s.radome, 0.8, 0.95, 0.8, 0, 0.16, 0, 'gunhouse', s.dome);
+  cyl(t, s.gunmetal, 0.08, 2.2, 1.5, 0.62, 0, 'x', 'barrel');
+  return { g, body: b, turret: t, turretX: 7.6, muzzle: 10.4, muzzleY: 2.1, ship: true };
+}
+// Landing craft: a blunt steel barge with an open well deck, a bow ramp held up while under way, and a pilot house
+// at the stern. `hold` (a tarpaulin-covered load) shows when something is aboard.
+function lcraft(P) {
+  const s = shared(), g = new THREE.Group(), b = grp(g), D = SHIPS.lcraft, L = D.length, B = D.beam;
+  shipHull(b, P.dark, L, B, 0.5, 0.45, 0.07);
+  box(b, s.greyDark, 7.0, 0.05, B - 0.5, 0.6, 0.42, 0, 'welldeck');
+  for (const k of [-1, 1]) box(b, P.hull, 7.6, 1.0, 0.24, 0.5, 0.92, k * (B / 2 - 0.12), 'bulwark');
+  const ramp = box(b, P.hull, 0.14, 1.5, B - 0.5, 4.5, 1.0, 0, 'ramp'); ramp.rotation.z = -0.35;
+  for (const k of [-1, 1]) cyl(b, s.gunmetal, 0.02, 1.8, 3.7, 1.5, k * (B / 2 - 0.2), 'x', 'rampcable').rotation.y = 0;
+  box(b, P.hull, 2.0, 1.5, B * 0.55, -4.0, 1.3, -0.5, 'pilothouse'); box(b, s.glass, 0.04, 0.4, B * 0.5, -2.98, 1.7, -0.5, 'window');
+  box(b, P.id, 1.6, 0.03, 1.4, -4.0, 2.07, -0.5, 'idpanel'); cyl(b, s.gunmetal, 0.03, 1.2, -4.6, 2.6, -0.9, 'y', 'mast');
+  box(b, s.gunmetal, 0.6, 0.5, 0.6, -4.3, 0.8, 1.1, 'vent'); cyl(b, s.track, 0.12, 0.9, -4.6, 1.2, 1.1, 'y', 'exhaust');
+  const hold = grp(b, 0.8, 0.45, 0, 'hold'); box(hold, s.canvas, 4.4, 0.9, B - 1.0, 0, 0.45, 0, 'tarp'); box(hold, s.canvas, 3.6, 0.3, B - 1.5, 0, 1.0, 0, 'tarp'); for (const x of [-1.6, 0, 1.6]) box(hold, s.track, 0.06, 0.94, B - 0.96, x, 0.46, 0, 'strap');
+  hold.visible = false;
+  return { g, body: b, hold, muzzle: 0, muzzleY: 1, ship: true };
+}
+// Missile boat: a wooden coastal trader given a rocket rack. High bow, wheelhouse aft, eight launch tubes amidships
+// that train and fire as one.
+function mboat(P) {
+  const s = shared(), g = new THREE.Group(), b = grp(g), D = SHIPS.mboat, L = D.length, B = D.beam;
+  shipHull(b, P.hull, L, B, 0.8, 0.5, 0.34);
+  box(b, s.wood, L * 0.9, 0.05, B * 0.8, -0.3, 0.98, 0, 'deck');
+  prism(b, P.dark, [[2.4, 0.96], [5.4, 0.96], [5.5, 1.75], [2.4, 1.3]], B * 0.5, 'side', 0, 0, 0, 'bowbulwark');
+  box(b, P.hull, 2.2, 1.6, B * 0.72, -3.6, 1.8, 0, 'wheelhouse'); box(b, s.glass, 0.04, 0.4, B * 0.6, -2.48, 2.1, 0, 'window'); box(b, s.wood, 2.5, 0.08, B * 0.8, -3.6, 2.64, 0, 'roof');
+  box(b, P.id, 1.4, 0.03, 1.2, -3.6, 2.7, 0, 'idpanel'); cyl(b, s.wood, 0.05, 2.4, -3.0, 3.9, 0, 'y', 'mast'); box(b, s.track, 0.03, 0.5, 0.8, -3.0, 4.8, 0.42, 'flag');
+  for (const z of [-0.7, 0.7]) cyl(b, s.rubber, 0.3, 0.2, -1.4, 0.9, z * 1.75, 'z', 'tyrefender');
+  for (const x of [1.6, 2.2]) cyl(b, s.ordnance, 0.24, 0.6, x, 1.3, -0.6, 'y', 'drum');
+  const t = grp(b, 0.2, 1.0, 0, 'turret');
+  cyl(t, s.gunmetal, 0.7, 0.1, 0, 0.05, 0, 'y', 'ring'); box(t, s.gunmetal, 0.3, 0.7, 1.2, -0.3, 0.45, 0, 'cradle');
+  const rack = grp(t, 0, 0.9, 0, 'rack'); rack.rotation.z = 0.42;
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) { cyl(rack, s.ordnance, 0.13, 2.2, 0.4, r * 0.3, (c - 1.5) * 0.3, 'x', 'tube'); cyl(rack, s.red, 0.1, 0.1, 1.52, r * 0.3, (c - 1.5) * 0.3, 'x', 'warhead'); }
+  box(rack, s.gunmetal, 0.1, 0.72, 1.34, -0.5, 0.15, 0, 'frame'); box(rack, s.gunmetal, 0.1, 0.72, 1.34, 1.1, 0.15, 0, 'frame');
+  return { g, body: b, turret: t, turretX: 0.2, muzzle: 2.0, muzzleY: 2.6, noRecoil: true, ship: true };
+}
+// Drone boat: a low, dark, uncrewed hull with a satellite dish and camera mast, contact fuzes on the bow and a
+// charge filling the hull.
+function dboat(P) {
+  const s = shared(), g = new THREE.Group(), b = grp(g), D = SHIPS.dboat, L = D.length, B = D.beam;
+  shipHull(b, s.strikeDark, L, B, 0.34, 0.28, 0.42);
+  prism(b, s.strike, [[-1.6, 0.48], [0.9, 0.48], [0.2, 0.86], [-1.6, 0.86]], B * 0.6, 'side', 0, 0, 0, 'cover');
+  box(b, P.id, 0.9, 0.03, 0.6, -0.9, 0.88, 0, 'idpanel');
+  for (const k of [-1, 0, 1]) cyl(b, s.red, 0.035, 0.5, 1.9 - Math.abs(k) * 0.35, 0.42, k * 0.26, 'x', 'fuze');
+  cyl(b, s.gunmetal, 0.025, 0.7, -0.5, 1.2, 0, 'y', 'mast'); ball(b, s.glass, 0.09, 0.09, 0.09, -0.5, 1.6, 0, 'camera');
+  const dish = cyl(b, s.white, 0.26, 0.04, -1.2, 1.0, 0, 'y', 'dish'); dish.rotation.z = 0.3;
+  box(b, s.gunmetal, 0.4, 0.4, 0.4, -2.0, 0.3, 0, 'waterjet');
+  return { g, body: b, muzzle: 0, muzzleY: 0.5, ship: true };
+}
+export const ASSEMBLY = { abrams, battlemaster, overlord: (P) => sovietTank(P, true), technical, scoutcar: scoutCar, comanche, drone, raptor, f15e, j11, lav25, scudtel, fpv, chinook, z10,
+  rhib, mkv, frigate, corvette, lcraft, mboat, dboat };
 // ---------------------------------------------------------------- C-130 Hercules / AC-130 gunship
 // Real aircraft (metres): 29.8 long, 40.4 span, 11.7 to the top of the fin; fuselage 4.3 across; four turboprops at
 // 4.95 m and 10.1 m from the centreline, each with a 4.1 m four-blade propeller; tailplane span 16.0. Every number in

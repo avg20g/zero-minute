@@ -2,20 +2,24 @@
 // kills, garrisons, reservations, spawn placement.
 import { N, CELL, NEUTRAL, ZONE_MULT, angDiff } from './defs.js';
 import { UNITS, BLDGS, WEAPONS, FACTIONS, GENERAL, VET, armorOf, promoNode, generalOf } from './factionRegistry.js';
+import { NAV_BOAT, NAV_WARSHIP, NAV_BEACH } from './pathfinding.js';
+
+// Navigation class of a unit type: its ground class, or one of the three ship classes.
+export const navOf = (d) => d.ship ? (d.beach ? NAV_BEACH : d.warship ? NAV_WARSHIP : NAV_BOAT) : d.cls;
 
 export function makeUnit(sim, type, team, x, z, facing = 0) {
   const d = UNITS[type];
   const u = {
     id: sim.nextId++, kind: 'unit', type, team, x, z, px: x, pz: z,
     facing, pfacing: facing, turret: facing, pturret: facing,
-    hp: d.hp, maxHp: d.hp, radius: d.radius, cls: d.cls, nc: d.cls, air: !!d.air, dead: false, // nc = navigation class: cls, +2 when amphibious
+    hp: d.hp, maxHp: d.hp, radius: d.radius, cls: d.cls, nc: navOf(d), air: !!d.air, dead: false, // nc = navigation class: cls, +2 when amphibious, 4 to 6 for ships
     vx: 0, vz: 0, spd: 0, ms: d.speed, path: null, pi: 0, pathReq: null, queued: false, arrived: false, goal: null,
     order: null, guardX: x, guardZ: z, target: 0, cds: [0, 0, 0], bursts: [0, 0, 0], burstCd: [0, 0, 0], wslots: null,
     stuck: 0, lx: x, lz: z, noPath: 0, inB: 0, working: false, still: false,
     cargo: 0, hs: 'seek', dock: 0, center: 0, slotB: 0, slotI: -1, holdI: -1, exitB: 0, exitI: -1, timer: 0, tries: 0,
     lastHit: -999, lastZone: 0, lastFire: -999,
     // phase 2
-    xp: 0, vet: 0, tier: 0, addon: null, addonQ: null, garrison: null,
+    xp: 0, vet: 0, tier: 0, addon: null, addonQ: null, garrison: d.transport ? [] : null,
     stealthMode: d.stealth || null, cloaked: false, detected: false, revealUntil: 0, stillT: 0,
     deployed: false, cashAcc: 0, horde: false, pdlCd: 0, capT: 0, windup: 0, dive: 0, charging: false,
     mode: d.modes ? d.modes[0] : null, inert: false, expires: 0, temp: false,   // hero ability mode; resigned (takes no part, about to leave); tick it vanishes; called-in unit that leaves no wreck or score
@@ -32,7 +36,7 @@ function outfit(sim, u, d) {
   const T = sim.teams[team_(u)];
   if (d.nuke && T.upgrades.has('r_nuke')) u.ms = d.speed * 1.15;
   const G = generalOf(T);
-  if (!d.air && (d.amph || d.infantry) && G && G.amph) u.nc = d.cls + 2;                       // Marine Corps: these units cross water
+  if (!d.air && !d.ship && (d.amph || d.infantry) && G && G.amph) u.nc = d.cls + 2;                       // Marine Corps: these units cross water
   if (G && G.cloak && !u.stealthMode && !d.air && (d.infantry || d.armor === 'light')) u.stealthMode = 'still'; // Stealth General: hidden when standing still
   if (u.type === 'v_comanche' && T.upgrades.has('v_stealthrotor')) u.stealthMode = 'always';
   if (d.salvage && T.flags.scrap) { u.tier = 1; }
@@ -64,6 +68,10 @@ export function makeBldg(sim, type, team, cx, cz, done = true) {
   };
   b.px = b.x; b.pz = b.z;
   b.rallyX = b.x; b.rallyZ = b.z + (d.h / 2 + 6) * CELL;
+  if (d.shore) { // a shipyard faces the water: ships are launched off that end and gather a little further out
+    const f = b.face = shoreFace(sim, type, cx, cz), fx = [1, 0, -1, 0][f], fz = [0, 1, 0, -1][f], hw = (f & 1 ? d.h : d.w) * CELL * 0.5;
+    b.launch = { x: b.x + fx * (hw + 9), z: b.z + fz * (hw + 9) }; b.rallyX = b.x + fx * (hw + 26); b.rallyZ = b.z + fz * (hw + 26);
+  }
   if (type === 'dock' || d.role === 'supply') {
     b.slots = []; b.holds = [];
     // Loading bays on both long sides. Each has an entry point one lane out,
@@ -128,7 +136,7 @@ export function spawnNear(sim, type, team, wx, wz, facing = 0) {
   const d = UNITS[type], nav = sim.nav;
   if (d.air) return makeUnit(sim, type, team, wx, wz, facing);
   if (nav.dirty) nav.rebuild();
-  const c = nav.nearest(Math.floor(wx / CELL), Math.floor(wz / CELL), d.cls, -1, 20);
+  const c = nav.nearest(Math.floor(wx / CELL), Math.floor(wz / CELL), navOf(d), -1, 20);
   const x = c >= 0 ? ((c % N) + 0.5) * CELL : wx, z = c >= 0 ? (((c / N) | 0) + 0.5) * CELL : wz;
   return makeUnit(sim, type, team, x, z, facing);
 }
@@ -154,21 +162,38 @@ export function freeSpot(sim, wx, wz, cls, radius, maxR = 14, ignoreId = 0) {
 }
 
 // ---------------- garrisons / containers ----------------
-// A container is a civilian building or a unit with a Battle Bunker hardpoint.
+// A container is a civilian building, a unit with a Battle Bunker hardpoint, or a transport (Landing Craft).
 export function capacityOf(c) {
   if (c.kind === 'bldg') { const d = BLDGS[c.type]; return (d.caps && d.caps[c.variant | 0]) || d.capacity || 0; }
-  return c.addon && UNITS[c.type].hardpoints[c.addon].capacity || 0;
+  const d = UNITS[c.type]; if (d.transport) return d.transport.squads;
+  return c.addon && d.hardpoints[c.addon].capacity || 0;
 }
+export const isTransport = (c) => c.kind === 'unit' && !!UNITS[c.type].transport;
+// Who may ride in a transport at all: infantry and ground vehicles (not ships, not aircraft).
+export const canRide = (u) => { const d = UNITS[u.type]; return !d.air && !d.ship && (d.infantry || u.cls === 1); };
+// Is there room in container c for unit u right now? A transport takes infantry squads or vehicles, never a mix.
+export function roomFor(sim, c, u) {
+  const cap = capacityOf(c); if (!cap || !c.garrison) return false;
+  if (!isTransport(c)) return c.garrison.length < cap;
+  if (!canRide(u)) return false;
+  const T = UNITS[c.type].transport, veh = !UNITS[u.type].infantry;
+  let vehIn = 0; for (const id of c.garrison) { const g = sim.byId.get(id); if (g && !UNITS[g.type].infantry) vehIn++; }
+  return veh ? c.garrison.length === vehIn && vehIn < T.vehicles : !vehIn && c.garrison.length < T.squads;
+}
+// The dry ground a transport can put its passengers on: the nearest cell a unit of class `nc` can stand on, or -1.
+export function landingCell(sim, c, nc = 0) { const nav = sim.nav; if (nav.dirty) nav.rebuild(); return nav.nearest(Math.floor(c.x / CELL), Math.floor(c.z / CELL), nc, -1, 9); }
 // `count`: how many squads leave (default: all of them, last in first out). Returns the units that came out.
 export function ejectGarrison(sim, c, hpFactor = 1, count = 1e9) {
   if (!c.garrison || !c.garrison.length) return [];
   const leaving = c.garrison.splice(Math.max(0, c.garrison.length - count)), out = [];
-  const hw = c.kind === 'bldg' ? c.w * CELL * 0.5 : c.radius, hh = c.kind === 'bldg' ? c.h * CELL * 0.5 : c.radius;
+  const hw = c.kind === 'bldg' ? c.w * CELL * 0.5 : c.radius, hh = c.kind === 'bldg' ? c.h * CELL * 0.5 : c.radius, boat = isTransport(c);
   let k = 0;
   for (const id of leaving) {
     const u = sim.byId.get(id); if (!u || u.dead) continue; out.push(u);
-    const a = k++ * 2.4, s = freeSpot(sim, c.x + Math.cos(a) * (hw + 2.5), c.z + Math.sin(a) * (hh + 2.5), 0, u.radius, 10, u.id);
-    if (s) { u.x = s[0]; u.z = s[1]; }
+    const a = k++ * 2.4; let s;
+    if (boat) { const lc = landingCell(sim, c, u.nc); s = lc < 0 ? null : freeSpot(sim, ((lc % N) + 0.5) * CELL, (((lc / N) | 0) + 0.5) * CELL, u.nc, u.radius, 10, u.id); }   // passengers step onto the beach
+    else s = freeSpot(sim, c.x + Math.cos(a) * (hw + 2.5), c.z + Math.sin(a) * (hh + 2.5), u.nc, u.radius, 10, u.id);
+    if (s) { u.x = s[0]; u.z = s[1]; } else if (boat) { u.x = c.x; u.z = c.z; }
     u.px = u.x; u.pz = u.z; u.lx = u.x; u.lz = u.z; u.inB = 0; u.order = null; u.target = 0; u.guardX = u.x; u.guardZ = u.z; u.stillT = 0;
     u.hp = Math.max(1, u.hp * hpFactor);
   }
@@ -241,11 +266,12 @@ export function kill(sim, e) {
   sim.events.push({ t: 'die', kind: e.kind, type: e.type, x: e.x, z: e.z, r: e.radius, team: e.team, id: e.id, air: !!e.air && !e.landed, f: e.facing, tf: e.turret, inf: e.kind === 'unit' && !!UNITS[e.type].infantry });
   if (e.kind === 'unit') {
     releaseSlot(sim, e);
-    if (e.garrison) ejectGarrison(sim, e, 0.5);
+    if (e.garrison && isTransport(e)) { for (const id of e.garrison.splice(0)) { const g = sim.byId.get(id); if (g && !g.dead) { g.inB = 0; g.x = e.x; g.z = e.z; kill(sim, g); } } }   // a transport that sinks takes everything aboard with it
+    else if (e.garrison) ejectGarrison(sim, e, 0.5);
     if (e.inB) { const b = sim.byId.get(e.inB); if (b) { b.garrison = b.garrison.filter(i => i !== e.id); if (!b.garrison.length && b.type === 'civ') b.team = NEUTRAL; } }
     if (e.home) { const b = sim.byId.get(e.home); if (b && b.pads && b.pads[e.pad] && b.pads[e.pad].by === e.id) b.pads[e.pad].by = 0; if (b && b.rws) for (const r of b.rws) if (r.by === e.id) r.by = 0; }
     // wrecks of ground vehicles become salvage when the other side can use it
-    if (e.cls === 1 && !e.air && e.team < 2 && !e.temp && FACTIONS[sim.teams[1 - e.team].faction].salvage)
+    if (e.cls === 1 && !e.air && !UNITS[e.type].ship && sim.nav.stat[sim.nav.cellOf(e.x, e.z)] !== 2 && e.team < 2 && !e.temp && FACTIONS[sim.teams[1 - e.team].faction].salvage)
       sim.crates.push({ id: sim.nextId++, x: e.x, z: e.z, until: sim.tick + 1800, team: 1 - e.team });
   } else {
     sim.nav.setRect(e.cx, e.cz, e.w, e.h, 0);
@@ -361,21 +387,46 @@ export function splashAll(sim, x, z, r, dmg, wname, src, sx = x, sz = z) {
 }
 
 // Placement rule shared by the sim (authoritative) and the UI ghost. Any open ground will do: it does not have to be scouted or near your base.
-export function canPlace(sim, type, cx, cz, team) {
+// Why a building cannot go here, or '' when it can. Shore buildings (shipyards) must stand half on land and half on
+// water with open sea in front; everything else needs dry open ground with a one-cell margin.
+export const SHORE_MIN = 0.3;   // share of a shipyard's footprint that must be land, and the share that must be water
+export function placeError(sim, type, cx, cz, team) {
   const d = BLDGS[type], nav = sim.nav;
-  if (cx < 4 || cz < 4 || cx + d.w > N - 4 || cz + d.h > N - 4) return false;
-  for (let z = cz - 1; z <= cz + d.h; z++) for (let x = cx - 1; x <= cx + d.w; x++) {
+  if (cx < 4 || cz < 4 || cx + d.w > N - 4 || cz + d.h > N - 4) return 'Too close to the map edge';
+  if (d.shore) {
+    let land = 0, wet = 0;
+    for (let z = cz - 1; z <= cz + d.h; z++) for (let x = cx - 1; x <= cx + d.w; x++) {
+      const i = z * N + x, inside = x >= cx && z >= cz && x < cx + d.w && z < cz + d.h;
+      if (nav.bld[i]) return 'Something is in the way';
+      if (!inside) continue;
+      if (nav.stat[i] === 1) return 'Cannot build on rock';
+      if (nav.stat[i] === 2) wet++; else land++;
+    }
+    const n = d.w * d.h;
+    if (wet < n * SHORE_MIN || land < n * SHORE_MIN) return 'Needs to sit half on land, half in water';
+    const f = shoreFace(sim, type, cx, cz), fx = [1, 0, -1, 0][f], fz = [0, 1, 0, -1][f];
+    const ox = Math.round(cx + d.w / 2 + fx * (d.w / 2 + 7)), oz = Math.round(cz + d.h / 2 + fz * (d.h / 2 + 7));
+    if (nav.dirty) nav.rebuild();
+    const c = nav.nearest(ox, oz, NAV_BOAT, -1, 5);
+    if (c < 0) return 'No open water in front';
+  } else for (let z = cz - 1; z <= cz + d.h; z++) for (let x = cx - 1; x <= cx + d.w; x++) {
     const i = z * N + x;
-    if (nav.stat[i] || nav.bld[i]) return false;
+    if (nav.stat[i] || nav.bld[i]) return nav.stat[i] === 2 ? 'Cannot build on water' : 'Cannot build there';
   }
   const x0 = cx * CELL, z0 = cz * CELL, x1 = (cx + d.w) * CELL, z1 = (cz + d.h) * CELL;
   for (const e of sim.ents) {
     if (e.kind !== 'unit' || e.dead || e.inB || e.air || UNITS[e.type].builder) continue;
-    if (e.x > x0 - e.radius && e.x < x1 + e.radius && e.z > z0 - e.radius && e.z < z1 + e.radius) return false;
+    if (e.x > x0 - e.radius && e.x < x1 + e.radius && e.z > z0 - e.radius && e.z < z1 + e.radius) return 'Units are in the way';
   }
-  return true;
+  return '';
 }
-
+// Which way a shore building at this spot looks out to sea: 0 east (+x), 1 south (+z), 2 west, 3 north.
+export function shoreFace(sim, type, cx, cz) {
+  const d = BLDGS[type], st = sim.nav.stat; let sx = 0, sz = 0;
+  for (let z = cz; z < cz + d.h; z++) for (let x = cx; x < cx + d.w; x++) if (st[z * N + x] === 2) { sx += x + 0.5 - (cx + d.w / 2); sz += z + 0.5 - (cz + d.h / 2); }
+  return Math.abs(sx) >= Math.abs(sz) ? (sx >= 0 ? 0 : 2) : (sz >= 0 ? 1 : 3);
+}
+export function canPlace(sim, type, cx, cz, team) { return !placeError(sim, type, cx, cz, team); }
 export function hasBldg(sim, team, type) {
   for (const e of sim.ents) if (e.kind === 'bldg' && e.team === team && e.type === type && e.done && !e.dead) return true;
   return false;

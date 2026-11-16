@@ -17,6 +17,7 @@ export function slotsOf(e) {
     const d = UNITS[e.type]; out = [];
     if (d.weapon) out.push(d.salvageWeapons ? d.salvageWeapons[e.tier] : d.weapon);
     if (d.weapon2) out.push(d.weapon2);
+    if (d.weapon3) out.push(d.weapon3);
     if (d.upWeapon && e.team < 2) for (const up in d.upWeapon) if (_sim.teams[e.team].upgrades.has(up)) out.push(d.upWeapon[up]); // weapon unlocked by an upgrade (LAV-25 TOW)
     if (e.addon && d.hardpoints[e.addon].weapon) out.push(d.hardpoints[e.addon].weapon);
   }
@@ -192,7 +193,21 @@ function suicideRun(sim, u, d, t, dist, W) {
     u.dive++; u.hoverLow = true; u.goal = { x: t.x, z: t.z };
     u.altK += Math.max(-0.085, Math.min(0.085, want - u.altK));
     boom = (dist <= 1.6 && Math.abs(want - u.altK) < 0.12) || u.dive > 60;
-  } else boom = dist <= W.range;
+  } else {
+    boom = dist <= W.range;
+    // A boat cannot ram something ashore. It closes in as far as the water lets it; once it has stopped gaining it
+    // goes off if the target is inside the blast, and otherwise drops the target (returns true: nothing more to do).
+    if (!boom && d.ship && !(t.kind === 'unit' && UNITS[t.type].ship) && !(t.ground && sim.nav.isWater(sim.nav.cellOf(t.x, t.z)))) {
+      const key = t.id || -1;
+      if (u.ramId !== key) { u.ramId = key; u.ramBest = 1e9; u.ramT = 0; u.ramSkip = false; }
+      if (u.ramSkip) return true;
+      if (dist < u.ramBest - 0.4) { u.ramBest = dist; u.ramT = 0; }
+      else if (++u.ramT > 40) {
+        if (dist <= S.r * 0.85) boom = true;
+        else { u.ramSkip = true; standDown(u, d); stopUnit(u); if (u.order && (u.order.t === 'attack' || u.order.t === 'fattack')) { u.order = null; u.guardX = u.x; u.guardZ = u.z; } u.target = 0; return true; }
+      }
+    }
+  }
   if (!boom) return false;
   const y = u.air ? d.alt * u.altK : 0;
   if (u.order && u.order.t === 'fattack') splashAll(sim, u.x, u.z, S.r, S.dmg, S.w || 'fab', u);       // force attack: the blast hurts whatever is there, friend or foe
@@ -204,7 +219,7 @@ function suicideRun(sim, u, d, t, dist, W) {
 
 // Occupants fire from the wall (or hull) of their container, with a range bonus.
 function garrisonCombat(sim, e, d, slots) {
-  const b = sim.byId.get(e.inB); if (!b) return;
+  const b = sim.byId.get(e.inB); if (!b || (b.kind === 'unit' && UNITS[b.type].transport)) return;   // passengers in a transport do not fight
   const w0 = WEAPONS[slots[0]], range = w0.range + GARRISON_RANGE_BONUS + b.radius;
   let t = e.target ? sim.byId.get(e.target) : null;
   if (t && (!targetable(sim, e.team, t) || edgeDist(b.x, b.z, t) > range || !canUse(w0, t))) { t = null; e.target = 0; }
@@ -218,11 +233,12 @@ function garrisonCombat(sim, e, d, slots) {
 function tryIntercept(sim, p, t) {
   for (const u of sim.pdlUnits) {
     if (u.team === p.team || u.dead || u.inB || u.pdlCd > 0) continue;
-    if (Math.hypot(u.x - p.x, u.z - p.z) > 13) continue;
-    if (t && Math.hypot(u.x - t.x, u.z - t.z) > 16) continue; // only covers itself and close neighbours
-    const base = UNITS[u.type].pdl || 70;
+    const D = UNITS[u.type], reach = D.pdlR || 13;              // a ship's defenses reach further than a tank's
+    if (Math.hypot(u.x - p.x, u.z - p.z) > reach) continue;
+    if (t && Math.hypot(u.x - t.x, u.z - t.z) > reach + 3) continue; // only covers itself and close neighbours
+    const base = D.pdl || 70;
     u.pdlCd = Math.round(base * (sim.teams[u.team].flags.fastPdl ? 0.6 : 1));
-    sim.events.push({ t: 'pdl', x: u.x, z: u.z, tx: p.x, tz: p.z, sid: u.id, tAir: p.tAir });
+    sim.events.push({ t: 'pdl', x: u.x, z: u.z, tx: p.x, tz: p.z, sid: u.id, tAir: p.tAir, gun: !!D.pdlGun });
     return true;
   }
   return false;

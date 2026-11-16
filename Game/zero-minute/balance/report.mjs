@@ -4,7 +4,7 @@
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { LOADOUTS, loadout, UNITS, BLDGS, FACTIONS, POWERS } from './match.mjs';
+import { LOADOUTS, loadout, UNITS, BLDGS, FACTIONS, POWERS, MAX_TICKS } from './match.mjs';
 import { trainsOf, nodePower } from '../js/sim/factionRegistry.js';
 
 const pct = (n, d) => (d ? Math.round(100 * n / d) + '%' : '-');
@@ -48,7 +48,7 @@ export function buildReport(matches) {
   const rate = (id) => { const s = S[id]; return s.wins + s.losses ? s.wins / (s.wins + s.losses) : 0.5; };
   const out = [], flags = [];
   const d0 = matches[0];
-  out.push('# Zero Minute balance report', '', `${matches.length} matches, ${d0 ? d0.difficulty : '?'} v ${d0 ? d0.difficulty : '?'} AI, maps: ${Object.keys(maps).join(', ')}. Draw = no winner after 25 minutes. Win rates leave out mirror matches and draws.`, '');
+  out.push('# Zero Minute balance report', '', `${matches.length} matches, ${d0 ? d0.difficulty : '?'} v ${d0 ? d0.difficulty : '?'} AI, maps: ${Object.keys(maps).join(', ')}. Draw = no winner after ${Math.round(MAX_TICKS / 1200)} minutes. Win rates leave out mirror matches and draws.`, '');
 
   out.push('## Loadouts', '');
   out.push(table(['Loadout', 'Games', 'Win rate', 'W', 'L', 'Draws', 'Avg win (min)', 'Value killed / lost', 'Earned', 'Idle money'],

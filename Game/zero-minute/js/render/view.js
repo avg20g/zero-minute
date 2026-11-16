@@ -31,18 +31,18 @@ export class View {
     this.env = new Environment(r, scene);
 
     // Fog-of-War texture (smoothed on the CPU, sampled by every lit material)
-    this.fowData = new Uint8Array(N * N * 4);
-    this.fowCur = new Float32Array(N * N);
-    const ft = this.fowTex = new THREE.DataTexture(this.fowData, N, N, THREE.RGBAFormat, THREE.UnsignedByteType);
+    this.fowData = new Uint8Array(N * N);     // one channel: the shader only reads red
+    this.fowCur = new Float32Array(N * N); this.fowRow = 0;
+    const ft = this.fowTex = new THREE.DataTexture(this.fowData, N, N, THREE.RedFormat, THREE.UnsignedByteType);
     ft.magFilter = THREE.LinearFilter; ft.minFilter = THREE.LinearFilter; ft.generateMipmaps = false; ft.needsUpdate = true;
-    fowUniforms.uFow.value = ft;
+    fowUniforms.uFow.value = ft; fowUniforms.uFowInv.value = 1 / (N * CELL);   // maps come in several sizes
     this.fowFrame = 0;
 
     const aniso = Math.min(8, r.capabilities.getMaxAnisotropy());
     this.terrainTex = makeTerrainTextures(aniso, this.map.biome);
     scene.add(buildTerrain(this.map, terrainMaterial(this.terrainTex)));
     scene.add(buildRocks(this.map));
-    if (this.map.hasWater) { scene.add(buildWater(this.map)); scene.add(buildBridges(this.map)); }
+    if (this.map.hasWater) { scene.add(this.water = buildWater(this.map, sim.nav.distS)); scene.add(buildBridges(this.map)); }
     if (this.map.trees.length) scene.add(buildTrees(this.map));
 
     this.fx = new VFX(scene, this.map);
@@ -122,7 +122,9 @@ export class View {
         case 'pdl': {
           if (!fog.visAt(PLAYER, e.x, e.z) && !fog.visAt(PLAYER, e.tx, e.tz)) break;
           const ty = fx.h(e.tx, e.tz) + (e.tAir ? AIR_Y : 2.2);
-          fx.beam(e.x, fx.h(e.x, e.z) + 2.7, e.z, e.tx, ty, e.tz, PDL, 0.18); fx.explosion(e.tx, ty, e.tz, 0.35);
+          if (e.gun) { for (let i = 0; i < 3; i++) fx.tracer(e.x, fx.h(e.x, e.z) + 3, e.z, e.tx + (fx.rnd() - 0.5), ty + (fx.rnd() - 0.5), e.tz + (fx.rnd() - 0.5)); }   // a gun-based defense (Corvette) fires a burst
+          else fx.beam(e.x, fx.h(e.x, e.z) + 2.7, e.z, e.tx, ty, e.tz, PDL, 0.18);
+          fx.explosion(e.tx, ty, e.tz, 0.35);
           break;
         }
         case 'die': {
@@ -134,7 +136,9 @@ export class View {
             fx.smokeColumn(e.x, e.z, 9, e.r * 0.5);
           } else if (seen) {
             if (UNITS[e.type].infantry) fx.dust(e.x, fx.h(e.x, e.z), e.z, 6, 2, 1.2);
-            else {
+            else if (UNITS[e.type].ship || (!e.air && fx.wet(e.x, e.z))) { // goes down: a blast, a column of water, smoke for a moment, nothing left afloat
+              fx.explosion(e.x, WATER_Y + 1.2, e.z, 1.2 + e.r * 0.25); fx.splash(e.x, e.z, 1 + e.r * 0.3); fx.smokeColumn(e.x, e.z, 3, 1 + e.r * 0.2); fx.shake(e.x, e.z, 0.3);
+            } else {
               fx.explosion(e.x, fx.h(e.x, e.z) + (e.air ? AIR_Y : 0.8), e.z, e.air ? 1.9 : 1.5); fx.crater(e.x, e.z, 6.5); fx.shake(e.x, e.z, 0.3);
               // ground vehicles leave a charred hull; one in four tanks throws its turret (decided by the unit's id, so replays match)
               if (!e.air) fx.wreck(e.x, e.z, e.f || 0, e.r * 2.3, !!UNITS[e.type].turret, (Math.imul(e.id, 2654435761) >>> 28) < 4, e.tf);
@@ -208,10 +212,12 @@ export class View {
 
   updateFow(dt) {
     const fog = this.sim.fog, vis = fog.vis[PLAYER], exp = fog.exp[PLAYER], cur = this.fowCur, d = this.fowData;
-    const k = Math.min(1, dt * 7);
-    for (let i = 0; i < N * N; i++) {
+    // The 2 km maps have four times the cells: there the texture is refreshed in two halves on alternate passes.
+    const parts = N > 512 ? 2 : 1, k = Math.min(1, dt * 7 * parts), r0 = Math.floor(N * this.fowRow / parts), r1 = Math.floor(N * (this.fowRow + 1) / parts);
+    this.fowRow = (this.fowRow + 1) % parts;
+    for (let i = r0 * N, n = r1 * N; i < n; i++) {
       const tgt = this.reveal || vis[i] ? 255 : 118, c = cur[i] + (tgt - cur[i]) * k;   // no black shroud: unseen ground is dimmed, never hidden (enemy units and buildings still are)
-      cur[i] = c; d[i * 4] = c;
+      cur[i] = c; d[i] = c;
     }
     this.fowTex.needsUpdate = true;
   }
@@ -221,7 +227,10 @@ export class View {
     if (!v) {
       const tm = e.kind === 'unit' && e.inert ? NEUTRAL : e.team;       // a unit that has resigned is drawn in neutral colours until it leaves
       v = createModel(tm === e.team ? e : { kind: e.kind, type: e.type, team: tm, variant: e.variant }); v.id = e.id; v.recoil = 0; v.dustAcc = 0; v.spinT = 0; v.alt = 0; v.team = tm;
-      if (e.kind === 'bldg') v.g.position.set(e.x, heightAt(this.map, e.x, e.z), e.z);
+      if (e.kind === 'bldg') { // a shipyard stands at quay height on the shore and looks out to sea
+        if (BLDGS[e.type].shore) { v.g.position.set(e.x, WATER_Y + 0.9, e.z); v.g.rotation.y = -(e.face | 0) * Math.PI / 2; }
+        else v.g.position.set(e.x, heightAt(this.map, e.x, e.z), e.z);
+      }
       this.scene.add(v.g); this.views.set(e.id, v);
     }
     return v;
@@ -268,6 +277,8 @@ export class View {
     const env = this.env; env.frame(rig.tx, rig.tz, rig.dist); env.begin();
 
     if ((this.fowFrame++ & 1) === 0) this.updateFow(dt * 2);
+    if (this.env.fogNear) { this.scene.fog.near = Math.max(this.env.fogNear, rig.dist * 1.15); this.scene.fog.far = Math.max(this.env.fogFar, rig.dist * 3.2); }   // pulled back on a big map: the haze starts further out
+    if (this.water) { const b = this.water.userData.bump; b.offset.x += dt * 0.012; b.offset.y += dt * 0.007; }   // the sea drifts
 
     let ringN = 0, shownUnits = 0, hidden = 0;
     const stamp = ++this.vis, sel = ui.selection;
@@ -296,6 +307,11 @@ export class View {
           if (v.prop) v.prop.rotation.x += dt * 60;
           if (e.dive) v.body.rotation.z = -Math.min(1.0, e.dive * 0.2);                                  // FPV drone tips its nose at the target
           if (ak > 0.5 && d.based && fx.rnd() < dt * 40) { const g = 0.85; fx.smoke.spawn(x - c * 3, y, z - s * 3, 0, 0, 0, 0.5, 0.6, 1.4, g, g, g, 0.25, 0, 0.5); }
+        } else if (d.ship) { // afloat: level on the water, with a slow roll and pitch; a bow wave and wake when under way
+          const ph = this.time * 1.1 + e.id * 1.7, k = d.warship ? 0.5 : 1;
+          y = WATER_Y + Math.sin(ph) * 0.05 * k; v.body.rotation.x = Math.sin(ph * 0.83) * 0.035 * k; v.body.rotation.z = Math.sin(ph * 0.61 + 1) * 0.014 * k + Math.min(0.05, e.spd * 0.0022) * (d.warship ? 0.4 : 1);
+          if (e.spd > 1.5) { v.dustAcc += dt * e.spd * 0.5; while (v.dustAcc > 1) { v.dustAcc -= 1; const side = fx.rnd() < 0.5 ? -1 : 1; fx.wake(x - c * e.radius * (0.4 + fx.rnd()) - s * side * e.radius * 0.3, z - s * e.radius * (0.4 + fx.rnd()) + c * side * e.radius * 0.3, 0.6 + e.radius * 0.28); } }
+          if (v.hold) v.hold.visible = !!(e.garrison && e.garrison.length);
         } else {
           const L = e.radius * 0.9;
           v.body.rotation.z = Math.atan2(heightAt(map, x + c * L, z + s * L) - heightAt(map, x - c * L, z - s * L), 2 * L);
@@ -324,14 +340,14 @@ export class View {
           v.round.visible = cd < W.cd * 0.55; v.round.position.x = -3.4 * back;
         }
         // tread / wheel dust
-        if (!e.air && e.cls === 1 && e.spd > 1.5) {
+        if (!e.air && e.cls === 1 && !d.ship && e.spd > 1.5 && !fx.wet(x, z)) {
           v.dustAcc += dt * e.spd * 1.15;
           while (v.dustAcc > 1) { v.dustAcc -= 1; const side = fx.rnd() < 0.5 ? -1 : 1; fx.dust(x - c * e.radius * 0.8 - s * side * 0.8, y, z - s * e.radius * 0.8 + c * side * 0.8, 1, 1.2, 1.15, 0.3); }
         } else if (e.working && fx.rnd() < dt * 14) {
           fx.fire.spawn(x + c * 2.2, y + 0.6, z + s * 2.2, (fx.rnd() - 0.5) * 6, 3 + fx.rnd() * 4, (fx.rnd() - 0.5) * 6, 0.4, 0.35, 0, 1, 0.8, 0.4, 1, 18, 0.5);
           if (fx.rnd() < 0.4) fx.dust(x + c * 2.4, y, z + s * 2.4, 1, 2, 1.3, 0.25);
         }
-        if (sel.has(e.id)) this.ring(ringN++, x, gy + 0.18, z, e.radius * 1.25, e.radius * 1.25, this.ringGeo, e.team !== PLAYER ? this.ringMatE : this.ringMat);
+        if (sel.has(e.id)) this.ring(ringN++, x, Math.max(gy, map.hasWater ? WATER_Y : -1e9) + 0.18, z, e.radius * 1.25, e.radius * 1.25, this.ringGeo, e.team !== PLAYER ? this.ringMatE : this.ringMat);
       } else {
         const d = BLDGS[e.type];
         v.g.scale.y = e.done ? 1 : 0.1 + 0.9 * e.progress;
@@ -341,7 +357,7 @@ export class View {
         if (d.superPower && e.done && (v.missile || v.missiles)) { // superweapon reload you can watch: 0 = ready, 1 = just fired
           const left = e.superCd ? Math.max(0, Math.min(1, (e.superReady - sim.tick) / e.superCd)) : 0;
           if (v.missile) { v.missile.visible = left < 0.6; v.missile.position.y = -11 * Math.min(1, left / 0.6); }               // the next missile rises out of the shaft as the countdown runs down
-          else { const n = Math.floor(9 * (1 - left) + 1e-6); for (let i = 0; i < 9; i++) v.missiles[i].visible = i < n || sim.tick < e.superShot + i * SCUD_GAP; }   // rails empty one by one, then refill one by one
+          else { const n = Math.min(9, Math.floor(9 * (1 - left) / 0.92 + 1e-6)); for (let i = 0; i < 9; i++) v.missiles[i].visible = i < n || sim.tick < e.superShot + i * SCUD_GAP; }   // rails empty one by one at launch, then a missile is raised onto each in turn; all nine stand ready a little before the countdown ends
         }
         if (v.pump) v.pump.rotation.z = Math.sin(this.time * 2.2) * 0.3;
         if (v.crates) { const n = e.maxSupplies ? Math.ceil(v.crates.length * e.supplies / e.maxSupplies) : 0; if (n !== v.nCrates) { v.nCrates = n; for (let i = 0; i < v.crates.length; i++) v.crates[i].visible = i >= v.crates.length - n; } }

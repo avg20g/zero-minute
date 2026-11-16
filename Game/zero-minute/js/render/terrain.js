@@ -58,11 +58,22 @@ export function terrainAttributes(map) {
   }
   return { pos, col, splat };
 }
+// The 2 km maps are drawn with a vertex every 4 m instead of every 2 m (the game rules still use 2 m cells): a quarter of the triangles.
+export const terrainStep = () => (N > 512 ? 2 : 1);
 export function buildTerrain(map, material) {
-  const V = map.V, { pos, col, splat } = terrainAttributes(map);
-  const idx = new Uint32Array(N * N * 6);
+  const V0 = map.V, full = terrainAttributes(map), st = terrainStep(), M = N / st, V = M + 1;
+  let { pos, col, splat } = full;
+  if (st > 1) { // keep every second vertex
+    pos = new Float32Array(V * V * 3); col = new Float32Array(V * V * 3); splat = new Float32Array(V * V * 4);
+    for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
+      const k = j * V + i, s = (j * st) * V0 + i * st;
+      for (let c = 0; c < 3; c++) { pos[k * 3 + c] = full.pos[s * 3 + c]; col[k * 3 + c] = full.col[s * 3 + c]; }
+      for (let c = 0; c < 4; c++) splat[k * 4 + c] = full.splat[s * 4 + c];
+    }
+  }
+  const idx = new Uint32Array(M * M * 6);
   let q = 0;
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+  for (let j = 0; j < M; j++) for (let i = 0; i < M; i++) {
     const a = j * V + i, b = a + 1, c = a + V, d = c + 1;
     idx[q++] = a; idx[q++] = c; idx[q++] = b; idx[q++] = b; idx[q++] = c; idx[q++] = d;
   }
@@ -109,10 +120,27 @@ export function buildRocks(map) {
 export { WORLD };
 
 // ---------------------------------------------------------------- water, bridges, trees (woods maps)
-// One flat, slightly see-through sheet at the water level: the terrain is only below it inside river beds.
-export function buildWater(map) {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(WORLD, WORLD), std(map.biome === 'snow' ? 0x8fb6c9 : 0x2c6c86, map.biome === 'snow' ? 0.25 : 0.1, 0.25, { transparent: true, opacity: map.biome === 'snow' ? 0.9 : 0.78 }));   // snow maps: pale, nearly opaque ice-water
+// One flat, slightly see-through sheet at the water level: the terrain is only below it inside river and sea beds.
+// Its colour comes from a texture with one texel per cell: deep water is dark, and the strip along the shore where
+// ships cannot go (`shore`: the ship clearance field, 0 on land up to 6 well out) is paler. A small tiled bump
+// texture drifts across it for the shimmer (see View.render).
+export function buildWater(map, shore) {
+  const snow = map.biome === 'snow', deep = snow ? [143, 182, 201] : [36, 96, 124], pale = snow ? [186, 214, 226] : [96, 170, 178];
+  const data = new Uint8Array(N * N * 4);
+  for (let z = 0; z < N; z++) for (let x = 0; x < N; x++) {
+    const k = ((N - 1 - z) * N + x) * 4, d = shore ? shore[z * N + x] : 6, t = map.water[z * N + x] ? Math.min(1, Math.max(0, (d - 1) / 5)) : 0, u = t * t * (3 - 2 * t);
+    data[k] = pale[0] + (deep[0] - pale[0]) * u; data[k + 1] = pale[1] + (deep[1] - pale[1]) * u; data[k + 2] = pale[2] + (deep[2] - pale[2]) * u; data[k + 3] = 255;
+  }
+  const tint = new THREE.DataTexture(data, N, N, THREE.RGBAFormat, THREE.UnsignedByteType); tint.magFilter = tint.minFilter = THREE.LinearFilter; tint.colorSpace = THREE.SRGBColorSpace; tint.needsUpdate = true;
+  const B = 64, bd = new Uint8Array(B * B * 4);
+  for (let j = 0; j < B; j++) for (let i = 0; i < B; i++) { // ripples that tile: sums of whole-number waves
+    const a = i / B * 6.2831853, b = j / B * 6.2831853, v = 0.5 + 0.2 * Math.sin(a * 3 + b * 2) + 0.16 * Math.sin(a * 5 - b * 4 + 1.3) + 0.12 * Math.sin(a * 2 + b * 7 + 0.4), k = (j * B + i) * 4;
+    bd[k] = bd[k + 1] = bd[k + 2] = Math.max(0, Math.min(255, v * 255)); bd[k + 3] = 255;
+  }
+  const bump = new THREE.DataTexture(bd, B, B, THREE.RGBAFormat, THREE.UnsignedByteType); bump.wrapS = bump.wrapT = THREE.RepeatWrapping; bump.magFilter = bump.minFilter = THREE.LinearFilter; bump.repeat.set(WORLD / 26, WORLD / 26); bump.needsUpdate = true;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(WORLD, WORLD), std(0xffffff, snow ? 0.25 : 0.12, 0.25, { transparent: true, opacity: snow ? 0.9 : 0.8, map: tint, bumpMap: bump, bumpScale: snow ? 0.15 : 0.5 }));   // snow maps: pale, nearly opaque ice-water
   m.rotation.x = -Math.PI / 2; m.position.set(WORLD / 2, WATER_Y, WORLD / 2); m.receiveShadow = true; m.renderOrder = 1;
+  m.userData.bump = bump;
   return m;
 }
 // A bridge is a causeway (the river bed is not cut under it) with a plank deck, kerbs and end posts.

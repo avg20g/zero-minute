@@ -256,8 +256,55 @@ commands a player can, and receives no bonus cash. Difficulty changes only
 behaviour: actions per minute, reaction delay, first-attack patience, and which
 tactics (counters, retreat, focus fire, flanking, power combos) are switched on.
 
+## Batch 11: navy, sea maps, bigger maps
+- **Maps have a size.** `N` and `WORLD` in `js/sim/defs.js` are live values set per map (`setMapSize`, called by
+  `generateMap`; `Sim.step()` re-asserts its own, so games of different sizes can run side by side). A spec's
+  `size` is 256 (the small fixtures the test suites use), 512 (1 km) or 1,024 (2 km).
+- **The five maps are 1 km x 1 km.** `scaleSpec()` in `js/sim/map.js` doubles a spec (positions, rock, rivers,
+  roads; not building footprints) and keeps the first Supply Dock at its old distance from the Command Center. Each
+  map then gets a third dock per side, more derricks and a village. `new Sim()` with no map still gives the small
+  canyon, which is what the older suites run on.
+- **Roads**: ground vehicles are 25% faster on a road or bridge deck (`ROAD_SPEED`; `map.road`), and their routes
+  prefer roads. Amphibious units swim at 60% speed (`SWIM_SPEED`).
+- **Two sea maps, 2 km x 2 km**: *Strait of Sand* (a channel about 550 m wide between the bases, a harbour inlet
+  each, a neck of land at each end) and *Emerald Isles* (island bases joined through a central island by long
+  causeways, open sea all round). Spec additions: `islands`, `coast`, `rim`, `naval`. Every map keeps a land route.
+- **Ships** (`ship: true` in the registry; classes 4 to 6 in `js/sim/pathfinding.js`): they sail on water only and
+  keep off the shore: boats 6 m, warships 10 m; the Landing Craft may touch it. Small craft are light armor and
+  warships heavy armor, so every existing weapon already works on them. They sink without a wreck.
+  - United States: *RHIB* (twin machine guns), *Frigate* (deck gun, laser against aircraft, shoots down rockets
+    and missiles). Marine Corps General adds the *Mk V Combat Boat* (miniguns, grenade launchers, Hellfire) and the
+    *SEAL Team* at the Barracks (rifles, sniper, grenade launcher).
+  - China: *Landing Craft* (four infantry squads or one vehicle, beach to beach; unarmed) and *Corvette* (deck
+    cannon; a minigun that hits aircraft and shoots down rockets and missiles).
+  - ISIS: *Missile Boat* (eight rockets, long reload) and *Drone Boat* (suicide: rams ships, goes off at the
+    water's edge against things on the shoreline; the same rules as the other suicide units).
+- **Shipyards** (Naval Yard, Shipyard, Smuggler's Dock; `shore: true`): at least 30% of the footprint on land and
+  30% on water, with open water in front (`placeError` in `js/sim/entities.js` returns the reason, which the HUD
+  shows). The building turns to face the sea, launches ships off that end and repairs ships near it; right-click it
+  with damaged ships selected to send them in.
+- **Missile defense at sea** reuses point defense (`pdl`, with a longer reach `pdlR` for ships). Rockets and guided
+  missiles can be shot down; Scuds and nuclear missiles cannot.
+- **AI**: on maps flagged `naval` it builds one shipyard and a fleet (2 / 4 / 6 ships on Easy / Medium / Hard),
+  guards its yard, attacks what it has seen within reach of the water and sweeps the enemy coast (`navalOps` in
+  `js/sim/aiController.js`). It does not use Landing Craft.
+- **Speed on big maps**: long trips are routed over 16 m blocks first and searched in that corridor; a building
+  change updates only the ground around it; the 2 km ground is drawn at 4 m spacing; the fog texture is one channel.
+- **Fixed**: the Scud Storm's rails were bare until launch (the line that draws the missiles had been swallowed
+  by a comment). Missiles are now raised onto the rails during the countdown and leave one by one.
+- **Map builder**: a map size choice (1 km or 2 km), the two sea maps as starting points; a custom map saved at
+  the old size is doubled when loaded.
+- **Balance** (details in `balance/CHANGELOG.md`): the AI's two sides now lay their bases out in mirrored order
+  (the second start used to win 54-69% of AI games); the Cyber General's permanent watch starts at 5:00 and covers
+  enemy buildings it has found (it won 72% on 1 km maps with the old rule). Hard, 1 km maps: all nine sides 46-59%.
+  Known weak spot: ISIS on the two sea maps (11-25%), from distance and no aircraft, not from ships.
+- Tests: `node test/batch11.mjs` (78 checks).
+
 ## Tests
 Node (simulation only):
+
+    node test/batch11.mjs     map sizes, doubled maps, roads, shipyards, every ship, Landing Craft,
+                              missile defense at sea, Drone Boat, the AI's fleet
 
     node test/phase4.mjs      lobby options, elimination rule, peace treaty,
                               reverse-move, scatter, 20-minute replay + tamper check

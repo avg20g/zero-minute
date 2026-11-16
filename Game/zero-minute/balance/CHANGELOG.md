@@ -1,5 +1,75 @@
 # Balance changelog
 
+## Batch 11 (2026-11-16): navy, sea maps, the five maps at 1 km
+
+Hard v Hard and Medium v Medium, 1,215 matches each on the five 1 km maps, friendly fire on, match limit raised
+from 25 to 40 minutes (longer marches). Full tables: `report.md` (Hard), `report-medium.md` (Medium); the batch 10
+table is kept as `report-batch10.md`. A separate 162-match sweep on the two 2 km sea maps is in `report-sea.md`.
+
+| Loadout | Batch 10 final (Hard, 0.5 km maps) | Batch 11 as first built (Hard, 1 km maps) | Batch 11 final (Hard) | Batch 11 final (Medium) |
+|---|---|---|---|---|
+| China: Mass Assault General | 60% | 58% | 59% | 73% |
+| China: Cyber General | 46% | 52% | 57% | 53% |
+| ISIS: WMD General | 42% | 32% | 50% | 36% |
+| China (no general) | 43% | 50% | 50% | 63% |
+| United States: Air Force General | 58% | 54% | 48% | 46% |
+| United States: Marine Corps General | 58% | 63% | 47% | 55% |
+| United States (no general) | 59% | 58% | 47% | 46% |
+| ISIS (no general) | 43% | 34% | 46% | 39% |
+| ISIS: Stealth General | 40% | 48% | 46% | 39% |
+
+Start positions (share of decided games won by the first / second start):
+
+| Map | As first built | Final (Hard) |
+|---|---|---|
+| Desert Canyon | 42 / 58 | 49 / 51 |
+| Forest River | 36 / 64 | 50 / 50 |
+| Urban Megacity | 38 / 62 | 47 / 53 |
+| Arctic Refinery | 31 / 69 | 41 / 59 |
+| Open Desert | 46 / 54 | 50 / 50 |
+
+What the sweeps showed and what was changed:
+
+| What | Before | After | Why |
+|---|---|---|---|
+| AI base layout | each side searched for building sites in the same compass order | the two sides search in mirrored order; first choice is behind the Command Center | on a mirrored map the same compass order gave the second side a sheltered base and the first an exposed one: the second start won 54-69% on every map. This was already there on the small maps (arctic 36/64); doubling them made it plain |
+| Cyber General: permanent watch | every enemy building, from the first second | from 5:00 on, every enemy building this side has found | with fair starts on 1 km maps the Cyber General won 72%: knowing the whole enemy base from the start is worth far more when the map is big. Without the watch at all it won 48%. Price and Cash Hack changes moved it by 2 points; delay alone 62%; found-only alone 63%; both together 54-57% |
+| Vehicle routes | shortest way | prefer roads (a road cell counts as 0.8 of a cell) | vehicles are 25% faster on roads but drifted off them |
+| AI fleet spending | replace every lost ship at once | at most 60% of the army's value afloat, and a 30 s wait after a loss | on the sea maps ISIS built 29 Drone Boats and 14 Missile Boats a game and lost 92-96% of them |
+| Missile Boat | 380 health, 8 x 55 damage, 70 m | 520 health, 8 x 60 damage, 74 m | it died before a second salvo |
+| Drone Boat | 110 health | 150 health | it was shot before reaching anything |
+
+New units whose numbers are first guesses (AI v AI only; the AI never loads Landing Craft and does not build the
+Mk V): RHIB $500, Frigate $2,200, Mk V $1,400, SEAL Team $900, Landing Craft $700, Corvette $1,900, Missile Boat
+$1,500, Drone Boat $400, shipyards $2,000 ($1,700 for ISIS).
+
+The two sea maps (Hard, one seed, 18 pairings each way; 2 km, so 4 in 10 matches reach the 40-minute limit):
+
+| Loadout | Win rate of decided games | Draws of 36 |
+|---|---|---|
+| United States (no general) | 71% | 11 |
+| United States: Air Force General | 63% | 13 |
+| United States: Marine Corps General | 63% | 16 |
+| China: Cyber General | 62% | 3 |
+| China (no general) | 59% | 10 |
+| China: Mass Assault General | 54% | 6 |
+| ISIS (no general) | 25% | 16 |
+| ISIS: Stealth General | 21% | 18 |
+| ISIS: WMD General | 11% | 13 |
+
+Start positions there: Strait of Sand 47 / 53, Emerald Isles 46 / 54. Decided matches run 20 to 31 minutes.
+
+Still open:
+- **ISIS on the two sea maps: it wins 11-25% of decided games.** Ships are not the cause: with every AI fleet switched off ISIS still
+  won only 12-25% there. ISIS has no aircraft, and on a 2 km map the land route is nearly 3 km, so the sides with
+  jets and helicopters strike first. Worth a decision with the player: an ISIS answer to distance (the AI using
+  Tunnel Networks and Sneak Attack to move armies, or a new unit).
+- **Medium: China Mass Assault wins 73%, ISIS 36-39%.** Hard is the level the numbers are tuned against. ISIS at
+  Medium is up from 25-35% in batch 10.
+- Arctic Refinery still favours the second start (41/59).
+- Ship prices and strengths have only been seen in AI hands, and the AI makes no landings.
+- The AI builds at most one superweapon and rarely fires it; it does not use Sneak Attack or build Saboteurs.
+
 ## Batch 10 (2026-11-16): heroes and second play notes
 
 Hard v Hard and Medium v Medium, 1,215 matches each, five maps, friendly fire on. Full tables: `report.md` (Hard),

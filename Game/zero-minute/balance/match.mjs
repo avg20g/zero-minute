@@ -15,7 +15,7 @@ if (process.env.ZM_TWEAK) {
   }
 }
 
-export const MAX_TICKS = 30000;   // 25 minutes at 20 Hz; a match still running then is a draw
+export const MAX_TICKS = 48000;   // 40 minutes at 20 Hz (the maps are 1 km and 2 km now, so marches are longer); a match still running then is a draw
 export const SAMPLE = 200;        // ticks between money samples (10 s)
 
 // Nine loadouts: each faction with no general, plus the six generals.

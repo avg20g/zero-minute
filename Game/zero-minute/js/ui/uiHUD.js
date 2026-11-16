@@ -5,7 +5,7 @@ import { TEAM } from './teamColors.js';
 import { N, CELL, WORLD, PLAYER, ENEMY, NEUTRAL, ZONE_MULT, ZONE_NAME, TICK_HZ } from '../sim/defs.js';
 import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS, GENERAL, VET, GENERALS, trainsOf, upgradesOf, unitCost, nodePower } from '../sim/factionRegistry.js';
 import { heightAt, BIOMES } from '../sim/map.js';
-import { hasBldg, capacityOf } from '../sim/entities.js';
+import { hasBldg, capacityOf, isTransport } from '../sim/entities.js';
 import { strikeVisible, hasPower, superOf, superBldgs } from '../sim/powers.js';
 import { heroTaken } from '../sim/simulationTick.js';
 
@@ -13,6 +13,8 @@ const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
 const svg = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
 const ICON = {
+  shipyard: svg('<path d="M11 3h2v4h3v2h-3v9.9a5 5 0 0 0 4.6-3.9l2 .8a7 7 0 0 1-13.2 0l2-.8a5 5 0 0 0 4.600 3.900V9H8V7h3z"/>'),
+  ship: svg('<path d="M2 15h20l-3 5H5z"/><path d="M7 15v-4h7l3 4z" opacity=".8"/><path d="M10.500 11V6h1.200v5z"/>'),
   power: svg('<path d="M4 21V11l3-6h3l2 6v10z"/><path d="M14 21V9l2-4h2l2 4v12z" opacity=".7"/>'),
   barracks: svg('<path d="M2 20v-6a10 8 0 0 1 20 0v6z"/><rect x="10" y="14" width="4" height="6" fill="#000" opacity=".35"/>'),
   supply: svg('<path d="M2 20V9l10-5 10 5v11z"/><rect x="6" y="12" width="5" height="5" fill="#000" opacity=".35"/><rect x="13" y="12" width="5" height="5" fill="#000" opacity=".35"/>'),
@@ -45,6 +47,7 @@ const ICON = {
 };
 const iconFor = (d, isBldg) => {
   if (isBldg) return ICON[d.role] || ICON[d.model] || ICON.cc;
+  if (d.ship) return ICON.ship;
   if (d.air) return d.based ? ICON.jet : ICON.heli;
   if (d.infantry) return ICON[d.model] || (d.model === 'rifle' ? ICON.rifle : ICON.man);
   return ICON[d.model] || (d.builder ? ICON.dozer : d.harvester ? ICON.truck : d.speed > 15 ? ICON.buggy : ICON.tank);
@@ -128,7 +131,7 @@ export class Hud {
         case 'upgrade': if (e.team === PLAYER) this.toast(UPGRADES[e.id].name + ' researched'); break;
         case 'addon': if (e.team === PLAYER) this.toast(UNITS.r_overlord.hardpoints[e.type].name + ' fitted'); break;
         case 'dockEmpty': if (fog.exp[PLAYER][sim.nav.cellOf(e.x, e.z)]) this.toast('Supply Dock depleted. Collectors will move to another dock.', 'warn'); break;
-        case 'garrison': if (e.team === PLAYER) this.toast('Squad garrisoned. Select the building and press U to take it out.'); break;
+        case 'garrison': if (e.team === PLAYER) { const c = this.sim.byId.get(e.id); this.toast(c && isTransport(c) ? 'Aboard. Take the Landing Craft to a beach, then select it and use Unload.' : 'Squad garrisoned. Select the building and press U to take it out.'); } break;
         case 'hit': {
           const t = sim.byId.get(e.id);
           if (t && this.shows(t)) this.float(e.x, e.z, 3.5, ZONE_NAME[e.zone] + ' HIT ×' + ZONE_MULT[e.zone], e.zone === 2 ? '#ff5a4d' : '#f2a93b');
@@ -262,7 +265,7 @@ export class Hud {
       for (const t of this.F.build) {
         const d = BLDGS[t]; let why = '';
         if (d.superPower && sim.noSuper) continue;                       // lobby rule: no superweapons
-        if (d.needs && !hasBldg(sim, PLAYER, d.needs)) why = 'Requires ' + BLDGS[d.needs].name; else if (T.money < d.cost) why = 'Insufficient funds';
+        if (d.needs && !hasBldg(sim, PLAYER, d.needs)) why = 'Requires ' + BLDGS[d.needs].name; else if (d.shore && !sim.map.hasWater) why = 'This map has no water'; else if (T.money < d.cost) why = 'Insufficient funds';
         out.push({ act: 'build:' + t, icon: iconFor(d, true), name: d.name, cost: d.cost, why, sub: d.power > 0 ? '+' + d.power + ' PWR' : d.power < 0 ? '−' + (-d.power) + ' PWR' : '', on: this.ui.place && this.ui.place.type === t });
       }
     } else if (units.length) {
@@ -278,7 +281,7 @@ export class Hud {
       if (dep.length) out.push({ act: 'deploy', icon: ICON.income, name: dep.every(u => u.deployed) ? 'Pack up' : 'Deploy hack', key: '+$6/s', on: dep.every(u => u.deployed) });
       const ov = units.filter(u => UNITS[u.type].hardpoints && !u.addon && !u.addonQ);
       if (ov.length) for (const [k, hp] of Object.entries(UNITS[ov[0].type].hardpoints)) out.push({ act: 'addon:' + k, icon: k === 'gatling' ? ICON.defense : ICON.barracks, name: hp.name, cost: hp.cost, why: T.money < hp.cost ? 'Insufficient funds' : '' });
-      if (units.some(u => u.garrison && u.garrison.length)) out.push({ act: 'evac', icon: ICON.evac, name: 'Unload bunker', key: 'U' });
+      if (units.some(u => u.garrison && u.garrison.length)) out.push({ act: 'evac', icon: ICON.evac, name: units.some(u => isTransport(u)) ? 'Unload at the beach' : 'Unload bunker', key: 'U', tip: units.some(u => isTransport(u)) ? 'Everything aboard gets out onto the nearest shore. The craft must be at a beach.' : '' });
     } else if (bldgs.length) {
       // a civilian building you hold counts as yours while the garrison is inside: this is where its exit buttons go
       for (const id of this.ui.selection) { const e = sim.byId.get(id); if (e && e.type === 'civ' && e.team === PLAYER && e.garrison.length) { out.push({ act: 'evac', icon: ICON.evac, name: 'Evacuate all', key: 'U', tip: 'Every squad leaves the building. Or right-click the ground to send them straight there.' }); out.push({ act: 'evac1', icon: ICON.evac, name: 'Take out one squad', key: 'Shift+U', tip: 'Only the last squad that went in comes out.' }); break; } }
@@ -328,6 +331,8 @@ export class Hud {
       if (d.based) out.push({ parked: e.ammo < d.ammo ? 'Rearming' : 'Ready on pad', out: 'On sortie', return: 'Returning to base' }[e.as] + ' · ' + e.ammo + '/' + d.ammo + ' missiles');
       if (e.addonQ) out.push('Fitting ' + d.hardpoints[e.addonQ.type].name + ' ' + Math.floor(e.addonQ.t / (d.hardpoints[e.addonQ.type].secs * 20) * 100) + '%');
       else if (e.addon) out.push(d.hardpoints[e.addon].name + (e.garrison ? ' ' + e.garrison.length + '/' + capacityOf(e) : ''));
+      if (d.transport) out.push(e.garrison.length ? 'Aboard: ' + e.garrison.length + (e.garrison.some(id => { const g = sim.byId.get(id); return g && !UNITS[g.type].infantry; }) ? ' vehicle' : ' of ' + d.transport.squads + ' squads') : 'Empty: right-click it with up to ' + d.transport.squads + ' infantry squads or one vehicle');
+      if (d.ship && !d.beach) out.push('Keeps off the shore');
       if (d.deploy) out.push(e.deployed ? 'Hacking: +$' + d.deploy.income + '/s' : 'Deploy to earn cash');
       if (e.order && e.order.t === 'capture' && e.capT) out.push('Capturing ' + Math.floor(e.capT / 100 * 100) + '%');
       if (d.harvester) out.push({ seek: 'Looking for supplies', toDock: e.holdI >= 0 && e.slotI < 0 ? 'Waiting for a free bay' : 'Heading to dock', loading: 'Loading', toCenter: e.holdI >= 0 && e.slotI < 0 ? 'Waiting to unload' : 'Returning $' + e.cargo, unloading: 'Unloading' }[e.hs] || '');
@@ -394,7 +399,7 @@ export class Hud {
     $('perf').textContent = `${fps.toFixed(0)} fps · sim ${simMs.toFixed(2)} ms/tick`;
     $('paused').hidden = !ui.paused;
     const pw = ui.power;
-    const m = pw ? POWERS[pw.id].name + ': ' + (pw.ok ? 'left-click the target' : pw.err) + ' (right-click cancels)' : ui.place ? 'Placing ' + BLDGS[ui.place.type].name + ': left-click to place, right-click to cancel' : ui.amove ? (ui.guard ? 'Guard area: left-click the spot to hold' : 'Attack-move: left-click a destination') : ui.force ? 'Force attack: left-click any spot, unit or building. It will be fired on, even if it is yours. (right-click cancels)' : ui.wp ? 'Move markers ON: each right-click adds a point to the route. Press Esc or the button to finish.' : '';
+    const m = pw ? POWERS[pw.id].name + ': ' + (pw.ok ? 'left-click the target' : pw.err) + ' (right-click cancels)' : ui.place ? 'Placing ' + BLDGS[ui.place.type].name + ': ' + (ui.place.why ? ui.place.why + '. ' : BLDGS[ui.place.type].shore ? 'Goes half on land, half in the water. ' : '') + 'Left-click to place, right-click to cancel' : ui.amove ? (ui.guard ? 'Guard area: left-click the spot to hold' : 'Attack-move: left-click a destination') : ui.force ? 'Force attack: left-click any spot, unit or building. It will be fired on, even if it is yours. (right-click cancels)' : ui.wp ? 'Move markers ON: each right-click adds a point to the route. Press Esc or the button to finish.' : '';
     $('mode').textContent = m; $('mode').hidden = !m; $('mode').classList.toggle('bad', !!pw && !pw.ok);
     // General: rank, XP toward the next rank, unspent points
     const lo = GENERAL.rankXp[t.rank - 1], hi = GENERAL.rankXp[t.rank];

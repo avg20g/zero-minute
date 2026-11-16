@@ -1,15 +1,17 @@
 // Movement: path following + local steering (separation, anticipatory
 // avoidance, convoy following), heading-limited vehicles, overlap resolution,
 // stuck detection. Runs once per sim tick; fully deterministic.
-import { N, CELL, DT, angDiff } from './defs.js';
+import { N, CELL, DT, angDiff, ROAD_SPEED, SWIM_SPEED } from './defs.js';
 import { UNITS } from './factionRegistry.js';
 import { reqPath } from './entities.js';
 
-const B = 8, GW = (N * CELL / B) | 0; // spatial hash: 8 m buckets
-const head = new Int32Array(GW * GW), nextI = new Int32Array(4096);
+const B = 8; // spatial hash: 8 m buckets
+let GW = 0, head = null;   // sized for the map being stepped (maps come in several sizes)
+const nextI = new Int32Array(4096);
 let list = [];
 
 function buildHash(sim) {
+  const gw = (N * CELL / B) | 0; if (gw !== GW) { GW = gw; head = new Int32Array(GW * GW); }
   head.fill(-1); list.length = 0;
   for (const e of sim.ents) {
     if (e.kind !== 'unit' || e.dead || e.inB || e.air) continue; // aircraft are handled in air.js
@@ -23,12 +25,14 @@ function buildHash(sim) {
 function immovable(u) { return u.still || u.working || u.deployed || u.inert; }
 
 export function stepMovement(sim) {
-  const nav = sim.nav;
+  const nav = sim.nav, road = sim.map.road;
   buildHash(sim);
   const n = list.length;
 
   for (let i = 0; i < n; i++) {
     const u = list[i], d = UNITS[u.type];
+    // top speed here: vehicles are faster on a road, amphibious units are slow while they swim
+    const here = nav.cellOf(u.x, u.z), ms = u.nc > 3 ? u.ms : nav.stat[here] === 2 ? u.ms * SWIM_SPEED : (u.cls === 1 && road[here] ? u.ms * ROAD_SPEED : u.ms);
     u.px = u.x; u.pz = u.z; u.pfacing = u.facing; u.pturret = u.turret; u.arrived = false;
 
     // Standing inside something solid (a building was placed on us): walk out.
@@ -54,7 +58,7 @@ export function stepMovement(sim) {
       const last = u.pi >= u.path.length - 2;
       if (last && dist < 0.5 + u.stuck * 0.7) { u.path = null; u.stuck = 0; u.arrived = true; }
       else {
-        want = last ? Math.min(u.ms, Math.max(1.5, dist * 2.2)) : u.ms;
+        want = last ? Math.min(ms, Math.max(1.5, dist * 2.2)) : ms;
         dirx = ex / dist; dirz = ez / dist; following = true;
       }
     }
@@ -103,7 +107,7 @@ export function stepMovement(sim) {
     let stx = dirx + ax, stz = dirz + az;
     if (following) { const sl = Math.hypot(stx, stz); if (sl > 0.001) { stx /= sl; stz /= sl; } else { stx = dirx; stz = dirz; } }
     dvx = stx * want + sx; dvz = stz * want + sz;
-    const lim = following ? u.ms : Math.min(u.ms, 5);
+    const lim = following ? ms : Math.min(ms, 5);
     const mag = Math.hypot(dvx, dvz);
     if (mag > lim) { dvx *= lim / mag; dvz *= lim / mag; }
     if (immovable(u)) { dvx = 0; dvz = 0; }

@@ -423,6 +423,11 @@ const UNIT = {
   mig: (T) => jet(T, false), // the Raptor and the Z-10 are built in modelFactory.js
   vet, fookmie, phantom, car,
   rifle: (T) => squad(T, FOUR, { gun: 'rifle' }),
+  seal: (T) => { // four operators in black: two carbines, a marksman with a long rifle, a grenadier
+    const g = new THREE.Group(), b = grp(g), o = { cloth: M.black, legs: M.dark, hat: M.dark };
+    const men = FOUR.map(([x, z], i) => { const m = man(b, T, x, z, { ...o, gun: i === 2 ? 'long' : 'rifle' }); box(m, M.dark, 0.2, 0.3, 0.3, -0.2, 0.92, 0); if (i === 3) cyl(m, M.gun, 0.07, 0.4, 0.42, 0.86, 0.24, 'x'); return m; });
+    return { g, body: b, men, muzzle: 0.9, muzzleY: 1.0 };
+  },
   bomber: (T) => { const r = squad(T, ONE, { gun: 'rifle', cloth: M.cloth, hat: M.dark }); box(r.body, M.crateC, 0.46, 0.34, 0.5, 0, 1.12, 0); for (const z of [-0.2, 0, 0.2]) cyl(r.body, M.gun, 0.05, 0.3, 0.26, 1.12, z); return r; }, // explosive vest over plain clothes
   rpg: (T) => squad(T, TWO, { gun: 'rpg', cloth: M.cloth, hat: M.red }),
   sniper: (T) => squad(T, ONE, { gun: 'long', cloth: M.ghillie, legs: M.ghillie, hat: M.ghillie }),
@@ -466,7 +471,8 @@ function scud(T) {
   const missiles = [];   // one node per rail: the view removes each as it launches and puts them back one by one during the reload
   for (let i = 0; i < 9; i++) {
     const x = (i % 3 - 1) * 2.6, z = (((i / 3) | 0) - 1) * 2.6; box(rack, M.gun, 0.2, 2.6, 0.2, x + 0.7, 1.3, z); box(rack, M.steel, 0.3, 5.0, 0.3, x + 0.62, 2.7, z);
-    const m = grp(rack, x, 2.9, z);   // rails stand vertical: the missiles go straight up cyl(m, M.olive, 0.5, 5.0, 0, 0, 0); add(m, G.cone, M.olive, 0.5, 2.6, 0.5, 0, 3.8, 0); cyl(m, M.gun, 0.52, 0.3, 0, -1.8, 0);   // long pointed nose
+    const m = grp(rack, x, 2.9, z);   // rails stand vertical: the missiles go straight up
+    cyl(m, M.olive, 0.5, 5.0, 0, 0, 0); add(m, G.cone, M.olive, 0.5, 2.6, 0.5, 0, 3.8, 0); cyl(m, M.gun, 0.52, 0.3, 0, -1.8, 0);   // long pointed nose
     for (const a of [0, 1.5708]) box(m, M.gun, 1.5, 0.8, 0.06, 0, -2.1, 0).rotation.y = a;
     missiles.push(m);
   }
@@ -474,7 +480,30 @@ function scud(T) {
   cyl(g, M.wood, 0.07, 3.4, 6.4, 2.4, -6.4); box(g, M.cloth, 1.6, 0.9, 0.05, 5.6, 3.6, -6.4);
   return { g, top: 9, missiles };
 }
-const BLDG = { cc, power, supply, barracks, factory, airfield, patriot, gatling, stinger, uplink, tunnel, market, particle, silo, scud };
+// Shipyard (20 m x 20 m). Model +X is the sea: the view turns it to face the water. The landward half is a quay with a
+// workshop and stores; the seaward half is a slipway between two piers, with a gantry crane over it. The quay wall and
+// the piles go well below the waterline, so the building sits right on any shore.
+function shipyard(T) {
+  const g = new THREE.Group();
+  box(g, M.slab, 11.5, 5.0, 19.6, -4.2, -2.3, 0);                                                 // quay block (top at +0.2)
+  box(g, T.wall, 6.4, 4.2, 9.0, -6.0, 2.3, -4.4); for (const s of [-1, 1]) box(g, T.roof, 6.8, 0.3, 5.0, -6.0, 4.75, -4.4 + s * 2.3).rotation.x = s * 0.2;   // workshop
+  box(g, M.dark, 0.12, 3.2, 5.2, -2.76, 1.8, -4.4); box(g, T.accent, 6.5, 0.4, 9.1, -6.0, 3.6, -4.4);   // big door facing the slip, team band
+  box(g, T.wall, 4.6, 2.6, 5.0, -6.6, 1.5, 6.2); box(g, T.roof, 5.0, 0.25, 5.4, -6.6, 2.95, 6.2);        // stores
+  for (const [x, z, m] of [[-2.2, 4.0, M.crateA], [-2.2, 5.4, M.crateB], [-3.4, 8.4, M.crateC], [-1.6, 8.2, M.crateA]]) box(g, m, 1.1, 1.0, 1.1, x, 0.7, z);
+  for (const s of [-1, 1]) { // two piers on piles
+    box(g, M.wood, 9.6, 0.3, 2.6, 5.4, 0.05, s * 8.2);
+    for (const x of [1.4, 4.2, 7.0, 9.8]) for (const k of [-1, 1]) cyl(g, M.wood, 0.2, 5.6, x, -2.6, s * 8.2 + k * 1.05);
+    for (const x of [2.5, 6.0, 9.4]) cyl(g, M.steel, 0.16, 0.7, x, 0.55, s * 7.2);                 // bollards
+  }
+  const slip = box(g, M.concrete, 12.4, 0.5, 9.2, 4.6, -1.2, 0); slip.rotation.z = -0.2;           // slipway running down into the water
+  for (const z of [-2.2, 2.2]) { const r = box(g, M.steel, 12.4, 0.16, 0.22, 4.6, -0.88, z); r.rotation.z = -0.2; }
+  box(g, M.wood, 3.6, 0.5, 3.0, 2.0, 0.1, 0); box(g, T.dark, 3.2, 0.9, 1.6, 2.0, 0.8, 0);          // a hull on the cradle
+  for (const s of [-1, 1]) { cyl(g, M.yellow, 0.3, 8.0, 0.4, 4.2, s * 6.2); cyl(g, M.yellow, 0.3, 8.0, 6.4, 4.2, s * 6.2); box(g, M.yellow, 6.6, 0.5, 0.5, 3.4, 8.2, s * 6.2); }   // gantry legs and rails
+  box(g, M.yellow, 0.7, 0.7, 13.0, 3.4, 8.7, 0); box(g, M.gun, 1.0, 0.7, 1.2, 3.4, 8.1, 1.5); cyl(g, M.gun, 0.04, 3.0, 3.4, 6.3, 1.5); box(g, M.gun, 0.5, 0.4, 0.5, 3.4, 4.7, 1.5);   // bridge, trolley, hook
+  cyl(g, M.steel, 0.12, 6.0, -9.0, 3.2, 9.0); add(g, G.sph, T.glow, 0.3, 0.3, 0.3, -9.0, 6.3, 9.0);  // signal mast
+  return { g };
+}
+const BLDG = { cc, power, supply, barracks, factory, airfield, patriot, gatling, stinger, uplink, tunnel, market, particle, silo, scud, shipyard };
 
 export function buildModel(e) {
   init();

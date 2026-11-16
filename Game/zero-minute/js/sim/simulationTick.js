@@ -1,12 +1,12 @@
 // The deterministic simulation. step() advances exactly one 20 Hz tick.
 // Nothing in here touches the DOM, the clock, or Math.random. All three
 // factions run through this one loop; their differences are registry data.
-import { N, CELL, WORLD, PLAYER, ENEMY, NEUTRAL } from './defs.js';
+import { N, CELL, WORLD, PLAYER, ENEMY, NEUTRAL, setMapSize } from './defs.js';
 import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS, GENERALS, GENERAL, trainsOf, upgradesOf, unitCost } from './factionRegistry.js';
 import { generateMap } from './map.js';
 import { Nav } from './pathfinding.js';
 import { Fog } from './fog.js';
-import { makeUnit, makeBldg, spawnNear, kill, reqPath, moveTo, isMoving, stopUnit, releaseSlot, rectDist, canPlace, hasBldg, ejectGarrison, capacityOf, removeBldg } from './entities.js';
+import { makeUnit, makeBldg, spawnNear, kill, reqPath, moveTo, isMoving, stopUnit, releaseSlot, rectDist, canPlace, placeError, hasBldg, ejectGarrison, capacityOf, removeBldg, roomFor, isTransport, canRide, landingCell } from './entities.js';
 import { stepMovement, stepPaths, formationSlots } from './move.js';
 import { stepAir, padCount } from './air.js';
 import { stepCombat, targetable, canAttack, canForce, groundTarget } from './combat.js';
@@ -22,9 +22,10 @@ const mkTeam = (faction, money) => ({ faction, money, prod: 0, use: 0, low: fals
 export class Sim {
   constructor(opts = {}) {
     this.rng = (opts.seed ?? 20031) >>> 0;
-    this.map = generateMap(opts.map || undefined);  // opts.map: a custom map spec from the lobby's map builder
+    this.map = generateMap(opts.map || undefined);  // opts.map: a map spec (lobby map or the map builder); it also sets the map size
+    this.size = this.map.N;
     this.noEnemy = !!opts.noEnemy;                  // sandbox: no opposing base, no AI, no win or lose
-    this.nav = new Nav(this.map.blocked);
+    this.nav = new Nav(this.map.blocked, this.map.road);
     this.fog = new Fog();
     this.ents = []; this.byId = new Map(); this.nextId = 1;
     this.projs = []; this.events = []; this.cmds = []; this.pathQ = [];
@@ -72,7 +73,10 @@ export class Sim {
   }
   issue(cmd) { this.cmds.push(cmd); } // applied at the start of the next tick
 
+  use() { if (N !== this.size) setMapSize(this.size); return this; }   // make this game's map size the current one (several games can exist at once)
+
   step() {
+    if (N !== this.size) setMapSize(this.size);
     if (this.cmds.length) { const c = this.cmds; this.cmds = []; for (const cmd of c) applyCommand(this, cmd); }
     if (this.nav.dirty) this.nav.rebuild();
     for (const a of this.ais) a.step();
@@ -257,9 +261,10 @@ function applyCommand(sim, c) {
       break;
     case 'repairat': { // vehicles drive to the repair bay of one of your buildings (War Factory, Tunnel Network)
       const b = own(sim, c.target, team); if (!b || b.kind !== 'bldg' || !b.done || !BLDGS[b.type].repair) break;
-      const us = units((u) => u.cls === 1 && !u.air); if (!us.length) break;
+      const yard = !!BLDGS[b.type].shore;                              // a shipyard takes ships, the others take land vehicles
+      const us = units((u, d) => u.cls === 1 && !u.air && !!d.ship === yard); if (!us.length) break;
       if (sim.nav.dirty) sim.nav.rebuild();
-      let cx = 0, cz = 0; for (const u of us) { cx += u.x; cz += u.z; } const [ax, az] = approachPoint(b, cx / us.length, cz / us.length, 5), slots = formationSlots(sim, us, ax, az);
+      let cx = 0, cz = 0; for (const u of us) { cx += u.x; cz += u.z; } const [ax, az] = yard ? [b.launch.x, b.launch.z] : approachPoint(b, cx / us.length, cz / us.length, 5), slots = formationSlots(sim, us, ax, az);
       us.forEach((u, i) => { freeUnit(sim, u); u.order = { t: 'move', x: slots[i][0], z: slots[i][1], rev: false }; reqPath(sim, u, slots[i][0], slots[i][1]); });
       break;
     }
@@ -275,7 +280,7 @@ function applyCommand(sim, c) {
       if (sim.nav.dirty) sim.nav.rebuild();
       for (const u of units()) {
         if (u.air) continue;
-        const a = sim.rand() * 6.2831853, d = 9 + sim.rand() * 9, c0 = sim.nav.nearest(Math.floor((u.x + Math.cos(a) * d) / CELL), Math.floor((u.z + Math.sin(a) * d) / CELL), u.cls, -1, 8);
+        const a = sim.rand() * 6.2831853, d = 9 + sim.rand() * 9, c0 = sim.nav.nearest(Math.floor((u.x + Math.cos(a) * d) / CELL), Math.floor((u.z + Math.sin(a) * d) / CELL), u.nc, -1, 8);
         if (c0 < 0) continue;
         freeUnit(sim, u); const x = ((c0 % N) + 0.5) * CELL, z = (((c0 / N) | 0) + 0.5) * CELL;
         u.order = { t: 'move', x, z }; reqPath(sim, u, x, z);
@@ -290,7 +295,7 @@ function applyCommand(sim, c) {
       if (T.money < d.cost) { msg(sim, team, 'Insufficient funds'); break; }
       if (d.needs && !hasBldg(sim, team, d.needs)) { msg(sim, team, `Requires ${BLDGS[d.needs].name}`); break; }
       if (d.superPower && sim.noSuper) { msg(sim, team, 'Superweapons are disabled for this match'); break; }
-      if (!canPlace(sim, c.type, c.cx, c.cz, team)) { msg(sim, team, 'Cannot build there'); break; }
+      { const why = placeError(sim, c.type, c.cx, c.cz, team); if (why) { msg(sim, team, why); break; } }
       T.money -= d.cost;
       const b = makeBldg(sim, c.type, team, c.cx, c.cz, false);
       sim.events.push({ t: 'place', id: b.id, team });
@@ -332,11 +337,13 @@ function applyCommand(sim, c) {
     case 'rally': { const b = own(sim, c.id, team); if (b && b.kind === 'bldg') { b.rallyX = c.x; b.rallyZ = c.z; } break; }
     case 'garrison': {
       const b = sim.byId.get(c.target); if (!b || b.ruined || !capacityOf(b)) break;
-      for (const u of units((u, d) => d.canGarrison && u !== b)) { freeUnit(sim, u); stopUnit(u); u.order = { t: 'garrison', id: b.id }; }
+      const boat = isTransport(b); if (boat && b.team !== team) break;     // a Landing Craft takes infantry squads or one vehicle; buildings and bunkers take squads that can garrison
+      for (const u of units((u, d) => (boat ? canRide(u) : d.canGarrison) && u !== b)) { freeUnit(sim, u); stopUnit(u); u.order = { t: 'garrison', id: b.id }; }
       break;
     }
     case 'evacuate': { // empty a garrison: all squads, or `count` of them; with x,z they walk to that point once outside
       const b = sim.byId.get(c.id); if (!b || b.team !== team || !b.garrison || !b.garrison.length) break;
+      if (isTransport(b) && landingCell(sim, b, 0) < 0) { msg(sim, team, 'Move to the shore to unload'); break; }
       const out = ejectGarrison(sim, b, 1, c.count > 0 ? c.count | 0 : 1e9);
       if (out.length && c.x >= 0 && c.z >= 0) {
         if (sim.nav.dirty) sim.nav.rebuild();
@@ -383,7 +390,7 @@ function applyCommand(sim, c) {
       break;
     case 'tunnel': {
       const ex = own(sim, c.target, team); if (!ex || !BLDGS[ex.type] || !BLDGS[ex.type].tunnel || !ex.done) break;
-      for (const u of units((u) => !u.air)) { freeUnit(sim, u); stopUnit(u); u.order = { t: 'tunnel', to: ex.id, via: 0 }; }
+      for (const u of units((u, d) => !u.air && !d.ship)) { freeUnit(sim, u); stopUnit(u); u.order = { t: 'tunnel', to: ex.id, via: 0 }; }
       break;
     }
     case 'capture': {
@@ -401,6 +408,7 @@ function applyCommand(sim, c) {
 
 // ---------------- Order upkeep ----------------
 function done(u) { u.order = null; u.guardX = u.x; u.guardZ = u.z; }
+export const BOARD_RANGE = 11;   // metres from a Landing Craft's side at which troops on the beach can get aboard
 export const MAX_WPS = 12;   // move markers one unit can have queued
 // Head for the next queued move marker, if there is one.
 function nextMarker(sim, u) {
@@ -430,9 +438,9 @@ function stepOrders(sim) {
         break;
       case 'garrison': {
         const b = sim.byId.get(o.id), cap = b && !b.dead && !b.ruined ? capacityOf(b) : 0;
-        const allowed = cap && b.garrison.length < cap && (b.kind === 'unit' ? b.team === u.team : (b.team === NEUTRAL || b.team === u.team));
+        const allowed = cap && roomFor(sim, b, u) && (b.kind === 'unit' ? b.team === u.team : (b.team === NEUTRAL || b.team === u.team));
         if (!allowed) { stopUnit(u); done(u); break; }
-        if (rectDist(b, u.x, u.z) <= 4.2) {
+        if (rectDist(b, u.x, u.z) <= (isTransport(b) ? BOARD_RANGE : 4.2)) {
           stopUnit(u); u.inB = b.id; u.order = null; u.target = 0; u.vx = u.vz = u.spd = 0; u.cloaked = false;
           b.garrison.push(u.id); if (b.kind === 'bldg') b.team = u.team;
           sim.events.push({ t: 'garrison', id: b.id, team: u.team, x: b.x, z: b.z });

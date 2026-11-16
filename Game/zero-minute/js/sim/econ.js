@@ -64,6 +64,9 @@ export function stepProduction(sim) {
     } else if (d.air) {
       u = makeUnit(sim, item, b.team, b.x, b.z, Math.PI / 2);
       u.order = { t: 'move', x: b.rallyX, z: b.rallyZ }; moveTo(sim, u, b.rallyX, b.rallyZ);
+    } else if (d.ship && b.launch) { // ships slide off the seaward end of the yard and gather at the rally point (the nearest water to it)
+      u = spawnNear(sim, item, b.team, b.launch.x, b.launch.z, [0, Math.PI / 2, Math.PI, -Math.PI / 2][b.face | 0]);
+      u.order = { t: 'move', x: b.rallyX, z: b.rallyZ }; reqPath(sim, u, b.rallyX, b.rallyZ);
     } else {
       u = BLDGS[b.type].exitEast ? spawnNear(sim, item, b.team, b.x + (b.w / 2 + 3) * CELL, b.z, 0) : spawnNear(sim, item, b.team, b.x, b.z + (b.h / 2 + 2) * CELL, Math.PI / 2);
       if (!d.harvester) { u.order = { t: 'move', x: b.rallyX, z: b.rallyZ }; reqPath(sim, u, b.rallyX, b.rallyZ); }

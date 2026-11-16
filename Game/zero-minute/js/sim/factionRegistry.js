@@ -43,7 +43,21 @@ export const WEAPONS = {
   phone:       { range: 42, dmg: 100, cd: 80, kind: 'hack', noJets: true, noBased: true, perSec: 150, minSec: 2, maxSec: 14, vs: { inf: 1, light: 1, heavy: 1, air: 1 } },
   // The Phantom's call: one of three attacks at random (hijacked airliner, 10 s ambush, car bomb). Numbers in HERO_CALL.
   phantom_call:{ range: 44, dmg: 1, cd: 200, kind: 'call', vs: { inf: 1, light: 1, heavy: 1, bldg: 1 } },
+  // ---- ships. Small craft count as light armor and warships as heavy, so every weapon above already knows what it does to them.
+  rhib_mg:     { range: 32, dmg: 8,  cd: 3,  kind: 'hitscan', vs: { inf: 1, light: 0.8, heavy: 0.2, bldg: 0.15, air: 0.5 } },                        // RHIB: twin machine guns
+  naval_gun:   { range: 62, dmg: 95, cd: 50, kind: 'shell', speed: 120, splash: 4, vs: { inf: 0.5, light: 1, heavy: 1, bldg: 1.1 } },                // Frigate deck gun: ships, the coast, buildings
+  naval_laser: { range: 48, dmg: 13, cd: 5,  kind: 'laser', vs: { air: 1.7 } },                                                                     // Frigate laser turret: jets and helicopters only
+  corvette_gun:{ range: 56, dmg: 70, cd: 44, kind: 'shell', speed: 115, splash: 3, vs: { inf: 0.45, light: 1, heavy: 1, bldg: 1 } },                 // Corvette deck cannon
+  ciws:        { range: 42, dmg: 6,  cd: 2,  kind: 'hitscan', vs: { air: 1.1, inf: 0.8, light: 0.6, heavy: 0.1 } },                                 // Corvette minigun: aircraft first, small boats and people too
+  minigun2:    { range: 32, dmg: 9,  cd: 2,  kind: 'hitscan', vs: { inf: 1, light: 0.8, heavy: 0.18, bldg: 0.12, air: 0.6 } },                       // Mk V: two miniguns
+  mk19:        { range: 36, dmg: 26, cd: 16, kind: 'lob', speed: 30, arc: 3, splash: 4, burst: 2, burstGap: 4, vs: { inf: 1, light: 0.8, heavy: 0.3, bldg: 0.5 } },   // Mk V: two grenade launchers
+  hellfire:    { range: 50, dmg: 150, cd: 120, kind: 'missile', speed: 70, intercept: true, vs: { inf: 0.2, light: 1, heavy: 1.8, bldg: 1 } },       // Mk V: one Hellfire launcher
+  boat_rockets:{ range: 74, minRange: 14, dmg: 60, cd: 260, kind: 'rocket', speed: 50, burst: 8, burstGap: 4, splash: 5, intercept: true, vs: { inf: 0.6, light: 1, heavy: 1.1, bldg: 1.2 } },   // Missile Boat: eight at a time, then a long reload
+  seal_rifle:  { range: 32, dmg: 12, cd: 5,  kind: 'hitscan', vs: { inf: 1, light: 0.5, heavy: 0.15, bldg: 0.2, air: 0.45 } },                       // SEAL Team: rapid-fire carbines
+  seal_sniper: { range: 50, dmg: 80, cd: 60, kind: 'hitscan', vs: { inf: 1, light: 0.08 } },                                                         // SEAL Team: the marksman
+  seal_gl:     { range: 34, dmg: 34, cd: 40, kind: 'lob', speed: 28, arc: 3.5, splash: 4.5, vs: { inf: 0.9, light: 1, heavy: 0.5, bldg: 0.7 } },     // SEAL Team: grenade launcher
   // damage profiles for off-map strikes and lingering hazards (never equipped)
+  boatblast: { vs: { inf: 0.6, light: 1.2, heavy: 1.2, bldg: 1 } },     // Drone Boat: a hull full of explosive
   a10gun:    { vs: { inf: 1, light: 1, heavy: 1, bldg: 0.4 } },      // 30 mm depleted-uranium burst
   a10rocket: { vs: { inf: 0.8, light: 1.2, heavy: 1, bldg: 0.6 } },   // armor-piercing rockets
   artillery: { vs: { inf: 1, light: 1, heavy: 0.7, bldg: 1 } },
@@ -113,6 +127,24 @@ export const UNITS = {
                   weapon: 'fpv_dive', air: true, alt: 8, fireMoving: true, suicide: { r: 5, dmg: 210, w: 'fpvblast', dive: true } },
   s_scudtruck:  { model: 'scudtel', name: 'Scud Launcher', faction: 'sandstorm', cost: 1500, secs: 16, hp: 260, speed: 7, turn: 1.4, radius: 2.8, cls: 1, sight: 30, armor: 'light',
                   weapon: 'scud_missile' },
+  // ---- ships: built at the shipyard. ship = sails on water only and keeps off the shore (a boat 6 m, a `warship` 10 m);
+  // `beach` = may touch the shore (landing craft). transport = carries `squads` infantry squads or `vehicles` ground vehicles, never both.
+  v_rhib:       { model: 'rhib', name: 'RHIB', faction: 'vanguard', cost: 500, secs: 6, hp: 180, speed: 24, turn: 2.6, radius: 2.2, cls: 1, sight: 44, armor: 'light',
+                  weapon: 'rhib_mg', turret: 5, fireMoving: true, ship: true, scout: true },
+  v_frigate:    { model: 'frigate', name: 'Frigate', faction: 'vanguard', cost: 2200, secs: 20, hp: 1000, speed: 12, turn: 1.0, radius: 8, cls: 1, sight: 52, armor: 'heavy',
+                  weapon: 'naval_gun', weapon2: 'naval_laser', turret: 2.4, fireMoving: true, ship: true, warship: true, pdl: 14, pdlR: 26, detector: 30 },   // pdl: ticks between missiles shot down; pdlR: how far out it reaches
+  v_mkv:        { model: 'mkv', name: 'Mk V Combat Boat', faction: 'vanguard', cost: 1400, secs: 12, hp: 420, speed: 20, turn: 2.0, radius: 3.8, cls: 1, sight: 44, armor: 'light',
+                  weapon: 'minigun2', weapon2: 'mk19', weapon3: 'hellfire', turret: 4, fireMoving: true, ship: true },
+  v_seal:       { model: 'seal', name: 'SEAL Team', faction: 'vanguard', cost: 900, secs: 10, hp: 320, speed: 6.5, turn: 9, radius: 1.0, cls: 0, sight: 44, armor: 'inf',
+                  weapon: 'seal_rifle', weapon2: 'seal_sniper', weapon3: 'seal_gl', infantry: true, canGarrison: true, canCapture: true },
+  r_lcraft:     { model: 'lcraft', name: 'Landing Craft', faction: 'redhammer', cost: 700, secs: 10, hp: 520, speed: 13, turn: 1.6, radius: 4.2, cls: 1, sight: 34, armor: 'light',
+                  ship: true, beach: true, transport: { squads: 4, vehicles: 1 } },
+  r_corvette:   { model: 'corvette', name: 'Corvette', faction: 'redhammer', cost: 1900, secs: 18, hp: 900, speed: 13, turn: 1.1, radius: 7, cls: 1, sight: 50, armor: 'heavy',
+                  weapon: 'corvette_gun', weapon2: 'ciws', turret: 2.6, fireMoving: true, ship: true, warship: true, pdl: 18, pdlR: 24, pdlGun: true },
+  s_mboat:      { model: 'mboat', name: 'Missile Boat', faction: 'sandstorm', cost: 1500, secs: 14, hp: 520, speed: 15, turn: 1.6, radius: 4.2, cls: 1, sight: 46, armor: 'light',
+                  weapon: 'boat_rockets', turret: 2.2, ship: true },
+  s_dboat:      { model: 'dboat', name: 'Drone Boat', faction: 'sandstorm', cost: 400, secs: 6, hp: 150, speed: 22, turn: 2.8, radius: 1.8, cls: 1, sight: 30, armor: 'light',
+                  weapon: 'vest', ship: true, suicide: { r: 8, dmg: 400, w: 'boatblast', charge: { r: 40, mult: 1.5 } } },   // rams ships; next to the shore it goes off as close as it can get
   // ---- heroes: trained at the Barracks, one alive per side, always cloaked (also while moving)
   v_hero:       { model: 'vet', name: 'Disabled Vet', faction: 'vanguard', cost: 2500, secs: 20, hp: 400, speed: 7, turn: 9, radius: 0.9, cls: 0, sight: 40, armor: 'inf',
                   weapon: 'm60', weapon2: 'vet_rpg', infantry: true, hero: true, stealth: 'always', needs: 'v_factory' },
@@ -148,6 +180,8 @@ const FACTORY = { model: 'factory', role: 'factory', cost: 2000, secs: 14, hp: 2
 // `layout` is in metres from the building's centre (x east, z south): `spots` are where jets park, each in front of
 // the door of its hangar (`hangars`: position and the way the door faces), so parked jets stay in view from above.
 const AIRFIELD= { model: 'airfield', role: 'airfield', cost: 1800, secs: 14, hp: 2000, w: 20, h: 14, power: -1, sight: 30, pads: 4, runway: true };
+// Shipyard: `shore` = it must stand half on land and half on water, and it turns to face the sea. It repairs ships near it.
+const SHIPYARD = { model: 'shipyard', role: 'shipyard', cost: 2000, secs: 16, hp: 2200, w: 10, h: 10, power: -1, sight: 34, shore: true, repair: 18 };
 const RUNWAYS = [4, 10.4];
 const US_FIELD = { runways: RUNWAYS, helipad: [14.2, -8.6], tower: [9.4, -12],          // two hangars on the left, two along the top
   hangars: [[-16.5, -10.5, 'e'], [-16.5, -3.6, 'e'], [-2.6, -10.5, 's'], [4.4, -10.5, 's']], spots: [[-10.4, -10.5], [-10.4, -3.6], [-2.6, -4], [4.4, -4]] };
@@ -161,6 +195,7 @@ export const BLDGS = {
   v_barracks: { ...BARRACKS, name: 'Barracks', faction: 'vanguard', trains: ['v_ranger', 'v_pathfinder', 'v_hero'] },
   v_factory:  { ...FACTORY, name: 'War Factory', faction: 'vanguard', trains: ['v_tank', 'v_avenger'], upgrades: ['v_pdl'], needs: 'v_supply' },
   v_airfield: { ...AIRFIELD, layout: US_FIELD, name: 'Air Field', faction: 'vanguard', trains: ['v_raptor', 'v_comanche'], needs: 'v_factory' },
+  v_shipyard: { ...SHIPYARD, name: 'Naval Yard', faction: 'vanguard', trains: ['v_rhib', 'v_frigate'], needs: 'v_factory' },
   v_patriot:  { model: 'patriot', role: 'defense', name: 'Patriot Battery', faction: 'vanguard', cost: 1000, secs: 8, hp: 1000, w: 4, h: 4, power: -3, sight: 50, weapon: 'patriot', turret: 3.0, detector: 30, needs: 'v_power' },
   v_uplink:   { model: 'uplink', role: 'income', name: 'Satellite Uplink', faction: 'vanguard', cost: 2500, secs: 20, hp: 1200, w: 6, h: 6, power: -3, sight: 30, income: { amt: 25, every: 40 }, needs: 'v_factory' },
 
@@ -170,12 +205,14 @@ export const BLDGS = {
   r_barracks: { ...BARRACKS, name: 'Barracks', faction: 'redhammer', trains: ['r_conscript', 'r_hacker', 'r_hero'] },
   r_factory:  { ...FACTORY, name: 'War Factory', faction: 'redhammer', trains: ['r_tank', 'r_inferno', 'r_overlord'], upgrades: ['r_nuke', 'r_thermo'], needs: 'r_supply' },
   r_airfield: { ...AIRFIELD, layout: CN_FIELD, name: 'Airfield', faction: 'redhammer', trains: ['r_mig', 'r_hind'], needs: 'r_factory' },
+  r_shipyard: { ...SHIPYARD, name: 'Shipyard', faction: 'redhammer', trains: ['r_lcraft', 'r_corvette'], needs: 'r_factory' },
   r_gatling:  { model: 'gatling', role: 'defense', name: 'Gatling Tower', faction: 'redhammer', cost: 900, secs: 8, hp: 1100, w: 4, h: 4, power: -2, sight: 46, weapon: 'gatling', turret: 4.0, detector: 28, needs: 'r_power' },
 
   s_cc:       { ...CC, name: 'Command Hideout', faction: 'sandstorm', trains: ['s_worker'] },
   s_supply:   { ...SUPPLY, name: 'Supply Stash', faction: 'sandstorm', power: 0, trains: ['s_truck'] },
   s_barracks: { ...BARRACKS, name: 'Barracks', faction: 'sandstorm', trains: ['s_guerrilla', 's_rpg', 's_saboteur', 's_hero'] },
   s_factory:  { ...FACTORY, name: 'Arms Dealer', faction: 'sandstorm', power: 0, cost: 1500, trains: ['s_technical', 's_scorpion', 's_tractor', 's_buggy'], needs: 's_supply' },
+  s_shipyard: { ...SHIPYARD, name: 'Smuggler’s Dock', faction: 'sandstorm', power: 0, cost: 1700, trains: ['s_dboat', 's_mboat'], needs: 's_factory' },
   s_stinger:  { model: 'stinger', role: 'defense', name: 'Stinger Site', faction: 'sandstorm', cost: 900, secs: 8, hp: 900, w: 4, h: 4, power: 0, sight: 48, weapon: 'stinger', turret: 3.2, detector: 28, needs: 's_barracks' },
   s_tunnel:   { model: 'tunnel', role: 'tunnel', name: 'Tunnel Network', faction: 'sandstorm', cost: 800, secs: 8, hp: 1000, w: 4, h: 4, power: 0, sight: 32, tunnel: true, repair: 10, needs: 's_barracks' },
   // Superweapons: build as many as you can pay for and power. Each is announced to both players and runs its own countdown from completion.
@@ -243,9 +280,9 @@ export const FACTIONS = {
     id: 'vanguard', name: 'United States', doctrine: 'High-tech and air superiority',
     blurb: 'Abrams tanks, F-22s, Comanche gunships and stealth snipers. Everything leans on the power grid.',
     hull: 0xc4b79a, dark: 0x8a8067, usesPower: true, radarNeedsPower: true,
-    build: ['v_power', 'v_barracks', 'v_supply', 'v_factory', 'v_airfield', 'v_patriot', 'v_uplink', 'v_particle', 'v_cc'],
-    roles: { cc: 'v_cc', power: 'v_power', supply: 'v_supply', barracks: 'v_barracks', factory: 'v_factory', airfield: 'v_airfield', defense: 'v_patriot', income: 'v_uplink', super: 'v_particle', builder: 'v_dozer', truck: 'v_chinook', squad: 'v_ranger', scout: 'v_drone' },
-    aiArmy: ['v_ranger', 'v_tank', 'v_ranger', 'v_avenger', 'v_tank', 'v_comanche'],
+    build: ['v_power', 'v_barracks', 'v_supply', 'v_factory', 'v_airfield', 'v_shipyard', 'v_patriot', 'v_uplink', 'v_particle', 'v_cc'],
+    roles: { cc: 'v_cc', power: 'v_power', supply: 'v_supply', barracks: 'v_barracks', factory: 'v_factory', airfield: 'v_airfield', shipyard: 'v_shipyard', defense: 'v_patriot', income: 'v_uplink', super: 'v_particle', builder: 'v_dozer', truck: 'v_chinook', squad: 'v_ranger', scout: 'v_drone' },
+    aiArmy: ['v_ranger', 'v_tank', 'v_ranger', 'v_avenger', 'v_tank', 'v_comanche'], aiNavy: ['v_rhib', 'v_frigate', 'v_frigate'],
     tree: [
       { id: 'v_pathfinder', tier: 1, name: 'Pathfinder Training', desc: 'Unlocks the Pathfinder Sniper at the Barracks.', unlock: 'v_pathfinder' },
       { id: 'v_vet', tier: 1, name: 'Armor Veterancy', desc: 'Tanks leave the War Factory as Veterans.', vetBuild: 'tank' },
@@ -260,9 +297,9 @@ export const FACTIONS = {
     id: 'redhammer', name: 'China', doctrine: 'Heavy armor and overwhelming firepower',
     blurb: 'Heavy tanks, Inferno Cannons and J-11 fighters. Units fight 15% faster in a horde of five or more.',
     hull: 0x5d6a48, dark: 0x3d4631, usesPower: true, horde: true,
-    build: ['r_power', 'r_barracks', 'r_supply', 'r_factory', 'r_airfield', 'r_gatling', 'r_silo', 'r_cc'],
-    roles: { cc: 'r_cc', power: 'r_power', supply: 'r_supply', barracks: 'r_barracks', factory: 'r_factory', airfield: 'r_airfield', defense: 'r_gatling', super: 'r_silo', builder: 'r_dozer', truck: 'r_truck', squad: 'r_conscript', scout: 'r_scout' },
-    aiArmy: ['r_conscript', 'r_tank', 'r_conscript', 'r_tank', 'r_inferno', 'r_overlord', 'r_mig'],
+    build: ['r_power', 'r_barracks', 'r_supply', 'r_factory', 'r_airfield', 'r_shipyard', 'r_gatling', 'r_silo', 'r_cc'],
+    roles: { cc: 'r_cc', power: 'r_power', supply: 'r_supply', barracks: 'r_barracks', factory: 'r_factory', airfield: 'r_airfield', shipyard: 'r_shipyard', defense: 'r_gatling', super: 'r_silo', builder: 'r_dozer', truck: 'r_truck', squad: 'r_conscript', scout: 'r_scout' },
+    aiArmy: ['r_conscript', 'r_tank', 'r_conscript', 'r_tank', 'r_inferno', 'r_overlord', 'r_mig'], aiNavy: ['r_corvette'],
     tree: [
       { id: 'r_redguard', tier: 1, name: 'Red Guard Training', desc: 'Infantry leave the Barracks as Veterans.', vetBuild: 'infantry' },
       { id: 'r_artyvet', tier: 1, name: 'Artillery Training', desc: 'Inferno Cannons are built as Veterans.', vetBuild: 'r_inferno' },
@@ -277,9 +314,9 @@ export const FACTIONS = {
     id: 'sandstorm', name: 'ISIS', doctrine: 'Guerrilla, stealth and salvage',
     blurb: 'No power grid. Vehicles upgrade from enemy wrecks, and Tunnel Networks move units across the map instantly.',
     hull: 0x9a7848, dark: 0x5e4a30, usesPower: false, salvage: true, ambush: ['s_rpg', 's_rpg', 's_guerrilla'],
-    build: ['s_barracks', 's_supply', 's_factory', 's_stinger', 's_tunnel', 's_market', 's_scud', 's_cc'],
-    roles: { cc: 's_cc', supply: 's_supply', barracks: 's_barracks', factory: 's_factory', defense: 's_stinger', tunnel: 's_tunnel', income: 's_market', super: 's_scud', builder: 's_worker', truck: 's_truck', squad: 's_guerrilla', scout: 's_technical' },
-    aiArmy: ['s_guerrilla', 's_technical', 's_rpg', 's_scorpion', 's_technical', 's_buggy', 's_tractor'],
+    build: ['s_barracks', 's_supply', 's_factory', 's_shipyard', 's_stinger', 's_tunnel', 's_market', 's_scud', 's_cc'],
+    roles: { cc: 's_cc', supply: 's_supply', barracks: 's_barracks', factory: 's_factory', shipyard: 's_shipyard', defense: 's_stinger', tunnel: 's_tunnel', income: 's_market', super: 's_scud', builder: 's_worker', truck: 's_truck', squad: 's_guerrilla', scout: 's_technical' },
+    aiArmy: ['s_guerrilla', 's_technical', 's_rpg', 's_scorpion', 's_technical', 's_buggy', 's_tractor'], aiNavy: ['s_mboat', 's_dboat', 's_dboat'],
     tree: [
       { id: 's_scrap', tier: 1, name: 'Scrap Mastery', desc: 'New vehicles start with one salvage upgrade.', flag: 'scrap' },
       { id: 's_saboteur', tier: 1, name: 'Saboteur Cell', desc: 'Unlocks the Saboteur at the Barracks.', unlock: 's_saboteur' },
@@ -308,7 +345,7 @@ export function trainerOf(type) {
 //   trains / upgrades   { building: [ids] } added to that building's lists
 //   swap                { power: replacement } in the promotion tree
 //   amph                infantry and units flagged `amph` cross water
-//   spy                 metres of permanent vision around every enemy building
+//   spy                 metres of permanent vision around enemy buildings; spyFrom: seconds before it starts; spySeen: only buildings already found
 //   grant               promotions owned from the start;  hack: overrides for Cash Hack
 //   discount            { infantry, tank } cost multipliers
 //   cloak               every infantry squad and light vehicle hides when it stands still
@@ -316,10 +353,10 @@ export function trainerOf(type) {
 export const GENERALS = {
   airforce: { faction: 'vanguard', name: 'General Drudgereport.com', title: 'Air Force General', desc: 'F-15E Strike Eagles with bunker-buster bombs, a Stealth Comanche upgrade, and a B-2 carpet bomb in place of the A-10 run.',
     trains: { v_airfield: ['v_f15'] }, upgrades: { v_airfield: ['v_stealthrotor'] }, swap: { a10: 'b2' } },
-  marine: { faction: 'vanguard', name: 'General Maddox', title: 'Marine Corps General', desc: 'Infantry and LAV-25s cross water. The LAV-25 fighting vehicle can add TOW missiles that smash tanks.',
-    trains: { v_factory: ['v_lav'] }, upgrades: { v_factory: ['v_tow'] }, amph: true },
-  cyber: { faction: 'redhammer', name: "Secretary Yuec'an Tsie Mie", title: 'Cyber General', desc: 'Always sees every enemy building and what stands next to it. Starts with Cash Hack (first use at 3:00), which steals more and recharges faster. Infantry and tanks cost 12% more.',
-    spy: 18, grant: ['r_hack'], hack: { amount: 2000, cd: 180 }, discount: { infantry: 1.12, tank: 1.12 } },
+  marine: { faction: 'vanguard', name: 'General Maddox', title: 'Marine Corps General', desc: 'Infantry and LAV-25s cross water. Adds the LAV-25 (TOW missile upgrade), SEAL Teams at the Barracks and the Mk V Combat Boat at the Naval Yard.',
+    trains: { v_factory: ['v_lav'], v_barracks: ['v_seal'], v_shipyard: ['v_mkv'] }, upgrades: { v_factory: ['v_tow'] }, amph: true },
+  cyber: { faction: 'redhammer', name: "Secretary Yuec'an Tsie Mie", title: 'Cyber General', desc: 'From 5:00 on, keeps a permanent watch on every enemy building you have found, and on what stands next to it. Starts with Cash Hack (first use at 3:00), which steals more and recharges faster. Infantry and tanks cost 12% more.',
+    spy: 18, spyFrom: 300, spySeen: true, grant: ['r_hack'], hack: { amount: 2000, cd: 180 }, discount: { infantry: 1.12, tank: 1.12 } },
   mass: { faction: 'redhammer', name: 'General Tsao, Chicken', title: 'Mass Assault General', desc: 'Tanks and infantry cost 8% less.',
     discount: { infantry: 0.92, tank: 0.92 } },
   stealth: { faction: 'sandstorm', name: 'EWSAMA BEN ALLADIN', title: 'Stealth General', desc: 'Infantry and light vehicles vanish when they stand still. Adds Suicide Bombers that charge and break tanks, and FPV Attack Drones that dive on infantry, light vehicles and helicopters.',

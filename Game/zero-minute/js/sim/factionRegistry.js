@@ -26,7 +26,7 @@ export const WEAPONS = {
   tow:         { range: 46, dmg: 170, cd: 110, kind: 'missile', speed: 60, intercept: true, vs: { inf: 0.2, light: 1, heavy: 1.9, bldg: 0.9 } },      // TOW upgrade: built to kill tanks
   vest:        { range: 2.6, dmg: 1, cd: 999, kind: 'hitscan', vs: { inf: 1, light: 1, heavy: 1, bldg: 1 } },                                        // suicide units: reaching this range triggers the blast
   fpv_dive:    { range: 9, dmg: 1, cd: 999, kind: 'hitscan', noJets: true, vs: { inf: 1, light: 1, heavy: 0.4, bldg: 0.3, air: 1 } },                 // FPV drone: inside this range it dives; helicopters yes, jets in flight no
-  scud_missile: { range: 120, dmg: 320, cd: 400, kind: 'shell', speed: 55, arc: 36, windup: 40, splash: 10, hazard: { kind: 'toxin', r: 7, secs: 10, dps: 16 }, vs: { inf: 1, light: 1, heavy: 0.7, bldg: 1.1 } },
+  scud_missile: { range: 120, dmg: 320, cd: 240, kind: 'shell', speed: 55, arc: 36, windup: 40, splash: 10, hazard: { kind: 'toxin', r: 7, secs: 10, dps: 16 }, vs: { inf: 1, light: 1, heavy: 0.7, bldg: 1.1 } },
   raptor_missile: { range: 46, dmg: 80, cd: 20, kind: 'missile', speed: 95, burst: 2, burstGap: 4, intercept: true, splash: 4, vs: { inf: 0.5, light: 0.9, heavy: 0.8, bldg: 0.6, air: 1.6 } },   // F-22: four per sortie, best against aircraft
   mig_missile: { range: 44, dmg: 110, cd: 20, kind: 'missile', speed: 90, burst: 2, burstGap: 4, intercept: true, splash: 5, hazard: { kind: 'fire', r: 4.5, secs: 4, dps: 16 }, vs: { inf: 0.8, light: 1, heavy: 1, bldg: 1 } },
   tech_mg:     { range: 30, dmg: 6,  cd: 4,  kind: 'hitscan', vs: { inf: 1, light: 0.6, heavy: 0.12, bldg: 0.12, air: 0.6 } },
@@ -35,6 +35,14 @@ export const WEAPONS = {
   toxin_shell: { range: 34, dmg: 42, cd: 46, kind: 'shell', speed: 100, hazard: { kind: 'toxin', r: 3.5, secs: 3, dps: 12 }, vs: { inf: 1, light: 1, heavy: 0.85, bldg: 0.8 } },
   scorp_rocket:{ range: 40, dmg: 60, cd: 110, kind: 'rocket', speed: 50, intercept: true, vs: { inf: 0.2, light: 1, heavy: 1.5, bldg: 1 } },
   toxin_spray: { range: 18, dmg: 7,  cd: 2,  kind: 'spray', clearsGarrison: true, vs: { inf: 1.25, light: 0.4, heavy: 0.05, bldg: 0.08 } },
+  // ---- hero weapons. noJets: cannot hit a strike aircraft in flight. noBased: cannot be used on strike aircraft at all.
+  m60:         { range: 34, dmg: 10, cd: 2,  kind: 'hitscan', noJets: true, vs: { inf: 1, light: 0.8, heavy: 0.3, bldg: 0.25, air: 0.9 } },                       // Disabled Vet, one hand
+  vet_rpg:     { range: 40, dmg: 70, cd: 30, kind: 'rocket', speed: 60, intercept: true, noJets: true, vs: { inf: 0.3, light: 1, heavy: 1.5, bldg: 1.1, air: 1.2 } }, // Disabled Vet, other hand
+  // Fook Mie's phone. Against a hero it does `dmg`; any other unit is recruited or made to resign, and the recharge
+  // then depends on what the unit cost: cost / perSec seconds, kept between minSec and maxSec (cd is the fallback).
+  phone:       { range: 42, dmg: 100, cd: 80, kind: 'hack', noJets: true, noBased: true, perSec: 150, minSec: 2, maxSec: 14, vs: { inf: 1, light: 1, heavy: 1, air: 1 } },
+  // The Phantom's call: one of three attacks at random (hijacked airliner, 10 s ambush, car bomb). Numbers in HERO_CALL.
+  phantom_call:{ range: 44, dmg: 1, cd: 200, kind: 'call', vs: { inf: 1, light: 1, heavy: 1, bldg: 1 } },
   // damage profiles for off-map strikes and lingering hazards (never equipped)
   a10gun:    { vs: { inf: 1, light: 1, heavy: 1, bldg: 0.4 } },      // 30 mm depleted-uranium burst
   a10rocket: { vs: { inf: 0.8, light: 1.2, heavy: 1, bldg: 0.6 } },   // armor-piercing rockets
@@ -48,6 +56,7 @@ export const WEAPONS = {
   toxin:     { vs: { inf: 1.3, light: 0.45 } },                          // gas: fast against infantry, a decent amount against light armor
   bombvest:  { vs: { inf: 0.7, light: 1, heavy: 1.7, bldg: 1.1 } },     // Suicide Bomber: shaped charge, built to break tanks
   fpvblast:  { vs: { inf: 1.2, light: 1.3, heavy: 0.35, bldg: 0.3, air: 1.2 } }, // FPV drone: small warhead for people, light vehicles and helicopters
+  airliner:  { vs: { inf: 1, light: 1, heavy: 0.8, bldg: 1.4 } },       // The Phantom's hijacked 737
   ac130gun:  { vs: { inf: 1, light: 0.7, heavy: 0.15, bldg: 0.1 } },    // AC-130 25 mm rotary cannon
   ac130shell:{ vs: { inf: 0.8, light: 1, heavy: 0.9, bldg: 1 } },       // AC-130 105 mm howitzer
 };
@@ -91,12 +100,12 @@ export const UNITS = {
   r_inferno:    { model: 'inferno', name: 'Inferno Cannon', faction: 'redhammer', cost: 850, secs: 12, hp: 240, speed: 7, turn: 1.6, radius: 1.9, cls: 1, sight: 30, armor: 'light', weapon: 'inferno', thermo: true },
   r_mig:        { model: 'j11', name: 'J-11 Fighter', faction: 'redhammer', cost: 1200, secs: 12, hp: 200, speed: 34, turn: 2.2, radius: 2.4, cls: 1, sight: 40, armor: 'air',
                   weapon: 'mig_missile', air: true, alt: 20, fireMoving: true, based: true, ammo: 2, reload: 120, thermo: true },
-  r_hind:       { model: 'hind', name: 'Hind Gunship', faction: 'redhammer', cost: 1500, secs: 14, hp: 340, speed: 14, turn: 2.2, radius: 2.4, cls: 1, sight: 42, armor: 'air',
+  r_hind:       { model: 'z10', name: 'Z-10 Gunship', faction: 'redhammer', cost: 1500, secs: 14, hp: 340, speed: 14, turn: 2.2, radius: 2.4, cls: 1, sight: 42, armor: 'air',
                   weapon: 'chaingun', weapon2: 'heli_rocket', turret: 5, air: true, alt: 13, fireMoving: true, heli: true },
   // ---- general-only units (see GENERALS)
   v_f15:        { model: 'f15e', name: 'F-15E Strike Eagle', faction: 'vanguard', cost: 1600, secs: 13, hp: 240, speed: 34, turn: 2.1, radius: 2.5, cls: 1, sight: 40, armor: 'air',
                   weapon: 'bunker_bomb', air: true, alt: 20, fireMoving: true, based: true, ammo: 2, reload: 130 },
-  v_lav:        { model: 'lav25', name: 'LAV-25', faction: 'vanguard', cost: 850, secs: 9, hp: 340, speed: 13, turn: 2.8, radius: 2.0, cls: 1, sight: 34, armor: 'light',
+  v_lav:        { model: 'lav25', name: 'LAV-25', faction: 'vanguard', cost: 800, secs: 9, hp: 380, speed: 13, turn: 2.8, radius: 2.0, cls: 1, sight: 34, armor: 'light',
                   weapon: 'lav_gun', upWeapon: { v_tow: 'tow' }, turret: 4, fireMoving: true, amph: true },
   s_bomber:     { model: 'bomber', name: 'Suicide Bomber', faction: 'sandstorm', cost: 300, secs: 5, hp: 70, speed: 9.5, turn: 9, radius: 0.8, cls: 0, sight: 26, armor: 'inf',
                   weapon: 'vest', infantry: true, stealth: 'still', suicide: { r: 7, dmg: 270, w: 'bombvest', charge: { r: 24, mult: 1.6 } } },   // sprints the last 24 m
@@ -104,6 +113,15 @@ export const UNITS = {
                   weapon: 'fpv_dive', air: true, alt: 8, fireMoving: true, suicide: { r: 5, dmg: 210, w: 'fpvblast', dive: true } },
   s_scudtruck:  { model: 'scudtel', name: 'Scud Launcher', faction: 'sandstorm', cost: 1500, secs: 16, hp: 260, speed: 7, turn: 1.4, radius: 2.8, cls: 1, sight: 30, armor: 'light',
                   weapon: 'scud_missile' },
+  // ---- heroes: trained at the Barracks, one alive per side, always cloaked (also while moving)
+  v_hero:       { model: 'vet', name: 'Disabled Vet', faction: 'vanguard', cost: 2500, secs: 20, hp: 400, speed: 7, turn: 9, radius: 0.9, cls: 0, sight: 40, armor: 'inf',
+                  weapon: 'm60', weapon2: 'vet_rpg', infantry: true, hero: true, stealth: 'always', needs: 'v_factory' },
+  r_hero:       { model: 'fookmie', name: 'Fook Mie', faction: 'redhammer', cost: 2500, secs: 20, hp: 300, speed: 7, turn: 9, radius: 0.9, cls: 0, sight: 42, armor: 'inf',
+                  weapon: 'phone', infantry: true, hero: true, stealth: 'always', needs: 'r_factory', modes: ['recruit', 'resign'] },
+  s_hero:       { model: 'phantom', name: 'The Phantom', faction: 'sandstorm', cost: 2500, secs: 20, hp: 200, speed: 7, turn: 9, radius: 0.9, cls: 0, sight: 46, armor: 'inf',
+                  weapon: 'phantom_call', infantry: true, hero: true, stealth: 'always', needs: 's_factory' },
+  s_carbomb:    { model: 'car', name: 'Car Bomb', faction: 'sandstorm', cost: 400, secs: 1, hp: 120, speed: 20, turn: 3.2, radius: 1.6, cls: 1, sight: 20, armor: 'light',
+                  weapon: 'vest', suicide: { r: 8, dmg: 350, w: 'bombvest' } },   // only ever called in by The Phantom
   // ---- Sandstorm Front
   s_worker:     { model: 'worker', name: 'Worker', faction: 'sandstorm', cost: 250, secs: 4, hp: 110, speed: 6.5, turn: 9, radius: 0.9, cls: 0, sight: 28, armor: 'inf', infantry: true, builder: true },
   s_truck:      { ...TRUCK, name: 'Supply Pickup', faction: 'sandstorm' },
@@ -126,30 +144,37 @@ const SUPPLY  = { model: 'supply', role: 'supply', cost: 1500, secs: 10, hp: 150
 const BARRACKS= { model: 'barracks', role: 'barracks', cost: 500, secs: 8, hp: 1000, w: 6, h: 6, power: 0, sight: 28 };
 // repair: vehicles within this many metres of the footprint are repaired while out of combat
 const FACTORY = { model: 'factory', role: 'factory', cost: 2000, secs: 14, hp: 2000, w: 8, h: 8, power: -1, sight: 28, repair: 12 };
-// 40 m x 28 m: four parking pads and a helipad down the middle, a 36 m runway on each side.
+// 40 m x 28 m. Two 36 m runways side by side along the south half; hangars, parking spots and the helipad to the north.
+// `layout` is in metres from the building's centre (x east, z south): `spots` are where jets park, each in front of
+// the door of its hangar (`hangars`: position and the way the door faces), so parked jets stay in view from above.
 const AIRFIELD= { model: 'airfield', role: 'airfield', cost: 1800, secs: 14, hp: 2000, w: 20, h: 14, power: -1, sight: 30, pads: 4, runway: true };
+const RUNWAYS = [4, 10.4];
+const US_FIELD = { runways: RUNWAYS, helipad: [14.2, -8.6], tower: [9.4, -12],          // two hangars on the left, two along the top
+  hangars: [[-16.5, -10.5, 'e'], [-16.5, -3.6, 'e'], [-2.6, -10.5, 's'], [4.4, -10.5, 's']], spots: [[-10.4, -10.5], [-10.4, -3.6], [-2.6, -4], [4.4, -4]] };
+const CN_FIELD = { runways: RUNWAYS, helipad: [14.4, -8.6], tower: [-18.4, -3],          // four hangars along the top
+  hangars: [[-14.4, -10.5, 's'], [-7.4, -10.5, 's'], [-0.4, -10.5, 's'], [6.6, -10.5, 's']], spots: [[-14.4, -4], [-7.4, -4], [-0.4, -4], [6.6, -4]] };
 
 export const BLDGS = {
   v_cc:       { ...CC, name: 'Command Center', faction: 'vanguard', trains: ['v_dozer', 'v_drone'] },
   v_power:    { ...POWER, name: 'Cold Fusion Reactor', faction: 'vanguard' },
   v_supply:   { ...SUPPLY, name: 'Supply Center', faction: 'vanguard', trains: ['v_chinook'], needs: 'v_power' },
-  v_barracks: { ...BARRACKS, name: 'Barracks', faction: 'vanguard', trains: ['v_ranger', 'v_pathfinder'] },
+  v_barracks: { ...BARRACKS, name: 'Barracks', faction: 'vanguard', trains: ['v_ranger', 'v_pathfinder', 'v_hero'] },
   v_factory:  { ...FACTORY, name: 'War Factory', faction: 'vanguard', trains: ['v_tank', 'v_avenger'], upgrades: ['v_pdl'], needs: 'v_supply' },
-  v_airfield: { ...AIRFIELD, name: 'Air Field', faction: 'vanguard', trains: ['v_raptor', 'v_comanche'], needs: 'v_factory' },
+  v_airfield: { ...AIRFIELD, layout: US_FIELD, name: 'Air Field', faction: 'vanguard', trains: ['v_raptor', 'v_comanche'], needs: 'v_factory' },
   v_patriot:  { model: 'patriot', role: 'defense', name: 'Patriot Battery', faction: 'vanguard', cost: 1000, secs: 8, hp: 1000, w: 4, h: 4, power: -3, sight: 50, weapon: 'patriot', turret: 3.0, detector: 30, needs: 'v_power' },
   v_uplink:   { model: 'uplink', role: 'income', name: 'Satellite Uplink', faction: 'vanguard', cost: 2500, secs: 20, hp: 1200, w: 6, h: 6, power: -3, sight: 30, income: { amt: 25, every: 40 }, needs: 'v_factory' },
 
   r_cc:       { ...CC, name: 'Command Center', faction: 'redhammer', trains: ['r_dozer', 'r_scout'] },
   r_power:    { ...POWER, name: 'Nuclear Reactor', faction: 'redhammer' },
   r_supply:   { ...SUPPLY, name: 'Supply Center', faction: 'redhammer', trains: ['r_truck'], needs: 'r_power' },
-  r_barracks: { ...BARRACKS, name: 'Barracks', faction: 'redhammer', trains: ['r_conscript', 'r_hacker'] },
+  r_barracks: { ...BARRACKS, name: 'Barracks', faction: 'redhammer', trains: ['r_conscript', 'r_hacker', 'r_hero'] },
   r_factory:  { ...FACTORY, name: 'War Factory', faction: 'redhammer', trains: ['r_tank', 'r_inferno', 'r_overlord'], upgrades: ['r_nuke', 'r_thermo'], needs: 'r_supply' },
-  r_airfield: { ...AIRFIELD, name: 'Airfield', faction: 'redhammer', trains: ['r_mig', 'r_hind'], needs: 'r_factory' },
+  r_airfield: { ...AIRFIELD, layout: CN_FIELD, name: 'Airfield', faction: 'redhammer', trains: ['r_mig', 'r_hind'], needs: 'r_factory' },
   r_gatling:  { model: 'gatling', role: 'defense', name: 'Gatling Tower', faction: 'redhammer', cost: 900, secs: 8, hp: 1100, w: 4, h: 4, power: -2, sight: 46, weapon: 'gatling', turret: 4.0, detector: 28, needs: 'r_power' },
 
   s_cc:       { ...CC, name: 'Command Hideout', faction: 'sandstorm', trains: ['s_worker'] },
   s_supply:   { ...SUPPLY, name: 'Supply Stash', faction: 'sandstorm', power: 0, trains: ['s_truck'] },
-  s_barracks: { ...BARRACKS, name: 'Barracks', faction: 'sandstorm', trains: ['s_guerrilla', 's_rpg', 's_saboteur'] },
+  s_barracks: { ...BARRACKS, name: 'Barracks', faction: 'sandstorm', trains: ['s_guerrilla', 's_rpg', 's_saboteur', 's_hero'] },
   s_factory:  { ...FACTORY, name: 'Arms Dealer', faction: 'sandstorm', power: 0, cost: 1500, trains: ['s_technical', 's_scorpion', 's_tractor', 's_buggy'], needs: 's_supply' },
   s_stinger:  { model: 'stinger', role: 'defense', name: 'Stinger Site', faction: 'sandstorm', cost: 900, secs: 8, hp: 900, w: 4, h: 4, power: 0, sight: 48, weapon: 'stinger', turret: 3.2, detector: 28, needs: 's_barracks' },
   s_tunnel:   { model: 'tunnel', role: 'tunnel', name: 'Tunnel Network', faction: 'sandstorm', cost: 800, secs: 8, hp: 1000, w: 4, h: 4, power: 0, sight: 32, tunnel: true, repair: 10, needs: 's_barracks' },
@@ -181,7 +206,6 @@ export const UPGRADES = {
 export const POWERS = {
   a10:     { name: 'A-10 Strafing Run', cd: 150, radius: 24, shape: 'line', desc: 'A-10 dives in: a 30 mm cannon burst along a 48 m line, then six armor-piercing rockets.',
              gun: { dmg: 80, r: 4.5, step: 3.5 }, rockets: { n: 6, dmg: 270, r: 7, flight: 16, seek: 7 } },
-  emp:     { name: 'EMP Pulse Bomb', cd: 210, radius: 22, desc: 'Disables enemy vehicles and defenses in the area for 12 s.' },
   barrage: { name: 'Artillery Barrage', cd: 150, radius: 16, desc: '12 high-explosive shells fall on the target zone.' },
   fab:     { name: 'Fuel-Air Bomb', cd: 240, radius: 24, desc: 'Massive shockwave, then lingering heat that burns infantry, including garrisons.' },
   ambush:  { name: 'Ambush Squad', cd: 180, radius: 8, desc: '6 stealthed guerrillas appear at the target.' },
@@ -197,6 +221,15 @@ export const POWERS = {
   nuke:     { name: 'Nuclear Missile', cd: 210, radius: 34, super: 'r_silo', flight: 120, dmg: 1400, fallout: { r: 20, secs: 12, dps: 40 }, desc: 'One warhead. Levels everything within 34 m and leaves fallout.' },
   scud:     { name: 'Scud Storm', cd: 210, radius: 24, super: 's_scud', n: 9, dmg: 280, r: 9, toxin: { r: 7, secs: 10, dps: 18 }, desc: 'Nine toxin-tipped missiles rain over a 24 m zone.' },
 };
+
+// The Phantom's three calls. airliner: metres per tick, start distance, blast. ambush: squads that fight for `secs` then vanish.
+// car: a Car Bomb unit appears `from` metres short of the target and drives in; it vanishes if it has not hit after `secs`.
+export const HERO_CALL = {
+  airliner: { speed: 3.2, lead: 220, alt: 70, r: 14, dmg: 600, fire: { r: 8, secs: 5, dps: 16 } },
+  ambush: { units: ['s_guerrilla', 's_rpg', 's_guerrilla', 's_rpg'], secs: 10 },
+  car: { unit: 's_carbomb', from: 30, secs: 15 },
+};
+export const RESIGN_TICKS = 60;   // a unit Fook Mie talks into resigning stands idle this long, then is gone
 
 // ---------------------------------------------------------------- general
 export const GENERAL = { rankXp: [0, 200, 500, 1000, 1700], dmgXp: 0.05, killXp: 0.1 };
@@ -219,7 +252,6 @@ export const FACTIONS = {
       { id: 'v_a10', tier: 3, name: 'A-10 Strafing Run', desc: POWERS.a10.desc, power: 'a10' },
       { id: 'v_para', tier: 3, req: 'v_pathfinder', name: 'Paratrooper Drop', desc: POWERS.paradrop.desc, power: 'paradrop' },
       { id: 'v_fastpdl', tier: 3, req: 'v_vet', name: 'Rapid Point Defense', desc: 'Point-defense lasers recharge 40% faster.', flag: 'fastPdl' },
-      { id: 'v_emp', tier: 5, req: 'v_a10', name: 'EMP Pulse Bomb', desc: POWERS.emp.desc, power: 'emp' },
       { id: 'v_ac130', tier: 5, req: 'v_para', name: 'AC-130 Gunship', desc: POWERS.ac130.desc, power: 'ac130' },
       { id: 'v_a10x2', tier: 5, req: 'v_a10', name: 'A-10 Wingman', desc: 'A second A-10 follows the first.', flag: 'a10x2' },
     ],

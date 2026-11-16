@@ -129,6 +129,8 @@ export class Controls {
       }
       else if (t.type === 'civ' && !t.ruined) give((u, d) => d.canGarrison, { t: 'garrison', target: t.id }, '#4aa3ff');
       else if (t.type === 'dock' || (td && td.role === 'supply' && t.team === PLAYER && t.done)) give((u, d) => d.harvester, { t: 'harvest', target: t.id }, '#f2a93b');
+      else if (td && td.pads && t.team === PLAYER && t.done) { give((u, d) => d.heli, { t: 'landrepair', target: t.id }, '#7dffa0'); give((u, d) => d.based, { t: 'rtb' }, '#7dffa0'); }   // aircraft: home for repairs
+      else if (td && td.repair && !td.tunnel && t.team === PLAYER && t.done) give((u) => u.cls === 1 && !u.air, { t: 'repairat', target: t.id }, '#7dffa0');                                 // vehicles: to the repair bay
       else if (td && td.tunnel && t.team === PLAYER && t.done) give((u) => !u.air, { t: 'tunnel', target: t.id }, '#c9a26b');
       else if (t.kind === 'unit' && t.team === PLAYER && capacityOf(t)) give((u, d) => d.canGarrison && u !== t, { t: 'garrison', target: t.id }, '#4aa3ff');
       if (t.kind === 'bldg' && t.team === PLAYER && td.faction && (!t.done || t.hp < t.maxHp)) give((u, d) => d.builder, { t: 'construct', target: t.id }, '#f2a93b');

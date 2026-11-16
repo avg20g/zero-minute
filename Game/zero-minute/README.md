@@ -11,7 +11,8 @@ deterministic replays.
 ## Run locally
 ES modules need a web server (opening the file directly will not work):
 
-    python3 -m http.server 8000      # then open http://localhost:8000/play.html
+    python3 serve.py                 # then open http://localhost:8010/play.html
+                                     # (serve.py is http.server with caching off, so a refresh always shows the newest files)
 
 `play.html` is the standalone page. `index.html` is the same page without the
 document wrapper, used for the hosted version.
@@ -91,7 +92,7 @@ guard and promotions, so attack-move is F and guard is V.
 - **Airfield** (Vanguard and Red Hammer, 36 m x 20 m): four parking pads, a 32 m runway and a helipad.
   Strike fighters (Raptor, MiG) taxi to the runway, line up, roll, lift off past the 55% mark, fly the
   sortie, then fly an approach, land, roll out and taxi back to re-arm. One aircraft uses the runway
-  at a time; others hold on the pad or orbit the approach fix. Helicopters (Comanche, Hind) start on
+  at a time; others hold on the pad or orbit the approach fix. Helicopters (Comanche, Z-10) start on
   the helipad, spool up and climb straight up. Layout lives in `sim/entities.js` (`b.pads`, `b.rw`,
   `b.heli`) and must match `airfield()` in `render/models.js`. State machine: `sim/air.js`.
 - **Map builder** (lobby, "Open map builder"): rock plateaus, ramps, roads, Supply Docks, Oil Derricks,
@@ -187,7 +188,7 @@ guard and promotions, so attack-move is F and guard is V.
 ## Batch 9: play notes
 Changes asked for after the first play session.
 - **Friendly fire** (lobby rule, on by default; `friendlyFire` in the match setup): explosions, gas and fire also hurt
-  the side that made them. The unit that fired is spared; direct fire, flashbangs and EMP are unchanged. The AI counts
+  the side that made them. The unit that fired is spared; direct fire and flashbangs are unchanged. The AI counts
   its own troops under a blast against a target before using a power.
 - **Superweapons**: build as many as you can pay for and power. Each building has its own countdown
   (`b.superReady`), now 3:30 instead of 5:00, and the HUD shows the earliest one and how many you have.
@@ -210,6 +211,35 @@ Changes asked for after the first play session.
   infantry, light vehicles and helicopters. The Suicide Bomber is hidden whenever it stands still, sprints the last
   24 m, and is strong against tanks. Both die in their own blast.
 - Tests: `node test/batch9.mjs` (64 checks).
+
+## Batch 10: heroes and second play notes
+- **Fixed**: the game crashed whenever a superweapon finished building (a helper the HUD message used was out of
+  reach). `test/batch10.mjs` guards it, and the browser check now pushes every game event through the HUD, view and
+  audio handlers.
+- **Fresh files every time**: `serve.py` replaces `python3 -m http.server`. It sends `Cache-Control: no-store`, and
+  it listens on port **8010**: browsers kept serving day-old copies of files stored under port 8000.
+- **Heroes** (one alive per side, Barracks, $2,500, needs the War Factory / Arms Dealer; always cloaked, also on the
+  move; seen for 2 s after firing, by any enemy unit within 7 m, and by base defenses):
+  - *Disabled Vet* (United States): M60 and RPG fired together; everything except jets in flight.
+  - *Fook Mie* (China): her phone recruits an enemy unit or makes it resign (command-card switch). Recharge is the
+    unit's cost / 150 seconds, between 2 and 14. Not buildings, not jets; an enemy hero takes damage instead.
+  - *The Phantom* (ISIS): every 10 s one of three attacks picked by the match RNG: a hijacked airliner, a four-squad
+    ambush that lasts 10 s, or a car bomb. Code: `js/sim/heroes.js`; numbers: `HERO_CALL` in the registry.
+  - The AI trains its hero once it has an army, sends it with an attack when one is under way, and otherwise lets
+    it hunt alone from what it has seen (`heroPlay` in `js/sim/aiController.js`).
+- **Force attack for suicide units**: the Suicide Bomber and FPV drone now take force-attack orders (ground, any
+  unit, any building). In Sandbox that is the only way to use them, and it was refused before.
+- **Repair**: a parked jet is repaired on its pad. Right-click your airfield: jets return to base, helicopters land
+  on that helipad. Right-click your War Factory: vehicles drive to its repair bay.
+- **Airfields**: layout is data (`layout` on the building in the registry). United States: two hangars on the left,
+  two along the top. China: four along the top. Runways are side by side in the south half; jets park in front of
+  their hangar doors.
+- **Models**: C-130 / AC-130 rebuilt from the real aircraft's measurements (`HERCULES`), with turning propellers;
+  paratroopers come down under canopies from the C-130; the Hind is now the Z-10 (`Z10`); a plain airliner and a
+  civilian car for The Phantom.
+- **Removed**: the EMP Pulse Bomb. **Changed**: Scud Launcher reload 20 s to 12 s; the Scud Storm fires straight up.
+- **Not done, by request**: no new hotkeys.
+- Tests: `node test/batch10.mjs` (67 checks).
 
 ## Replays
 A replay is the match setup plus the player's commands with their tick numbers
@@ -239,6 +269,7 @@ Node (simulation only):
     node test/batch7.mjs      garrison size and exit, powers light fog and wreck buildings
     node test/balance.mjs     balance harness: six fixed matches repeat exactly, report is well formed
     node test/batch9.mjs      friendly fire, many superweapons, AC-130, drone loiter, garrisons, FPV, bomber
+    node test/batch10.mjs     heroes, AI hero use, force attack for suicide units, repair orders, airfields
     node test/bench.mjs       simulation speed benchmark
     node test/addon.mjs       superweapons, No-Superweapons rule, new powers,
                               King of the Hill, AI use of all of them

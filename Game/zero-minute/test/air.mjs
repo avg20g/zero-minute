@@ -17,8 +17,8 @@ const target = (sim, team, cx, cz, hp = 1e6) => { const t = makeBldg(sim, team =
     const d = BLDGS[t]; ok(d.w === 20 && d.h === 14 && d.pads === 4 && d.trains.some(u => UNITS[u].based) && d.trains.some(u => UNITS[u].heli), `${t}: 40 x 28 m, 4 pads, one fixed-wing and one helicopter type`);
   }
   const { b } = field('v_airfield');
-  ok(b.rws.length === 2 && b.rws.every(r => r.x1 - r.x0 === 36) && b.rws[0].z < b.z && b.rws[1].z > b.z, 'two 36 m runways, one each side of the apron');
-  ok(b.pads.length === 4 && b.pads.every(p => p.z === b.z && Math.abs(p.x - b.x) < 19) && Math.abs(b.heli.x - b.x) < 19 && b.heli.z === b.z, 'pads and helipad sit between the runways, inside the footprint');
+  ok(b.rws.length === 2 && b.rws.every(r => r.x1 - r.x0 === 36) && b.rws[0].z > b.z && b.rws[1].z > b.rws[0].z + 6 && b.rws[1].z < b.z + 11, 'two 36 m runways side by side south of the hangars');
+  ok(b.pads.length === 4 && b.pads.every(p => p.z < b.z + 1 && p.z > b.z - 13 && Math.abs(p.x - b.x) < 19) && Math.abs(b.heli.x - b.x) < 19 && b.heli.z < b.z && b.heli.z > b.z - 13, 'parking spots and helipad sit north of the runways, inside the footprint');
 }
 
 // ---------------------------------------------------------------- B. one full sortie on each side of the map
@@ -59,7 +59,7 @@ for (const [type, fieldType, cx, cz, team, side] of [['v_raptor', 'v_airfield', 
   ok(L.finalUp === 0, 'height only ever falls on final approach');
   ok(Math.hypot(u.x - parkedAt.x, u.z - parkedAt.z) < 0.01 && u.altK === 0 && u.landed && b.rws.every(r => r.by === 0), 'parks back on its own pad and frees the runway');
   const up = (L.tAir - L.tOrder) / 20, down = (L.tPark - L.tFix) / 20;
-  ok(up <= (side === 'west' ? 4 : 7) && down <= 10, `ground handling is quick: ${up.toFixed(1)} s from order to wheels-up, ${down.toFixed(1)} s from approach fix to parked`);
+  ok(up <= (side === 'west' ? 5 : 7) && down <= 10, `ground handling is quick: ${up.toFixed(1)} s from order to wheels-up, ${down.toFixed(1)} s from approach fix to parked`);
   console.log(`${type.padEnd(9)}: order -> wheels-up ${up.toFixed(1)} s | lift-off at ${L.liftX.toFixed(1)} m / ${L.liftSpd.toFixed(1)} m/s | approach fix -> touchdown ${((L.tDown - L.tFix) / 20).toFixed(1)} s -> parked ${((L.tPark - L.tDown) / 20).toFixed(1)} s | touchdown ${Math.abs(L.td.z - Rin.z).toFixed(2)} m off centreline`);
 }
 

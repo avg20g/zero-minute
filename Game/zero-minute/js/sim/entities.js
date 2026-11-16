@@ -17,7 +17,8 @@ export function makeUnit(sim, type, team, x, z, facing = 0) {
     // phase 2
     xp: 0, vet: 0, tier: 0, addon: null, addonQ: null, garrison: null,
     stealthMode: d.stealth || null, cloaked: false, detected: false, revealUntil: 0, stillT: 0,
-    empUntil: 0, emp: false, deployed: false, cashAcc: 0, horde: false, pdlCd: 0, capT: 0, windup: 0, dive: 0, charging: false,
+    deployed: false, cashAcc: 0, horde: false, pdlCd: 0, capT: 0, windup: 0, dive: 0, charging: false,
+    mode: d.modes ? d.modes[0] : null, inert: false, expires: 0, temp: false,   // hero ability mode; resigned (takes no part, about to leave); tick it vanishes; called-in unit that leaves no wreck or score
     ammo: d.ammo || 0, as: d.based ? 'parked' : null, home: 0, pad: -1, rw: -1, loiterT: 0, loiterO: null, extend: 0, appr: 0, wps: null, hb: 0, hoverLow: false, landed: false, reloadT: 0,
     altK: d.air && !d.based ? 1 : 0, paltK: d.air && !d.based ? 1 : 0, // height as a fraction of cruise altitude (see air.js)
   };
@@ -58,7 +59,7 @@ export function makeBldg(sim, type, team, cx, cz, done = true) {
     garrison: [], supplies: 0, maxSupplies: 0, ruined: false, seen: [false, false],
     target: 0, cds: [0, 0, 0], bursts: [0, 0, 0], burstCd: [0, 0, 0], wslots: null, slots: null, holds: null, variant: 0,
     lastHit: -999, lastZone: 0, lastFire: -999, vet: 0, horde: false,
-    disabledUntil: 0, empUntil: 0, offline: false, capBy: 0, capT: 0, capXp: [false, false], pads: null,
+    disabledUntil: 0, offline: false, capBy: 0, capT: 0, capXp: [false, false], pads: null,
     superReady: 0, superCd: 0, superShot: -1e9,   // superweapon buildings: tick it can fire, length of its countdown, tick it last fired
   };
   b.px = b.x; b.pz = b.z;
@@ -74,9 +75,10 @@ export function makeBldg(sim, type, team, cx, cz, done = true) {
     const R = Math.hypot(d.w, d.h) * CELL * 0.5 + 9;
     for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6 + 0.26; b.holds.push({ x: b.x + Math.cos(a) * R, z: b.z + Math.sin(a) * R, by: 0 }); }
   }
-  if (d.pads) { // airfield layout (metres from the centre): parking pads in a row down the middle, helipad at the east end, one runway north and one south
-    b.pads = []; for (let i = 0; i < d.pads; i++) b.pads.push({ x: b.x - 14 + i * 7, z: b.z, by: 0 });
-    b.rws = [-10, 10].map(oz => ({ x0: b.x - 18, x1: b.x + 18, z: b.z + oz, by: 0 })); b.heli = { x: b.x + 15.5, z: b.z };
+  if (d.pads) { // airfield: parking spots, runways and helipad come from the building's layout in the registry (metres from the centre)
+    const L = d.layout;
+    b.pads = L.spots.map(([x, z]) => ({ x: b.x + x, z: b.z + z, by: 0 }));
+    b.rws = L.runways.map(oz => ({ x0: b.x - 18, x1: b.x + 18, z: b.z + oz, by: 0 })); b.heli = { x: b.x + L.helipad[0], z: b.z + L.helipad[1] };
   }
   sim.nav.setRect(cx, cz, d.w, d.h, 1);
   sim.ents.push(b); sim.byId.set(b.id, b);
@@ -232,7 +234,7 @@ export function kill(sim, e) {
     return;
   }
   e.dead = true; e.hp = 0;
-  if (e.team < 2) { // after-action report counters
+  if (e.team < 2 && !e.temp && !e.inert) { // after-action report counters (called-in units do not count; a resigned unit was counted when it resigned)
     const mine = sim.teams[e.team], foe = sim.teams[1 - e.team];
     if (e.kind === 'unit') { mine.unitsLost++; foe.unitsKilled++; } else if (BLDGS[e.type].faction) { mine.bldgsLost++; foe.bldgsKilled++; }
   }
@@ -243,12 +245,42 @@ export function kill(sim, e) {
     if (e.inB) { const b = sim.byId.get(e.inB); if (b) { b.garrison = b.garrison.filter(i => i !== e.id); if (!b.garrison.length && b.type === 'civ') b.team = NEUTRAL; } }
     if (e.home) { const b = sim.byId.get(e.home); if (b && b.pads && b.pads[e.pad] && b.pads[e.pad].by === e.id) b.pads[e.pad].by = 0; if (b && b.rws) for (const r of b.rws) if (r.by === e.id) r.by = 0; }
     // wrecks of ground vehicles become salvage when the other side can use it
-    if (e.cls === 1 && !e.air && e.team < 2 && FACTIONS[sim.teams[1 - e.team].faction].salvage)
+    if (e.cls === 1 && !e.air && e.team < 2 && !e.temp && FACTIONS[sim.teams[1 - e.team].faction].salvage)
       sim.crates.push({ id: sim.nextId++, x: e.x, z: e.z, until: sim.tick + 1800, team: 1 - e.team });
   } else {
     sim.nav.setRect(e.cx, e.cz, e.w, e.h, 0);
     if (e.slots) { for (const s of e.slots) s.by = 0; markBays(sim, e, 0); }
   }
+}
+
+// Take a unit off the map quietly: no explosion, wreck, salvage or scoreboard entry. Used when a called-in unit's
+// time is up and when a unit that resigned leaves.
+export function vanish(sim, u) {
+  if (u.dead) return;
+  u.dead = true; u.hp = 0;
+  releaseSlot(sim, u);
+  if (u.garrison) ejectGarrison(sim, u, 1);
+  if (u.inB) { const b = sim.byId.get(u.inB); if (b) { b.garrison = b.garrison.filter(i => i !== u.id); if (!b.garrison.length && b.type === 'civ') b.team = NEUTRAL; } }
+  freeAirSpots(sim, u);
+  sim.events.push({ t: 'vanish', x: u.x, z: u.z, team: u.team, id: u.id, inf: !!UNITS[u.type].infantry });
+}
+function freeAirSpots(sim, u) { // parking pad, runway and helipad claims
+  if (u.home) { const b = sim.byId.get(u.home); if (b && b.pads && b.pads[u.pad] && b.pads[u.pad].by === u.id) b.pads[u.pad].by = 0; if (b && b.rws) for (const r of b.rws) if (r.by === u.id) r.by = 0; }
+  if (UNITS[u.type].heli) for (const f of sim.ents) if (f.heli && f.heli.by === u.id) f.heli.by = 0;
+}
+// Hand a unit to the other side where it stands (Fook Mie's recruit). Everything tied to its old owner is dropped:
+// reservations, passengers, orders, target and cached weapon slots. The view rebuilds its model in the new colours.
+export function changeTeam(sim, u, team) {
+  releaseSlot(sim, u);
+  if (u.garrison && u.garrison.length) ejectGarrison(sim, u, 1);
+  freeAirSpots(sim, u);
+  const d = UNITS[u.type];
+  if (d.heli && u.landed) { u.as = 'spool'; u.reloadT = 0; } else if (d.heli) u.as = null;   // a helicopter sitting on the old owner's pad starts up and leaves
+  stopUnit(u);
+  u.team = team; u.order = null; u.target = 0; u.wps = null; u.wslots = null; u.working = false; u.still = false; u.deployed = false; u.capT = 0; u.addonQ = null;
+  u.charging = false; u.dive = 0; u.windup = 0; u.bursts[0] = u.bursts[1] = u.bursts[2] = 0; u.guardX = u.x; u.guardZ = u.z; u.horde = false;
+  u.cloaked = false; u.detected = false; u.revealUntil = sim.tick + 40;
+  if (d.harvester) { u.hs = 'seek'; u.timer = -1; u.dock = 0; u.center = 0; u.cargo = 0; u.hoverLow = false; }
 }
 
 // Take an unfinished building off the map without a wreck or a loss on the scoreboard (cancelled construction).

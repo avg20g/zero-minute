@@ -278,13 +278,6 @@ export class VFX {
     this.fire.spawn(x, y, z, 0, 0, 0, 0.08, 2.4 * size, 0, 1, 0.8, 0.4, 1, 0, 0); this.fire.spawn(x, y, z, 0, 0, 0, 0.05, 1.2 * size, 0, 1, 1, 0.9, 1, 0, 0);
     this.smoke.spawn(x + (r() - 0.5) * 0.4, y, z + (r() - 0.5) * 0.4, (r() - 0.5), 0.3, (r() - 0.5), 1.6 + r() * 1.2, 1.4 * size, 3.2 * size, g, g, g, 0.42, -0.1, 0.8);
   }
-  empBlast(x, z, R) {
-    const r = this.rnd, y = this.h(x, z);
-    this.shock(x, y + 0.7, z, R, 0.7, 0x66ccff); this.shock(x, y + 1.2, z, R * 0.6, 0.45, 0xbfeaff);
-    this.fire.spawn(x, y + 3, z, 0, 0, 0, 0.3, 26, 20, 0.6, 0.85, 1, 1, 0, 0);
-    for (let i = 0; i < 90; i++) { const a = r() * 6.283, d = Math.sqrt(r()) * R; this.fire.spawn(x + Math.cos(a) * d, y + 0.5 + r() * 3, z + Math.sin(a) * d, (r() - 0.5) * 8, r() * 8, (r() - 0.5) * 8, 0.3 + r() * 0.6, 0.5 + r() * 0.9, 0, 0.55, 0.85, 1, 1, 6, 1); }
-    this.flash(x, y + 8, z, 140, 0.35);
-  }
   spark(x, y, z, col = [0.55, 0.85, 1]) {
     const r = this.rnd;
     for (let i = 0; i < 3; i++) this.fire.spawn(x + (r() - 0.5) * 2, y + r() * 1.5, z + (r() - 0.5) * 2, (r() - 0.5) * 6, 2 + r() * 4, (r() - 0.5) * 6, 0.2 + r() * 0.25, 0.4, 0, col[0], col[1], col[2], 1, 14, 0.5);

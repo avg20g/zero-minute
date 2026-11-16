@@ -3,7 +3,7 @@
 // salvage crates, lingering hazards, passive income, tunnels, capture, sabotage.
 import { CELL, NEUTRAL } from './defs.js';
 import { UNITS, BLDGS, WEAPONS, FACTIONS, HORDE, VET, generalOf } from './factionRegistry.js';
-import { applyDamage, hurtGarrison, addGeneralXp, rectDist, releaseSlot, stopUnit, freeSpot } from './entities.js';
+import { applyDamage, hurtGarrison, addGeneralXp, rectDist, releaseSlot, stopUnit, freeSpot, vanish } from './entities.js';
 
 // ---------------- hazards (firestorm, thermal, toxin) ----------------
 export function addHazard(sim, kind, x, z, r, secs, dps, team, clears) {
@@ -76,7 +76,7 @@ export function stepUpkeep(sim) {
   for (const e of sim.ents) {
     if (e.dead) continue;
     if (e.kind === 'bldg') {
-      e.offline = e.disabledUntil > tick || e.empUntil > tick;
+      e.offline = e.disabledUntil > tick;
       const d = BLDGS[e.type];
       if (d.income && e.done && e.team < 2 && !e.offline && (tick + e.id) % d.income.every === 0) {
         const T = sim.teams[e.team];
@@ -84,8 +84,8 @@ export function stepUpkeep(sim) {
       }
       continue;
     }
+    if (e.expires && tick >= e.expires) { vanish(sim, e); continue; }   // a called-in unit's time is up, or a resigned unit leaves
     const d = UNITS[e.type], T = sim.teams[e.team];
-    e.emp = e.empUntil > tick;
     e.stillT = (e.spd < 0.2 && !e.path && !e.goal) ? e.stillT + 1 : 0;
     if (e.addonQ) { // hardpoint being fitted
       if (++e.addonQ.t >= d.hardpoints[e.addonQ.type].secs * 20) {
@@ -94,7 +94,7 @@ export function stepUpkeep(sim) {
         sim.events.push({ t: 'addon', id: e.id, team: e.team, type: e.addon });
       }
     }
-    if (e.deployed && !e.emp && (tick + e.id) % d.deploy.every === 0) {
+    if (e.deployed && (tick + e.id) % d.deploy.every === 0) {
       T.money += d.deploy.income; T.passive += d.deploy.income; e.cashAcc += d.deploy.income;
       if (e.cashAcc >= 30) { sim.events.push({ t: 'cash', x: e.x, z: e.z, amt: e.cashAcc, team: e.team, quiet: true }); e.cashAcc = 0; }
     }

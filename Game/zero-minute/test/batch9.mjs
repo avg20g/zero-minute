@@ -172,12 +172,12 @@ const hold = (u) => { u.order = { t: 'hold' }; u.cds = [1e9, 1e9, 1e9]; return u
   const s = bare({ factions: ['sandstorm', 'vanguard'], generals: ['wmd', null] }), sc = makeUnit(s, 's_scudtruck', PLAYER, 200, 200, 0), tg = makeBldg(s, 'v_barracks', ENEMY, 140, 100); s.nav.rebuild();
   makeUnit(s, 's_buggy', PLAYER, tg.x - 20, tg.z, 0).cds = [1e9, 1e9, 1e9]; run(s, 6); s.issue({ t: 'attack', ids: [sc.id], target: tg.id });
   const W = WEAPONS.scud_missile, t0 = s.tick; let fired = [], maxUp = 0; run(s, 900, (ev) => { maxUp = Math.max(maxUp, sc.windup); for (const e of ev) if (e.t === 'fire' && e.w === 'scud_missile') fired.push(s.tick - t0); });
-  ok(fired.length === 2 && fired[0] >= W.windup - 2 && fired[1] - fired[0] >= W.cd + W.windup - 2, `it raises the missile for ${(W.windup / 20).toFixed(0)} s before each launch and reloads for ${(W.cd / 20).toFixed(0)} s between them (launches at ${fired.map(t => (t / 20).toFixed(1)).join(' s and ')} s)`);
+  ok(fired.length >= 2 && fired[0] >= W.windup - 2 && fired[1] - fired[0] >= W.cd + W.windup - 2, `it raises the missile for ${(W.windup / 20).toFixed(0)} s before each launch and reloads for ${(W.cd / 20).toFixed(0)} s between them (launches at ${fired.map(t => (t / 20).toFixed(1)).join(' s and ')} s)`);
   ok(maxUp === W.windup - 1 && Math.hypot(sc.x - 200, sc.z - 200) < 2 && tg.hp < tg.maxHp, 'fires from where it stands and hits');
   const rig = MF.createModel({ kind: 'unit', type: 's_scudtruck', team: 0 });   // (the Scud Storm and silo models need a browser canvas; they are checked in the running game)
   ok(rig.arm && rig.round, 'model: the launcher erector and its missile are separate moving parts');
   ok(MF.createMissile('scud').body && MF.createMissile('nuke').body && MF.createPlane('ac130', 'vanguard', 0).body, 'models: Scud and nuclear missile in flight, AC-130');
-  console.log(`scud launcher  : launches at ${fired.map(t => (t / 20).toFixed(1)).join(' s, ')} s (2 s to raise, 20 s to reload)`);
+  console.log(`scud launcher  : launches at ${fired.map(t => (t / 20).toFixed(1)).join(' s, ')} s (2 s to raise, 12 s to reload)`);
 }
 
 console.log(fail ? `BATCH9: ${fail} FAILURES of ${pass + fail}` : `BATCH9: all ${pass} checks passed`);

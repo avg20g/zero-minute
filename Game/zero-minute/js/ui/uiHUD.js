@@ -7,6 +7,7 @@ import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS, GENERAL, VET, GENERALS, train
 import { heightAt, BIOMES } from '../sim/map.js';
 import { hasBldg, capacityOf } from '../sim/entities.js';
 import { strikeVisible, hasPower, superOf, superBldgs } from '../sim/powers.js';
+import { heroTaken } from '../sim/simulationTick.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
@@ -51,6 +52,7 @@ const iconFor = (d, isBldg) => {
 const TEAM_CSS = TEAM.css; // lobby colours: [you, enemy, neutral]
 const VET_CSS = ['', '#ffcf3a', '#5ac8ff', '#ff5a4d'];
 
+const mmss = (n) => Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0');   // seconds as m:ss (module scope: both the event handler and the frame update use it)
 export class Hud {
   constructor(sim, view, rig, controls, ui) {
     this.sim = sim; this.view = view; this.rig = rig; this.controls = controls; this.ui = ui;
@@ -111,6 +113,14 @@ export class Hud {
         case 'helipad': if (e.team === PLAYER) this.float(e.x, e.z, 4, 'REPAIRING', '#7dffa0'); break;
         // Superweapons are public: both sides are told when one comes online, where it is, and when it fires.
         case 'superbuilt': this.alert(e.x, e.z); this.toast(e.team === PLAYER ? POWERS[e.id].name + ' online. Ready in ' + mmss(e.secs) + '.' : 'WARNING: enemy ' + POWERS[e.id].name + ' detected. It fires in ' + mmss(e.secs) + '.', e.team === PLAYER ? '' : 'bad'); break;
+        case 'hack': {
+          if (e.k === 'hurt') break;
+          const nm = UNITS[e.type].name;
+          if (e.team === PLAYER) this.toast(e.k === 'recruit' ? 'Fook Mie recruited a ' + nm : nm + ' resigned');
+          else if (e.victim === PLAYER) { this.alert(e.tx, e.tz); this.toast(e.k === 'recruit' ? 'Your ' + nm + ' was recruited by Fook Mie' : 'Your ' + nm + ' resigned after a call from Fook Mie', 'bad'); }
+          break;
+        }
+        case 'phantom': if (e.team === PLAYER) this.toast('The Phantom called in ' + (e.k === 'airliner' ? 'a hijacked airliner' : e.k === 'ambush' ? 'an ambush' : 'a car bomb')); break;
         case 'superlaunch': if (e.team !== PLAYER) this.toast('WARNING: enemy ' + POWERS[e.id].name + ' launched', 'bad'); break;
         case 'cashhack': if (e.team === PLAYER) this.toast('Cash Hack: stole $' + fmt(e.amt)); else if (e.victim === PLAYER) { this.toast('Enemy hackers stole $' + fmt(e.amt), 'bad'); this.alert(e.x, e.z); } break;
         case 'hill': this.toast(e.owner === PLAYER ? 'You hold the hill' : e.owner === ENEMY ? 'The enemy holds the hill' : 'The hill is contested', e.owner === ENEMY ? 'bad' : e.owner === PLAYER ? '' : 'warn'); if (e.owner === ENEMY) this.ui.sfx && this.ui.sfx('klaxon'); break;
@@ -137,7 +147,6 @@ export class Hud {
         case 'sabotage': if (e.team === PLAYER) this.toast('Saboteur: ' + e.text); else if (e.victim === PLAYER) { this.toast('Enemy saboteur hit us: ' + e.text, 'bad'); this.alert(e.x, e.z); } break;
         case 'power': if (e.team === PLAYER) this.toast(POWERS[e.id].name + ' inbound'); break; // enemy strikes are not announced: you see them only where you have vision
         case 'cleared': if (fog.visAt(PLAYER, e.x, e.z)) this.float(e.x, e.z, 9, 'GARRISON CLEARED', '#f2a93b'); break;
-        case 'emp': if (e.team === PLAYER && e.n) this.toast(`EMP: ${e.n} enemy vehicles and defenses disabled`); break;
         case 'tunnel': break;
       }
     }
@@ -174,6 +183,7 @@ export class Hud {
       else if (act === 'land') ctl.landRepair();
       else if (act === 'cancelbuild') { for (const x of ctl.selectedOwn('bldg')) if (!x.done) sim.issue({ t: 'cancelbuild', id: x.id }); }
       else if (act === 'scatter') { if (units.length) { sim.issue({ t: 'scatter', ids: units.map(u => u.id) }); ui.sfx && ui.sfx('order'); } }
+      else if (act === 'heromode') sim.issue({ t: 'heromode', ids: units.filter(u => UNITS[u.type].modes).map(u => u.id) });
       else if (act === 'deploy') sim.issue({ t: 'deploy', ids: units.filter(u => UNITS[u.type].deploy).map(u => u.id) });
       else if (act === 'addon') { for (const u of units) if (UNITS[u.type].hardpoints && !u.addon && !u.addonQ) sim.issue({ t: 'addon', id: u.id, type: arg }); }
       else if (act === 'evac') ctl.evacuate(0);
@@ -259,9 +269,11 @@ export class Hud {
       out.push({ act: 'stop', icon: ICON.stop, name: 'Stop', key: 'Z' });
       out.push({ act: 'scatter', icon: ICON.scatter, name: 'Scatter', key: 'X' });
       if (units.some(u => UNITS[u.type].weapon)) { out.push({ act: 'amove', icon: ICON.amove, name: 'Attack-move', key: 'F', on: this.ui.amove && !this.ui.guard }); out.push({ act: 'guard', icon: ICON.guard, name: 'Guard area', key: 'V', on: this.ui.amove && !!this.ui.guard }); }
-      if (units.some(u => UNITS[u.type].weapon && !UNITS[u.type].suicide)) out.push({ act: 'force', icon: ICON.force, name: 'Force attack', key: 'T', on: !!this.ui.force, tip: 'Fire on any spot, unit or building, even your own. Shortcut: Ctrl + right-click.' });
+      if (units.some(u => UNITS[u.type].weapon)) out.push({ act: 'force', icon: ICON.force, name: 'Force attack', key: 'T', on: !!this.ui.force, tip: 'Fire on any spot, unit or building, even your own. Shortcut: Ctrl + right-click.' });
       out.push({ act: 'wp', icon: ICON.marker, name: 'Move markers', key: 'Shift', on: !!this.ui.wp, tip: 'While on, every right-click adds another point to the route. Shortcut: Shift + right-click.' });
       if (units.some(u => UNITS[u.type].heli)) out.push({ act: 'land', icon: ICON.land, name: 'Land & repair', key: 'L', tip: 'Fly to the nearest friendly helipad, land and repair.' });
+      const md = units.filter(u => UNITS[u.type].modes);   // a hero with a switchable ability (Fook Mie)
+      if (md.length) out.push({ act: 'heromode', icon: ICON.bolt, name: md[0].mode === 'resign' ? 'Phone: Resign' : 'Phone: Recruit', key: 'switch', on: md[0].mode === 'resign', tip: 'Recruit: the enemy unit she calls joins your side. Resign: it stands down and leaves the battle. Cheap units take about 2 s to recharge, the most expensive up to 14 s. Against a hero the call does damage instead.' });
       const dep = units.filter(u => UNITS[u.type].deploy);
       if (dep.length) out.push({ act: 'deploy', icon: ICON.income, name: dep.every(u => u.deployed) ? 'Pack up' : 'Deploy hack', key: '+$6/s', on: dep.every(u => u.deployed) });
       const ov = units.filter(u => UNITS[u.type].hardpoints && !u.addon && !u.addonQ);
@@ -278,8 +290,8 @@ export class Hud {
         for (const t of trainsOf(T, b.type)) {
           if (seen.has(t)) continue; seen.add(t);
           const d = UNITS[t]; let why = '';
-          if (d.promo && !T.promos.has(d.promo)) why = 'Needs promotion: ' + this.F.tree.find(n => n.id === d.promo).name; else if (T.money < unitCost(T, t)) why = 'Insufficient funds';
-          out.push({ act: 'train:' + t, icon: iconFor(d, false), name: d.name, cost: unitCost(T, t), why });
+          if (d.promo && !T.promos.has(d.promo)) why = 'Needs promotion: ' + this.F.tree.find(n => n.id === d.promo).name; else if (d.needs && !hasBldg(sim, PLAYER, d.needs)) why = 'Requires ' + BLDGS[d.needs].name; else if (d.hero && heroTaken(sim, PLAYER)) why = 'Only one hero at a time'; else if (T.money < unitCost(T, t)) why = 'Insufficient funds';
+          out.push({ act: 'train:' + t, icon: d.hero ? ICON.star : iconFor(d, false), name: d.name, cost: unitCost(T, t), why, tip: d.hero ? 'Hero. One at a time. Always cloaked; seen when it fires or when enemies or defenses are close.' : undefined });
         }
         for (const u of upgradesOf(T, b.type)) {
           if (seen.has(u) || T.upgrades.has(u)) continue; seen.add(u);
@@ -309,7 +321,6 @@ export class Hud {
       const d = UNITS[e.type];
       if (e.vet) out.push(VET.names[e.vet] + ' (+' + e.vet * 15 + '% HP and fire rate' + (e.vet >= 2 ? ', self-repair' : '') + ')');
       if (!mine) return out.join(' · ');
-      if (e.emp) out.push('DISABLED by EMP');
       if (e.cloaked) out.push(e.detected ? 'Cloak detected' : 'Cloaked'); else if (e.stealthMode === 'still') out.push('Cloaks when stationary');
       if (e.horde) out.push('Horde +' + (T.flags.hordePlus ? 25 : 15) + '% fire rate');
       if (d.salvage) out.push('Salvage tier ' + e.tier + '/2');
@@ -331,7 +342,6 @@ export class Hud {
       else if (!e.done) out.push(`Building ${Math.floor(e.progress * 100)}%`);
       else if (mine) {
         if (e.disabledUntil > sim.tick) out.push('SABOTAGED ' + Math.ceil((e.disabledUntil - sim.tick) / TICK_HZ) + ' s');
-        if (e.empUntil > sim.tick) out.push('DISABLED by EMP');
         if (d.weapon && d.power < 0 && T.low) out.push('OFFLINE (low power)');
         if (d.income) out.push(d.power < 0 && T.low ? 'No income (low power)' : '+$' + d.income.amt + ' every 2 s');
         if (d.pads) out.push('Pads ' + e.pads.filter(p => p.by).length + '/' + e.pads.length);
@@ -374,7 +384,7 @@ export class Hud {
     const s = Math.floor(sim.tick / TICK_HZ);
     $('clock').textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
     // public match state: superweapon countdowns for both sides, and the King of the Hill clocks
-    const mmss = (n) => Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0'); let sw = '';
+    let sw = '';
     for (const t of [PLAYER, ENEMY]) { const id = superOf(sim, t); if (id && hasPower(sim, t, id)) { const left = Math.ceil(((sim.teams[t].powerReady[id] || 0) - sim.tick) / TICK_HZ), n = superBldgs(sim, t, id).length; sw += `<span class="${t === PLAYER ? 'mine' : 'foe'}">${t === PLAYER ? 'Your' : 'Enemy'} ${POWERS[id].name}${n > 1 ? ' ×' + n : ''} <b>${left > 0 ? mmss(left) : 'READY'}</b></span>`; } }
     if (sw !== this.swSig) { this.swSig = sw; $('sw').innerHTML = sw; $('sw').hidden = !sw; }
     const k = sim.koth, hb = $('hill');
@@ -401,7 +411,7 @@ export class Hud {
     const sig = list.join();
     if (sig !== this.pwSig) {
       this.pwSig = sig;
-      box.innerHTML = list.map(id => `<button type="button" class="pbtn${POWERS[id].super ? ' super' : ''}" data-power="${id}" title="${POWERS[id].desc}"><span class="dial">${id === 'ambush' || id === 'paradrop' ? ICON.rifle : id === 'emp' || id === 'cashhack' || POWERS[id].super ? ICON.bolt : id === 'sneaktunnel' ? ICON.stop : ICON.jet}<b class="sec"></b></span><span class="pn">${POWERS[id].name}</span></button>`).join('');
+      box.innerHTML = list.map(id => `<button type="button" class="pbtn${POWERS[id].super ? ' super' : ''}" data-power="${id}" title="${POWERS[id].desc}"><span class="dial">${id === 'ambush' || id === 'paradrop' ? ICON.rifle : id === 'cashhack' || POWERS[id].super ? ICON.bolt : id === 'sneaktunnel' ? ICON.stop : ICON.jet}<b class="sec"></b></span><span class="pn">${POWERS[id].name}</span></button>`).join('');
       box.hidden = !list.length;
     }
     for (const b of box.children) {
@@ -500,7 +510,7 @@ export class Hud {
       const isU = e.kind === 'unit', d = isU ? UNITS[e.type] : BLDGS[e.type];
       if (d.indestructible && !d.capturable) continue;
       const sel = ui.selection.has(e.id), hov = ui.hover === e.id, hurt = e.hp < e.maxHp && !e.ruined && !d.indestructible, building = !isU && !e.done;
-      const mine = e.team === PLAYER, flag = isU && mine && (e.emp || e.cloaked || e.horde || e.deployed || e.capT || e.addonQ);
+      const mine = e.team === PLAYER, flag = isU && mine && (e.cloaked || e.horde || e.deployed || e.capT || e.addonQ);
       if (!sel && !hov && !hurt && !building && !flag) continue;
       if (!isU && !mine && !sim.fog.canSee(PLAYER, e) && !sel) continue; // no live health on remembered structures
       const top = isU ? (e.air && !e.landed ? d.alt + 2.2 : d.radius > 2.4 ? 3.6 : 2.6) : (v.views.get(e.id)?.top || 7.5);
@@ -520,7 +530,7 @@ export class Hud {
         // veterancy chevrons float above selected or hovered units
         if (e.vet && (sel || hov)) this.chevrons(g, p.x, y - 7, e.vet, k);
         if (mine) {
-          const tag = e.emp ? ['EMP', '#66ccff'] : e.cloaked ? [e.detected ? 'SEEN' : 'CLOAK', e.detected ? '#ff5a4d' : '#9fb0bd'] : e.deployed ? ['$', '#f2a93b'] : e.horde ? ['HORDE', '#ff8a5a'] : null;
+          const tag = e.cloaked ? [e.detected ? 'SEEN' : 'CLOAK', e.detected ? '#ff5a4d' : '#9fb0bd'] : e.deployed ? ['$', '#f2a93b'] : e.horde ? ['HORDE', '#ff8a5a'] : null;
           if (tag) { const ty = y - (e.vet && (sel || hov) ? 12 + e.vet * 5 * k : 6); g.fillStyle = 'rgba(8,10,12,0.8)'; g.fillText(tag[0], p.x + 1, ty + 1); g.fillStyle = tag[1]; g.fillText(tag[0], p.x, ty); }
         }
       }

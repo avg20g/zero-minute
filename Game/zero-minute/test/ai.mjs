@@ -249,7 +249,7 @@ function match(fa, fb, lv, ticks, extra) {
 // ---------------------------------------------------------------- H. support powers never land on fogged targets
 {
   const rows = []; let n = 0;
-  for (const [f, lv, nodes, spotter] of [['vanguard', 'medium', ['v_a10'], 'v_drone'], ['vanguard', 'hard', ['v_a10', 'v_emp'], 'v_drone'], ['redhammer', 'medium', ['r_barrage'], 'r_scout'],
+  for (const [f, lv, nodes, spotter] of [['vanguard', 'medium', ['v_a10'], 'v_drone'], ['vanguard', 'hard', ['v_a10', 'v_para'], 'v_drone'], ['redhammer', 'medium', ['r_barrage'], 'r_scout'],
                                          ['redhammer', 'hard', ['r_barrage', 'r_fab'], 'r_conscript'], ['sandstorm', 'easy', ['s_ambush'], 's_guerrilla'], ['sandstorm', 'hard', ['s_ambush', 's_toxin'], 's_technical']]) {
     const sim = new Sim({ factions: ['redhammer', f], difficulty: lv }); const a = sim.ais[0], acc = newAcc(); watch(sim, a, acc);
     const T = sim.teams[ENEMY]; for (const k of nodes) { T.promos.add(k); T.powerReady[FACTIONS[f].tree.find(q => q.id === k).power] = 0; } T.points = 0;

@@ -21,7 +21,7 @@ function audit(sim, label) {
   for (const e of sim.ents) {
     if (e.team !== ENEMY || e.kind !== 'unit' || e.dead || e.inB) continue;
     const m = truth(sim, PLAYER, e), vis = sim.fog.shouldShow(PLAYER, e);
-    if (Math.abs(m) < TOL) { skipped++; continue; }
+    if (Math.abs(m) < TOL || (e.cloaked && !e.detected)) { skipped++; continue; }   // a cloaked unit (a hero, say) is hidden by the stealth rules, not by fog
     checked++; if (vis) shown++;
     if (vis !== (m > 0)) { bad++; if (bad < 4) console.log('  mismatch', label, e.type, 'margin', m.toFixed(2), 'shown', vis); }
   }

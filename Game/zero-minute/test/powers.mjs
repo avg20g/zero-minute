@@ -58,13 +58,10 @@ const visCells = (sim, team, x, z, r) => { let n = 0; for (let dz = -r; dz <= r;
 // 4. Each power does what it says
 {
   const mk = (f) => { const s = new Sim({ ai: false, empty: true, factions: [f, 'vanguard'] }); const sc = spawnNear(s, 'v_ranger', PLAYER, 300, 300); sc.order = { t: 'hold' }; s.step(); return s; };
-  { const s = mk('vanguard'); grant(s, PLAYER, 'v_a10', 'v_emp');
-    const tank = makeUnit(s, 'r_tank', ENEMY, 320, 300, 0), inf = makeUnit(s, 'r_conscript', ENEMY, 324, 306, 0), heli = makeUnit(s, 'v_comanche', ENEMY, 316, 294, 0);
-    const tower = makeBldg(s, 'r_gatling', ENEMY, 163, 153); s.nav.rebuild(); for (const u of [tank, inf, heli]) u.order = { t: 'hold' };
-    s.issue({ t: 'power', id: 'emp', x: 322, z: 302 }); run(s, 80);
-    ok(tank.emp && tower.offline && !inf.emp, 'EMP disables vehicles and defenses, not infantry'); ok(heli.hp <= heli.maxHp * 0.5 + 1, 'EMP cripples aircraft');
-    const x0 = tank.x; s.issue({ t: 'move', team: ENEMY, ids: [tank.id], x: 360, z: 300 }); run(s, 100); ok(Math.abs(tank.x - x0) < 0.5, 'disabled vehicle cannot move');
-    run(s, 170); ok(!tank.emp && !tower.offline, 'EMP wears off after 12 s'); run(s, 100); ok(tank.x - x0 > 5, 'vehicle resumes its order'); }
+  { const s = mk('vanguard');   // the EMP Pulse Bomb was removed from the game in batch 10
+    ok(!POWERS.emp && !FACTIONS.vanguard.tree.some(n => n.power === 'emp' || n.id === 'v_emp'), 'EMP is gone: no such power and no promotion for it');
+    s.fog.exp[PLAYER].fill(1); s.teams[PLAYER].promos.add('v_a10'); s.issue({ t: 'power', id: 'emp', x: 322, z: 302 }); run(s, 5);
+    ok(s.strikes.length === 0 && !s.teams[PLAYER].powersUsed, 'an order to use it is refused'); }
   { const s = mk('redhammer'); grant(s, PLAYER, 'r_barrage', 'r_fab');
     const civ = makeBldg(s, 'civ', NEUTRAL, 158, 148); s.nav.rebuild(); const g1 = makeUnit(s, 'v_ranger', ENEMY, civ.x - 9, civ.z, 0);
     s.issue({ t: 'garrison', team: ENEMY, ids: [g1.id], target: civ.id }); run(s, 80); ok(civ.garrison.length === 1, 'enemy squad garrisoned');
@@ -84,6 +81,6 @@ const visCells = (sim, team, x, z, r) => { let n = 0; for (let dz = -r; dz <= r;
     s.fog.stamp(PLAYER, civ.x, civ.z, 40); s.issue({ t: 'power', id: 'toxinbomb', x: civ.x + 10, z: civ.z }); run(s, 260);
     ok(civ.garrison.length === 0 && g1.dead && civ.hp === civ.maxHp, 'Toxin Bomb killed the garrison inside with zero building damage'); ok(g2.dead || g2.hp < g2.maxHp * 0.6, 'toxin damages infantry'); ok(tk.hp === tk.maxHp, 'toxin does not hurt tanks');
     ok(s.hazards.some(h => h.kind === 'toxin'), 'cloud persists'); run(s, 300); ok(!s.hazards.some(h => h.kind === 'toxin'), 'cloud is gone after 20 s'); }
-  console.log('power effects  : EMP, Fuel-Air Bomb, Ambush, Toxin Bomb behave as specified');
+  console.log('power effects  : Fuel-Air Bomb, Ambush, Toxin Bomb behave as specified; EMP removed');
 }
 console.log(fails ? `POWERS/FOG: ${fails} FAILURES of ${checks}` : `POWERS/FOG: all ${checks} checks passed`);

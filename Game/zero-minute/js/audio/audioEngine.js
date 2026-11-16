@@ -217,12 +217,14 @@ export class AudioEngine {
         case 'gunship': if (hear(e)) { if (e.k === 'cannon') { this.cannon(e.x, e.z, 1.3); this.explosion(e.x, e.z, 1.8); } else this.rifle(e.x, e.z, true); } break;
         case 'fab': if (hear(e)) this.explosion(e.x, e.z, 3.4); break;
         case 'suicide': if (hear(e)) this.explosion(e.x, e.z, 2.2); break;
+        case 'airliner': this.explosion(e.x, e.z, hear(e) ? 3.6 : 1.4); break;
+        case 'hack': if (hear({ team: e.team, x: e.tx, z: e.tz })) this.laser(e.tx, e.tz); break;
+        case 'phantom': if (e.k === 'airliner' && hear({ team: e.team, x: e.tx, z: e.tz })) this.flyby(e.tx, e.tz, 3.5); break;
         case 'nuke': this.explosion(e.x, e.z, hear(e) ? 5 : 2.2); break;                   // a nuclear blast is heard across the map, fogged or not
         case 'scudhit': if (hear(e)) this.explosion(e.x, e.z, 2.2); break;
         case 'pbeam': if (e.k % 6 === 0 && hear(e)) this.laser(e.x, e.z); break;
         case 'superlaunch': this.klaxon(); break;                                              // public warning for both sides
         case 'superbuilt': this.ping(); break;
-        case 'emp': if (hear(e)) { this.explosion(e.x, e.z, 2.6); this.laser(e.x, e.z); } break;
         case 'power': if (e.id === 'a10' && hear(e)) this.flyby(e.x, e.z); break;
         case 'die': if (hear(e) && !e.inf) this.explosion(e.x, e.z, e.kind === 'bldg' ? 3 : 1.5); break;
       }

@@ -1,5 +1,49 @@
 # Balance changelog
 
+## Batch 10 (2026-11-16): heroes and second play notes
+
+Hard v Hard and Medium v Medium, 1,215 matches each, five maps, friendly fire on. Full tables: `report.md` (Hard),
+`report-medium.md` (Medium); the batch 9 table is kept as `report-batch9.md`.
+
+| Loadout | Batch 9 (Hard) | Batch 10 without heroes | Heroes as first written | Batch 10 final (Hard) | Batch 10 final (Medium) |
+|---|---|---|---|---|---|
+| China: Mass Assault General | 62% | 61% | 49% | 60% | 65% |
+| United States (no general) | 54% | 58% | 68% | 59% | 56% |
+| United States: Marine Corps General | 39% | 32% | 47% | 58% | 62% |
+| United States: Air Force General | 49% | 56% | 64% | 58% | 58% |
+| China: Cyber General | 50% | 51% | 47% | 46% | 60% |
+| ISIS (no general) | 50% | 52% | 51% | 43% | 28% |
+| China (no general) | 47% | 43% | 33% | 43% | 59% |
+| ISIS: WMD General | 52% | 54% | 45% | 42% | 35% |
+| ISIS: Stealth General | 46% | 42% | 47% | 40% | 25% |
+
+"Without heroes" is this batch's other changes alone (EMP removed, jets repaired on the pad, new airfields, Scud
+Launcher reload 12 s), measured by taking the heroes out of the Barracks lists.
+
+What the sweeps showed and what was changed:
+
+| What | First written | Final | Why |
+|---|---|---|---|
+| Disabled Vet: M60 damage | 16 | 10 | United States at 64-68% with him; he killed a tank in 3.6 s |
+| Disabled Vet: RPG damage | 90 | 70 | same |
+| Disabled Vet: health | 500 | 400 | same |
+| Fook Mie: health | 150 | 300 | she died in 57-75% of the matches she was built in, and China fell to 33% |
+| Fook Mie: phone range | 36 m | 42 m | same: she had to stand inside rifle range to use it |
+| LAV-25 | $850, 340 health | $800, 380 health | Marine Corps General at 32-39% for two batches |
+| Car Bomb price (used for scoring only) | 0 | 400 | a price of zero broke the AI's unit-value table for all of ISIS |
+
+Fook Mie's recharge rule is as the player asked: unit cost / 150 seconds, between 2 and 14 (2 s for a squad, 6 s for
+a $900 tank, 13.3 s for an Overlord); against a hero the call does 100 damage instead. The Phantom was left as first
+written (one call every 10 s; airliner 600 damage over 14 m, car 350 over 8 m, four ambush squads for 10 s).
+
+Still open:
+- **Medium: ISIS wins only 25-35%.** The Medium AI gets little out of ISIS's cheap units and tunnels; this was 31-36%
+  in batch 8 and has not been tuned since. Hard is the level the numbers are tuned against.
+- Start positions: urban 56/44, arctic 36/64.
+- The AI builds at most one superweapon and rarely fires it; it does not use Sneak Attack or build Saboteurs.
+- Hero numbers come from AI-versus-AI matches. A person will use a cloaked hero far better than the AI does, so
+  expect to revisit them after play.
+
 ## Batch 9 (2026-11-15): play notes
 
 The changes in this batch were asked for by the player (friendly fire, any number of superweapons at 3:30, AC-130,

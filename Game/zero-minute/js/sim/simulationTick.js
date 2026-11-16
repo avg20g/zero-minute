@@ -128,7 +128,7 @@ function checkVictory(sim) {
   const alive = [0, 0];
   for (const e of sim.ents) {
     if (e.dead || e.team > 1) continue;
-    if (e.kind === 'bldg' ? BLDGS[e.type].role === 'cc' : !!UNITS[e.type].builder) alive[e.team]++;
+    if (e.kind === 'bldg' ? BLDGS[e.type].role === 'cc' : !!UNITS[e.type].builder && !e.inert) alive[e.team]++;
   }
   if (!alive[ENEMY]) sim.winner = PLAYER; else if (!alive[PLAYER]) sim.winner = ENEMY;
   if (sim.winner >= 0) sim.events.push({ t: 'over', winner: sim.winner });
@@ -174,6 +174,14 @@ function freeUnit(sim, u) { // clear any state tied to the previous order
   u.bursts[0] = u.bursts[1] = u.bursts[2] = 0;
 }
 const msg = (sim, team, text) => sim.events.push({ t: 'msg', team, text });
+// One hero per side: true while this team has a hero alive or in a production queue.
+export function heroTaken(sim, team) {
+  for (const e of sim.ents) {
+    if (e.dead || e.team !== team) continue;
+    if (e.kind === 'unit' ? UNITS[e.type].hero && !e.inert : e.queue.some(q => UNITS[q] && UNITS[q].hero)) return true;
+  }
+  return false;
+}
 function upgradeTaken(sim, team, id) {
   if (sim.teams[team].upgrades.has(id)) return true;
   for (const e of sim.ents) if (e.kind === 'bldg' && e.team === team && e.queue.includes('up:' + id)) return true;
@@ -182,7 +190,7 @@ function upgradeTaken(sim, team, id) {
 
 function applyCommand(sim, c) {
   const team = c.team ?? PLAYER, T = sim.teams[team], F = FACTIONS[T.faction];
-  const units = (pred) => { const out = []; for (const id of c.ids || []) { const u = own(sim, id, team); if (u && u.kind === 'unit' && !u.inB && (!pred || pred(u, UNITS[u.type]))) out.push(u); } return out; };
+  const units = (pred) => { const out = []; for (const id of c.ids || []) { const u = own(sim, id, team); if (u && u.kind === 'unit' && !u.inB && !u.inert && (!pred || pred(u, UNITS[u.type]))) out.push(u); } return out; };   // a unit that has resigned takes no orders
   switch (c.t) {
     case 'move': {
       let all = units();
@@ -233,8 +241,10 @@ function applyCommand(sim, c) {
       break;
     }
     case 'landrepair': { // helicopters fly to the nearest friendly helipad, land and are repaired there
+      const want = c.target ? own(sim, c.target, team) : null;       // a helipad the player pointed at
       for (const u of units((u, d) => d.heli)) {
-        let best = null, bd = 1e18;
+        let best = want && want.heli && want.done ? want : null, bd = 1e18;
+        if (!best)
         for (const b of sim.ents) { if (b.kind !== 'bldg' || b.dead || !b.done || b.team !== team || !b.heli) continue; const dd = (b.x - u.x) ** 2 + (b.z - u.z) ** 2; if (dd < bd) { bd = dd; best = b; } }
         if (!best) { msg(sim, team, 'Requires an Airfield (helipad)'); break; }
         if (u.as === 'pad') continue;                                     // already down
@@ -242,6 +252,20 @@ function applyCommand(sim, c) {
       }
       break;
     }
+    case 'rtb': // strike aircraft break off, fly home and land (where they are re-armed and repaired)
+      for (const u of units((u, d) => d.based)) { freeUnit(sim, u); u.order = null; u.target = 0; u.loiterT = 0; }
+      break;
+    case 'repairat': { // vehicles drive to the repair bay of one of your buildings (War Factory, Tunnel Network)
+      const b = own(sim, c.target, team); if (!b || b.kind !== 'bldg' || !b.done || !BLDGS[b.type].repair) break;
+      const us = units((u) => u.cls === 1 && !u.air); if (!us.length) break;
+      if (sim.nav.dirty) sim.nav.rebuild();
+      let cx = 0, cz = 0; for (const u of us) { cx += u.x; cz += u.z; } const [ax, az] = approachPoint(b, cx / us.length, cz / us.length, 5), slots = formationSlots(sim, us, ax, az);
+      us.forEach((u, i) => { freeUnit(sim, u); u.order = { t: 'move', x: slots[i][0], z: slots[i][1], rev: false }; reqPath(sim, u, slots[i][0], slots[i][1]); });
+      break;
+    }
+    case 'heromode': // switch a hero's ability (Fook Mie: recruit or resign)
+      for (const u of units((u, d) => d.modes)) { const m = UNITS[u.type].modes; u.mode = m.includes(c.mode) ? c.mode : m[(m.indexOf(u.mode) + 1) % m.length]; }
+      break;
     case 'attack': {
       const t = sim.byId.get(c.target); if (!targetable(sim, team, t)) break;
       for (const u of units((u) => canAttack(u, t))) { freeUnit(sim, u); u.order = { t: 'attack', id: t.id }; u.target = t.id; }
@@ -291,6 +315,8 @@ function applyCommand(sim, c) {
       if (!d || !trainsOf(T, b.type).includes(c.type)) break;
       if (d.promo && !T.promos.has(d.promo)) { msg(sim, team, 'Requires a General’s promotion'); break; }
       if (d.based && padCount(sim, b) >= b.pads.length) { msg(sim, team, 'Airfield is full'); break; }
+      if (d.needs && !hasBldg(sim, team, d.needs)) { msg(sim, team, `Requires ${BLDGS[d.needs].name}`); break; }
+      if (d.hero && heroTaken(sim, team)) { msg(sim, team, 'Only one hero at a time'); break; }
       const price = unitCost(T, c.type);                 // a general may make some units cheaper
       if (T.money < price) { msg(sim, team, 'Insufficient funds'); break; }
       T.money -= price; b.queue.push(c.type);
@@ -387,8 +413,8 @@ function nextMarker(sim, u) {
 }
 function stepOrders(sim) {
   for (const u of sim.ents) {
-    if (u.kind !== 'unit' || u.dead || u.inB) continue;
-    const o = u.order; if (!o || u.emp) continue;
+    if (u.kind !== 'unit' || u.dead || u.inB || u.inert) continue;
+    const o = u.order; if (!o) continue;
     switch (o.t) {
       case 'move':
         if (UNITS[u.type].based) break; // flight logic owns strike aircraft

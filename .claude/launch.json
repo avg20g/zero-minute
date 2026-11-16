@@ -1,6 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "zero-minute", "runtimeExecutable": "python3", "runtimeArgs": ["-m", "http.server", "8000", "--directory", "Game/zero-minute"], "port": 8000 }
+    { "name": "zero-minute", "runtimeExecutable": "python3", "runtimeArgs": ["Game/zero-minute/serve.py", "8010"], "port": 8010 }
   ]
 }

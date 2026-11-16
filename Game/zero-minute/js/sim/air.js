@@ -88,6 +88,7 @@ function fighter(sim, u, d) {
     case 'parked': {
       u.landed = true; u.altK = 0; u.goal = null; u.spd = 0; u.vx = u.vz = 0; u.x = pad.x; u.z = pad.z;
       if (u.ammo < d.ammo && ++u.reloadT >= d.reload) { u.ammo = d.ammo; u.reloadT = 0; }
+      if (u.hp < u.maxHp) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * HELI_REPAIR * DT);   // ground crew patch it up on the pad, at the helipad's rate
       const o = u.order;
       if (o && (o.t === 'attack' || o.t === 'fattack' || o.t === 'move' || o.t === 'amove')) { if (u.ammo > 0 && lockRunway(sim, home, u)) u.as = 'taxi'; } // holds on the pad while the runway is busy
       else if (o) u.order = null;
@@ -213,7 +214,6 @@ export function stepAir(sim) {
   for (const u of airs) {
     const d = UNITS[u.type];
     u.px = u.x; u.pz = u.z; u.pfacing = u.facing; u.pturret = u.turret; u.paltK = u.altK; u.arrived = false;
-    if (u.emp) { u.vx = u.vz = 0; u.spd = 0; continue; }
     if (d.based) { if (fighter(sim, u, d) || u.dead) continue; }
     else if (d.heli) { if (heli(sim, u)) continue; }
     if (u.altK < 1 && !u.hoverLow) u.altK = Math.min(1, u.altK + 1 / CLIMB_TICKS);  // e.g. climbing away from a go-around

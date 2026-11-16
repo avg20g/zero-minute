@@ -9,6 +9,7 @@ import { N, CELL, WORLD } from './defs.js';
 import { FACTIONS, POWERS, UNITS, BLDGS, generalOf, nodePower } from './factionRegistry.js';
 import { strikeDamage, kill, makeUnit, makeBldg, freeSpot, canPlace, spawnNear } from './entities.js';
 import { addHazard } from './abilities.js';
+import { stepAirliner } from './heroes.js';
 
 export function hasPower(sim, team, id) {
   const T = sim.teams[team], P = POWERS[id];
@@ -162,7 +163,7 @@ export function usePower(sim, team, id, x, z) {
   sim.reveals.push({ team, x, z, r: Math.max(P.radius, (P.line || 0) / 2, P.beam ? P.beam.sweep : 0) + REVEAL_PAD, until: sim.tick + (P.reveal || REVEAL_SECS) * 20 });
   if (P.super) sim.events.push({ t: 'superlaunch', id, team, bid: from.id, bx: from.x, bz: from.z });   // public warning: both sides hear the klaxon, nobody is told where it will land
   switch (id) {
-    case 'paradrop': plane(sim, team, 'bomber', 'paradrop', x, z); break;
+    case 'paradrop': plane(sim, team, 'c130', 'paradrop', x, z); break;
     case 'b2': plane(sim, team, 'b2', 'carpet', x, z); break;
     case 'cashhack': {
       const b = hackTarget(sim, team, x, z), E = sim.teams[b.team], amt = Math.min(hk ? hk.amount : P.amount, Math.max(0, Math.floor(E.money)));
@@ -182,7 +183,6 @@ export function usePower(sim, team, id, x, z) {
     case 'particle': { const [dx, dz] = approach(sim, team, x, z); sim.strikes.push({ id: sim.nextId++, kind: 'pbeam', team, x, z, px: x, pz: z, sx: x, sz: z, dx, dz, n: 0, bx: from.x, bz: from.z, dead: false }); break; }
     case 'ac130': gunship(sim, team, x, z); break;
     case 'a10': plane(sim, team, 'a10', 'strafe', x, z); if (T.flags.a10x2) plane(sim, team, 'a10', 'strafe', x, z, 9, 14); break;
-    case 'emp': plane(sim, team, 'a10', 'emp', x, z); break;
     case 'fab': plane(sim, team, 'bomber', 'fab', x, z); break;
     case 'toxinbomb': plane(sim, team, 'bomber', 'toxin', x, z); break;
     case 'barrage': {
@@ -207,18 +207,6 @@ function detonate(sim, p, x, z) {
   } else if (p.payload === 'toxin') {
     addHazard(sim, 'toxin', x, z, POWERS.toxinbomb.radius, 20, 22, p.team, true);
     sim.events.push({ t: 'toxin', x, z, r: POWERS.toxinbomb.radius, team: p.team });
-  } else if (p.payload === 'emp') {
-    const R = POWERS.emp.radius; let n = 0;
-    for (const e of sim.ents) {
-      if (e.dead || e.team === p.team || e.team > 1) continue;
-      if (Math.hypot(e.x - x, e.z - z) - e.radius > R) continue;
-      if (e.kind === 'unit') {
-        if (e.cls !== 1 || e.inB) continue; // infantry are unaffected
-        e.empUntil = sim.tick + 240; n++;
-        if (e.air && !e.landed) { e.hp -= e.maxHp * 0.5; e.lastHit = sim.tick; if (e.hp <= 0) kill(sim, e); }
-      } else if (BLDGS[e.type].weapon) { e.empUntil = sim.tick + 240; n++; }
-    }
-    sim.events.push({ t: 'emp', x, z, r: R, team: p.team, n });
   }
 }
 
@@ -243,6 +231,7 @@ export function stepPowers(sim) {
         sim.strikes.push({ id: sim.nextId++, kind: p.payload === 'paradrop' ? 'para' : p.payload === 'carpet' ? 'carpet' : 'bomb', dx: p.dx, dz: p.dz, payload: p.payload, team: p.team, x: p.tx, z: p.tz, px: p.tx, pz: p.tz, t: p.payload === 'paradrop' ? 60 : 12, dead: false });
       }
       if (p.s > 260) p.dead = true;
+    } else if (p.kind === 'airliner') { stepAirliner(sim, p);
     } else if (p.kind === 'gunship') {
       const P = POWERS.ac130;
       p.phdg = p.hdg;

@@ -51,7 +51,8 @@ const P = MF.paint('vanguard', 0), PR = MF.paint('redhammer', 1), PS = MF.paint(
 {
   const rigs = { abrams: MF.ASSEMBLY.abrams(P), overlord: MF.ASSEMBLY.overlord(PR), battlemaster: MF.ASSEMBLY.battlemaster(PR), technical: MF.ASSEMBLY.technical(PS), scoutcar: MF.ASSEMBLY.scoutcar(PR),
     comanche: MF.ASSEMBLY.comanche(P), drone: MF.ASSEMBLY.drone(P), a10: MF.AIRCRAFT.a10(P), rocket: MF.createRocket(), raptor: MF.ASSEMBLY.raptor(P),
-    f15e: MF.ASSEMBLY.f15e(P), j11: MF.ASSEMBLY.j11(PR), b2: MF.AIRCRAFT.b2(P), lav25: MF.ASSEMBLY.lav25(P), scudtel: MF.ASSEMBLY.scudtel(PS), fpv: MF.ASSEMBLY.fpv(PS), chinook: MF.ASSEMBLY.chinook(P) };
+    f15e: MF.ASSEMBLY.f15e(P), j11: MF.ASSEMBLY.j11(PR), b2: MF.AIRCRAFT.b2(P), lav25: MF.ASSEMBLY.lav25(P), scudtel: MF.ASSEMBLY.scudtel(PS), fpv: MF.ASSEMBLY.fpv(PS), chinook: MF.ASSEMBLY.chinook(P),
+    z10: MF.ASSEMBLY.z10(PR), c130: MF.AIRCRAFT.c130(P), ac130: MF.AIRCRAFT.ac130(P), b737: MF.AIRCRAFT.b737(PS) };
   let prisms = 0, meshes = 0;
   for (const [k, r] of Object.entries(rigs)) r.g.traverse((o) => {
     if (!o.isMesh) return; meshes++;
@@ -238,5 +239,27 @@ const R = globalThis.__rigs;
   ok(r.gear && r.gear.children.filter(c => c.name === 'wheel').length === 3 && r.ground > 1, 'tricycle landing gear in its own group so it can retract');
   ok(UNITS.v_raptor.model === 'raptor' && MF.createModel({ kind: 'unit', type: 'v_raptor', team: 0 }).source === 'assembly', 'the Raptor unit uses this model');
   console.log(`F-22 Raptor    : span/length ${(span / len).toFixed(3)} (real ${(F.span / F.length).toFixed(3)}) | tail/wing span ${(tspan / span).toFixed(3)} (real ${(F.tailSpan / F.span).toFixed(3)}) | sweep ${sweep.toFixed(1)} deg | fins canted 28 deg | gear retracts`);
+}
+// ---- batch 10: C-130 / AC-130 from real dimensions, Z-10, airliner
+{
+  const H = MF.HERCULES, K = H.scale, c = R.c130, ac = R.ac130, ps = parts(c), pa = parts(ac);
+  const prof = (rig, name, i) => { const out = []; rig.body.traverse(o => { if (o.isMesh && o.name === name && o.userData.profile) for (const p of o.userData.profile) out.push(p[i]); }); return out; };
+  const span = 2 * Math.max(...prof(c, 'wingouter', 1).map(Math.abs)), fin = Math.max(...prof(c, 'fin', 1)), tail = 2 * Math.max(...prof(c, 'tailplane', 1).map(Math.abs));
+  const nose = named(ps, 'radome')[0], len = nose.x + nose.sx - Math.min(...prof(c, 'fin', 0));
+  ok(near(span, H.span * K, 0.01) && near(span / len, H.span / H.length, 0.06), `C-130: span ${span.toFixed(1)} and span/length ${(span / len).toFixed(2)} (real ${(H.span / H.length).toFixed(2)})`);
+  ok(near(tail, H.tailSpan * K, 0.01) && near(tail / span, H.tailSpan / H.span, 0.01), 'C-130: tailplane is ' + (tail / span).toFixed(2) + ' of the wing span, as on the real aircraft');
+  const nac = named(ps, 'nacelle'), wing = named(ps, 'wingcentre')[0], fus = named(ps, 'fuselage')[0];
+  ok(nac.length === 4 && nac.every(n => n.y < wing.y) && H.engines.every(e => nac.filter(n => near(Math.abs(n.z), e * K, 0.01)).length === 2), 'C-130: four nacelles under the wing at the real engine stations');
+  ok(c.props.length === 4 && c.props.every(p => p.children.filter(m => m.name === 'propblade').length === 2 && near(p.children[0].scale.y, H.prop * K, 1e-9)), 'C-130: four four-blade propellers (two crossed blades each) of the real diameter, each its own turning part');
+  ok(wing.y > fus.y + fus.sx * 0.9 && named(ps, 'gearfairing').length === 2 && named(ps, 'ramp').length === 1, 'C-130: high wing on top of the fuselage, main-gear fairings, tail ramp');
+  ok(fin > fus.sx * 3.5 && named(ps, 'afterbody')[0].m.rotation.z < -Math.PI / 2, `C-130: tall fin (${fin.toFixed(1)} above the centreline) over an upswept after body`);
+  ok(named(ps, 'howitzer').length === 0 && named(pa, 'howitzer').length === 1 && named(pa, 'rotarycannon').length === 1 && named(pa, 'sensorball').length === 1 && [...named(pa, 'howitzer'), ...named(pa, 'rotarycannon')].every(g => g.z < 0) && ac.guns.length === 2,
+    'AC-130: the same airframe with a howitzer, a rotary cannon and a sensor ball, guns out of the port side; the C-130 has none');
+  const z = R.z10, pz = parts(z), blades = (g) => { let n = 0; g.traverse(o => { if (o.isMesh && /blade/.test(o.name)) n++; }); return n; };
+  ok(blades(z.rotor) === MF.Z10.blades && blades(z.rotorTail) === 2 && named(pz, 'canopy').length === 2 && named(pz, 'canopy')[0].y < named(pz, 'canopy')[1].y, 'Z-10: five-blade main rotor, scissor tail rotor, two stepped cockpits in tandem');
+  ok(named(pz, 'stubwing').length === 2 && named(pz, 'missilerack').length === 2 && named(pz, 'rocketpod').length === 2 && named(pz, 'wheel').length === 2 && named(pz, 'tailwheel').length === 1 && z.turret, 'Z-10: stub wings with a missile rack and a rocket pod each, fixed main wheels and a tailwheel, chin cannon turret');
+  ok(UNITS.r_hind.model === 'z10' && UNITS.r_hind.name === 'Z-10 Gunship', 'the Hind is now the Z-10 Gunship');
+  const a = R.b737, pb = parts(a); ok(named(pb, 'engine').length === 2 && named(pb, 'idpanel').length === 0 && named(pb, 'cheatline').length === 2, 'airliner: twin-jet with no team markings');
+  console.log(`hercules       : span ${span.toFixed(1)}, length ${len.toFixed(1)}, fin ${fin.toFixed(1)}; 4 nacelles, 4 propellers; AC-130 guns to port | Z-10 ${MF.Z10.blades}-blade rotor`);
 }
 console.log(fails ? `MODELS: ${fails} FAILURES of ${checks}` : `MODELS: all ${checks} checks passed`);

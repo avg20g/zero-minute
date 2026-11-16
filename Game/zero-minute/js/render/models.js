@@ -32,6 +32,7 @@ function init() {
     rubble: std(0x5d564d, 1, 0), rubber: std(0x1b1b1d, 0.95, 0), white: std(0xe6e1d6, 0.8, 0), sandbag: std(0xa8946a, 1, 0),
     tarmac: std(0x4a4c4f, 0.95, 0), dark: std(0x2a2b2e, 0.9, 0.1), ghillie: std(0x5b6a3a, 1, 0), cloth: std(0xb9a98c, 1, 0), red: std(0x9c2f25, 0.8, 0.1),
     toxin: std(0x5f8f3a, 0.75, 0.1),
+    black: std(0x121214, 0.9, 0), dress: std(0xc21f2b, 0.75, 0.05), blue: std(0x1f5fd0, 0.8, 0.05), camo: std(0x4c5a33, 0.95, 0),   // hero clothing
     laser: std(0x24424f, 0.14, 0.7), // coated optic, not a light source
     salvage: std(0x6a5c40, 0.85, 0.2),
     grey: std(0x80868c, 0.6, 0.5), jet: std(0x8a9096, 0.5, 0.6),
@@ -165,28 +166,6 @@ function landingGear(b, mainX, mainZ, noseX, belly) {
 }
 // Hind: armoured gunship with stepped "double bubble" canopies, troop cabin, drooped stub wings with
 // rocket pods, 5-blade main rotor, 3-blade tail rotor, chin gun, fixed wheels.
-function hind(T) {
-  const g = new THREE.Group(), b = grp(g);
-  box(b, T.hull, 4.2, 1.3, 1.3, 0.1, 0, 0); add(b, G.cone, T.hull, 0.6, 1.4, 0.6, 2.9, -0.15, 0).rotation.z = -Math.PI / 2;
-  add(b, G.sph, M.glass, 0.52, 0.42, 0.5, 2.2, 0.38, 0); add(b, G.sph, M.glass, 0.56, 0.48, 0.54, 1.3, 0.72, 0);      // gunner in front, pilot stepped up behind
-  box(b, T.dark, 2.0, 0.5, 1.0, -0.1, 0.85, 0); for (const k of [-1, 1]) cyl(b, M.gun, 0.2, 0.7, -1.2, 0.85, k * 0.3, 'x'); // engines and exhausts
-  box(b, T.hull, 3.6, 0.45, 0.4, -3.6, 0.35, 0).rotation.z = 0.08; box(b, T.hull, 0.7, 1.5, 0.1, -5.2, 1.1, 0).rotation.z = 0.5; // tail boom and fin
-  box(b, T.accent, 0.5, 0.3, 0.12, -5.0, 1.2, 0); box(b, T.dark, 0.6, 0.06, 1.6, -4.7, 0.5, 0);
-  for (const k of [-1, 1]) {
-    box(b, T.dark, 1.0, 0.1, 1.9, 0, -0.1, k * 1.5).rotation.x = k * 0.2;                                          // drooped stub wing
-    cyl(b, M.gun, 0.2, 1.2, 0.1, -0.45, k * 1.5, 'x'); cyl(b, M.gun, 0.16, 1.0, 0.1, -0.55, k * 2.2, 'x');           // rocket pods
-    cyl(b, M.steel, 0.05, 0.5, 0.3, -0.85, k * 0.7); cyl(b, M.rubber, 0.2, 0.14, 0.3, -1.12, k * 0.7, 'z');
-  }
-  cyl(b, M.steel, 0.05, 0.5, 2.3, -0.85, 0); cyl(b, M.rubber, 0.17, 0.12, 2.3, -1.12, 0, 'z');
-  cyl(b, M.gun, 0.08, 0.4, 0, 1.3, 0);
-  const rotor = grp(b, 0, 1.55, 0); cyl(rotor, M.gun, 0.2, 0.12, 0, 0, 0);
-  for (let i = 0; i < 5; i++) { const arm = grp(rotor); arm.rotation.y = i * Math.PI * 2 / 5; box(arm, M.gun, 3.4, 0.04, 0.24, 1.8, 0, 0); }
-  const rotorTail = grp(b, -5.4, 1.5, 0.12);
-  for (let i = 0; i < 3; i++) { const arm = grp(rotorTail); arm.rotation.z = i * Math.PI * 2 / 3; box(arm, M.steel, 1.3, 0.07, 0.03, 0.6, 0, 0); }
-  const t = grp(b, 2.6, -0.7, 0); cyl(t, M.gun, 0.16, 0.18, 0, 0, 0); cyl(t, M.gun, 0.04, 0.9, 0.5, -0.05, 0, 'x');
-  return { g, body: b, turret: t, turretX: 2.6, rotor, rotorTail, ground: 1.5, muzzle: 3.2, muzzleY: -0.75 };
-}
-
 // ---------------- infantry ----------------
 function man(parent, T, x, z, o) {
   const m = grp(parent, x, 0, z), cloth = o.cloth || M.khaki, legs = o.legs || M.olive;
@@ -204,6 +183,53 @@ function man(parent, T, x, z, o) {
 function squad(T, spots, o) {
   const g = new THREE.Group(), b = grp(g), men = spots.map(([x, z]) => man(b, T, x, z, o));
   return { g, body: b, men, muzzle: 0.9, muzzleY: 1.0 };
+}
+// ---------------- heroes ----------------
+// One figure each, drawn 1.4 times the size of a soldier so it can be picked out in a crowd. Forward is +X.
+function heroRig(build) { const g = new THREE.Group(), b = grp(g), m = grp(b); m.scale.setScalar(1.4); build(m); return { g, body: b, men: [m], muzzle: 1.3, muzzleY: 1.45 }; }
+// Disabled Vet: long black hair and a red headband, bare chest, camouflage trousers, an M60 in the right hand and an RPG in the left.
+function vet(T) {
+  return heroRig((m) => {
+    for (const s of [-1, 1]) { box(m, M.camo, 0.18, 0.62, 0.18, 0, 0.31, s * 0.12); box(m, M.olive, 0.1, 0.16, 0.185, 0.02, 0.4, s * 0.12); box(m, M.black, 0.24, 0.1, 0.19, 0.03, 0.05, s * 0.12); }
+    box(m, M.skin, 0.28, 0.58, 0.46, 0, 0.91, 0); box(m, M.black, 0.3, 0.07, 0.48, 0, 0.64, 0);                       // bare torso, belt
+    box(m, M.yellow, 0.3, 0.06, 0.07, 0, 0.95, 0).rotation.x = 0.75;                                                  // ammunition belt across the chest
+    for (const s of [-1, 1]) box(m, M.skin, 0.36, 0.13, 0.13, 0.14, 1.02, s * 0.3);                                   // both arms held forward
+    add(m, G.sph, M.skin, 0.14, 0.15, 0.14, 0, 1.34, 0); add(m, G.sph, M.black, 0.16, 0.13, 0.165, -0.02, 1.4, 0);    // head, hair
+    box(m, M.black, 0.1, 0.5, 0.3, -0.13, 1.12, 0); box(m, M.red, 0.3, 0.045, 0.31, 0, 1.38, 0);                      // hair down the back, headband
+    box(m, M.gun, 1.0, 0.1, 0.09, 0.5, 0.98, 0.31); cyl(m, M.gun, 0.03, 0.5, 1.2, 0.99, 0.31, 'x'); box(m, M.yellow, 0.06, 0.22, 0.05, 0.45, 0.85, 0.36);   // M60 with its belt
+    cyl(m, M.olive, 0.07, 1.2, 0.35, 1.08, -0.31, 'x'); add(m, G.cone, M.gun, 0.12, 0.34, 0.12, 1.1, 1.08, -0.31).rotation.z = -Math.PI / 2;               // RPG
+    box(m, T.accent, 0.12, 0.08, 0.14, 0.02, 1.02, 0.3);                                                              // armband in the owner's colour
+  });
+}
+// Fook Mie: a woman in a red dress, a phone held up in one hand.
+function fookmie(T) {
+  return heroRig((m) => {
+    for (const s of [-1, 1]) { box(m, M.skin, 0.09, 0.36, 0.09, 0, 0.2, s * 0.08); box(m, M.dress, 0.2, 0.06, 0.09, 0.03, 0.03, s * 0.08); }   // legs, red shoes
+    add(m, G.cone, M.dress, 0.3, 0.62, 0.3, 0, 0.62, 0); box(m, M.dress, 0.18, 0.42, 0.3, 0, 1.0, 0);                 // skirt flaring from the waist, bodice
+    box(m, M.skin, 0.1, 0.32, 0.08, 0, 0.98, -0.19); box(m, M.skin, 0.1, 0.08, 0.22, 0.02, 1.16, 0.2); box(m, M.skin, 0.09, 0.26, 0.08, 0.06, 1.24, 0.27); // one arm down, one raised to the ear
+    add(m, G.sph, M.skin, 0.125, 0.14, 0.125, 0, 1.36, 0); add(m, G.sph, M.black, 0.15, 0.14, 0.155, -0.035, 1.39, 0); box(m, M.black, 0.08, 0.3, 0.26, -0.11, 1.22, 0); // head, long black hair
+    box(m, M.dark, 0.03, 0.15, 0.08, 0.1, 1.36, 0.2); box(m, T.glow, 0.012, 0.11, 0.06, 0.118, 1.36, 0.2);            // the phone, screen lit in the owner's colour
+    box(m, T.accent, 0.19, 0.05, 0.31, 0, 0.82, 0);                                                                   // sash in the owner's colour
+  });
+}
+// The Phantom: black tracksuit with blue stripes, hood up, nothing in his hands.
+function phantom(T) {
+  return heroRig((m) => {
+    for (const s of [-1, 1]) { box(m, M.black, 0.17, 0.62, 0.17, 0, 0.31, s * 0.12); box(m, M.blue, 0.05, 0.6, 0.03, 0, 0.31, s * 0.21); box(m, M.white, 0.24, 0.08, 0.18, 0.03, 0.04, s * 0.12); } // trousers with a side stripe, white trainers
+    box(m, M.black, 0.27, 0.58, 0.44, 0, 0.91, 0); box(m, M.blue, 0.28, 0.09, 0.45, 0, 1.06, 0); box(m, M.blue, 0.03, 0.56, 0.05, 0.14, 0.91, 0);          // jacket, chest band, zip line
+    for (const s of [-1, 1]) { box(m, M.black, 0.13, 0.5, 0.12, 0, 0.88, s * 0.29); box(m, M.blue, 0.04, 0.48, 0.03, 0, 0.88, s * 0.355); add(m, G.sph, M.skin, 0.06, 0.06, 0.06, 0, 0.6, s * 0.29); } // arms at his sides, empty hands
+    add(m, G.sph, M.skin, 0.13, 0.145, 0.13, 0.01, 1.33, 0); add(m, G.sph, M.black, 0.17, 0.16, 0.17, -0.04, 1.37, 0);                                 // face in a raised hood
+    box(m, T.accent, 0.12, 0.07, 0.13, 0, 1.0, 0.29);                                                                 // armband in the owner's colour
+  });
+}
+// A plain civilian saloon car (The Phantom's car bomb).
+function car(T) {
+  const g = new THREE.Group(), b = grp(g);
+  wheels(b, [1.15, -1.15], 0.72, 0.32, 0.22);
+  box(b, M.white, 3.8, 0.5, 1.55, 0, 0.62, 0); box(b, M.white, 1.9, 0.12, 1.4, -0.2, 1.36, 0); box(b, M.glass, 2.0, 0.46, 1.42, -0.2, 1.08, 0);
+  for (const x of [0.75, -1.15]) box(b, M.white, 0.1, 0.46, 1.44, x, 1.08, 0);
+  box(b, M.dark, 0.08, 0.16, 1.3, 1.9, 0.6, 0); for (const k of [-1, 1]) { box(b, M.yellow, 0.06, 0.12, 0.24, 1.9, 0.72, k * 0.55); box(b, M.red, 0.06, 0.12, 0.24, -1.9, 0.72, k * 0.55); }
+  return { g, body: b, muzzle: 0, muzzleY: 0 };
 }
 const FOUR = [[0.5, 0], [-0.1, 0.55], [-0.1, -0.55], [-0.65, 0]], TWO = [[0.1, 0.35], [-0.1, -0.35]], ONE = [[0, 0]];
 
@@ -263,24 +289,29 @@ function factory(T) {
 }
 // Airfield (40 m x 28 m). Must match the layout in sim/entities.js: runway centrelines at z = -10 and z = +10,
 // four parking pads at x = -14 + 7 i on the centre line, helipad at (15.5, 0).
-function airfield(T) {
-  const g = new THREE.Group(); slab(g, 39.6, 27.6, M.tarmac, 0.4);
-  for (const rz of [-10, 10]) {
-    for (const z of [rz - 3.1, rz + 3.1]) box(g, M.white, 36, 0.05, 0.16, 0, 0.38, z);                              // runway edge lines
+function airfield(T, d) {
+  const g = new THREE.Group(), L = d.layout; slab(g, 39.6, 27.6, M.tarmac, 0.4);
+  for (const rz of L.runways) {
+    for (const z of [rz - 3.0, rz + 3.0]) box(g, M.white, 36, 0.05, 0.16, 0, 0.38, z);                              // runway edge lines
     for (let i = -6; i <= 6; i++) box(g, M.white, 1.5, 0.05, 0.22, i * 2.6, 0.38, rz);                              // centreline dashes
     for (const x of [-17.2, 17.2]) for (let k = -3; k <= 3; k++) box(g, M.white, 1.5, 0.05, 0.3, x, 0.38, rz + k * 0.78); // threshold bars
   }
-  for (let i = 0; i < 4; i++) {
-    const x = -14 + i * 7;
-    box(g, M.yellow, 0.14, 0.05, 13.6, x, 0.38, 0);                                                                 // taxi line to both runways
-    for (const s of [-1, 1]) { box(g, T.wall, 0.4, 1.5, 5.2, x + s * 3.1, 1.1, 0); box(g, T.accent, 0.42, 0.2, 5.2, x + s * 3.1, 1.9, 0); } // blast walls either side, open to both runways
+  // One hangar per jet. The door faces south ('s') or east ('e'); the jet parks on the marked spot in front of it.
+  for (const [x, z, face] of L.hangars) {
+    const h = grp(g, x, 0.35, z); if (face === 'e') h.rotation.y = Math.PI / 2;                                     // built facing south (+z), turned for an east door
+    box(h, T.wall, 6.2, 3.0, 0.3, 0, 1.5, -2.85); for (const s of [-1, 1]) box(h, T.wall, 0.3, 3.0, 6.0, s * 2.95, 1.5, 0);   // back and side walls
+    const roof = cyl(h, T.roof, 3.1, 6.0, 0, 3.0, 0, 'z', G.cyl8); roof.scale.set(3.25, 6.0, 0.9);                       // shallow arched roof
+    box(h, T.accent, 6.3, 0.3, 0.12, 0, 3.1, 3.0); box(h, M.dark, 5.5, 2.7, 0.1, 0, 1.4, -2.6);                          // door lintel in team colour, dark interior
   }
-  cyl(g, M.yellow, 3.0, 0.05, 15.5, 0.38, 0); cyl(g, M.tarmac, 2.7, 0.06, 15.5, 0.39, 0);                           // helipad ring
-  for (const s of [-1, 1]) box(g, M.white, 0.3, 0.05, 2.0, 15.5 + s * 0.7, 0.42, 0); box(g, M.white, 1.4, 0.05, 0.3, 15.5, 0.42, 0); // "H"
-  box(g, T.wall, 2.0, 2.4, 2.4, -18.6, 1.5, 0); cyl(g, T.wall, 0.75, 5, -18.6, 4.4, 0); cyl(g, M.glass, 1.25, 1.1, -18.6, 7.2, 0); cyl(g, T.roof, 1.45, 0.25, -18.6, 7.9, 0); // control tower at the west end of the apron
-  box(g, T.accent, 2.05, 0.3, 2.45, -18.6, 2.5, 0);
-  const spin = grp(g, -18.6, 8.1, 0); box(spin, M.steel, 2.2, 0.5, 0.12, 0, 0.5, 0); cyl(spin, M.steel, 0.07, 0.5, 0, 0.2, 0);
-  cyl(g, M.steel, 0.06, 2.4, 11.4, 1.5, 5.2); box(g, M.red, 1.0, 0.45, 0.05, 12.0, 2.5, 5.2);                       // windsock
+  for (const [x, z] of L.spots) { box(g, M.yellow, 3.4, 0.05, 0.14, x, 0.38, z); box(g, M.yellow, 0.14, 0.05, 3.4, x, 0.38, z); box(g, M.yellow, 0.14, 0.05, Math.max(0.1, L.runways[0] - 3 - z), x, 0.38, (z + L.runways[0] - 3) / 2); } // parking cross and taxi line to the runway
+  const [hx, hz] = L.helipad;
+  cyl(g, M.yellow, 3.0, 0.05, hx, 0.38, hz); cyl(g, M.tarmac, 2.7, 0.06, hx, 0.39, hz);                             // helipad ring
+  for (const s of [-1, 1]) box(g, M.white, 0.3, 0.05, 2.0, hx + s * 0.7, 0.42, hz); box(g, M.white, 1.4, 0.05, 0.3, hx, 0.42, hz); // "H"
+  const [tx, tz] = L.tower;
+  box(g, T.wall, 2.0, 2.4, 2.4, tx, 1.5, tz); cyl(g, T.wall, 0.75, 5, tx, 4.4, tz); cyl(g, M.glass, 1.25, 1.1, tx, 7.2, tz); cyl(g, T.roof, 1.45, 0.25, tx, 7.9, tz); // control tower
+  box(g, T.accent, 2.05, 0.3, 2.45, tx, 2.5, tz);
+  const spin = grp(g, tx, 8.1, tz); box(spin, M.steel, 2.2, 0.5, 0.12, 0, 0.5, 0); cyl(spin, M.steel, 0.07, 0.5, 0, 0.2, 0);
+  cyl(g, M.steel, 0.06, 2.4, 18.4, 1.5, -1.2); box(g, M.red, 1.0, 0.45, 0.05, 19.0, 2.5, -1.2);                     // windsock
   return { g, spin, top: 9 };
 }
 function patriot(T) {
@@ -389,7 +420,8 @@ function dock() {
 
 const UNIT = {
   avenger, inferno, scorpion, buggy, tractor, dozer, truck, // tanks, technical, helicopter and scouts are built in modelFactory.js
-  mig: (T) => jet(T, false), hind, // the Raptor is built in modelFactory.js
+  mig: (T) => jet(T, false), // the Raptor and the Z-10 are built in modelFactory.js
+  vet, fookmie, phantom, car,
   rifle: (T) => squad(T, FOUR, { gun: 'rifle' }),
   bomber: (T) => { const r = squad(T, ONE, { gun: 'rifle', cloth: M.cloth, hat: M.dark }); box(r.body, M.crateC, 0.46, 0.34, 0.5, 0, 1.12, 0); for (const z of [-0.2, 0, 0.2]) cyl(r.body, M.gun, 0.05, 0.3, 0.26, 1.12, z); return r; }, // explosive vest over plain clothes
   rpg: (T) => squad(T, TWO, { gun: 'rpg', cloth: M.cloth, hat: M.red }),
@@ -426,15 +458,15 @@ function silo(T) {
   box(g, T.wall, 3, 2.4, 2.4, -5.2, 4.1, -5.2); const spin = grp(g, -5.2, 5.4, -5.2); box(spin, M.steel, 1.8, 0.12, 0.5, 0, 0.3, 0); cyl(spin, M.steel, 0.06, 0.5, 0, 0.05, 0);
   return { g, spin, missile, top: 15 };
 }
-// Scud Storm: nine launch rails raked skyward on an improvised sandbagged platform.
+// Scud Storm: nine vertical launch rails on an improvised sandbagged platform.
 function scud(T) {
   const g = new THREE.Group(); slab(g, 15.4, 15.4, M.sandbag, 0.7);
   box(g, M.wood, 11, 0.5, 11, 0, 0.95, 0); box(g, M.dark, 9, 1.2, 9, 0, 1.6, 0); box(g, T.accent, 9.1, 0.3, 9.1, 0, 2.2, 0);
   const rack = grp(g, 0, 2.3, 0); rack.rotation.z = 0;
   const missiles = [];   // one node per rail: the view removes each as it launches and puts them back one by one during the reload
   for (let i = 0; i < 9; i++) {
-    const x = (i % 3 - 1) * 2.6, z = (((i / 3) | 0) - 1) * 2.6; box(rack, M.gun, 0.2, 2.6, 0.2, x + 0.7, 1.3, z); box(rack, M.steel, 0.3, 5.0, 0.3, x + 0.55, 2.7, z).rotation.z = 0.32;
-    const m = grp(rack, x, 2.9, z); m.rotation.z = 0.32; cyl(m, M.olive, 0.5, 5.0, 0, 0, 0); add(m, G.cone, M.olive, 0.5, 2.6, 0.5, 0, 3.8, 0); cyl(m, M.gun, 0.52, 0.3, 0, -1.8, 0);   // long pointed nose
+    const x = (i % 3 - 1) * 2.6, z = (((i / 3) | 0) - 1) * 2.6; box(rack, M.gun, 0.2, 2.6, 0.2, x + 0.7, 1.3, z); box(rack, M.steel, 0.3, 5.0, 0.3, x + 0.62, 2.7, z);
+    const m = grp(rack, x, 2.9, z);   // rails stand vertical: the missiles go straight up cyl(m, M.olive, 0.5, 5.0, 0, 0, 0); add(m, G.cone, M.olive, 0.5, 2.6, 0.5, 0, 3.8, 0); cyl(m, M.gun, 0.52, 0.3, 0, -1.8, 0);   // long pointed nose
     for (const a of [0, 1.5708]) box(m, M.gun, 1.5, 0.8, 0.06, 0, -2.1, 0).rotation.y = a;
     missiles.push(m);
   }
@@ -451,7 +483,7 @@ export function buildModel(e) {
   else {
     const d = BLDGS[e.type];
     if (d.model === 'civ') v = civ(e.variant); else if (d.model === 'dock') v = dock(); else if (d.model === 'derrick') v = derrick();
-    else v = (BLDG[d.model] || BLDG.power)(mats(d.faction, e.team));
+    else v = (BLDG[d.model] || BLDG.power)(mats(d.faction, e.team), d);
   }
   v.kind = e.kind; v.type = e.type;
   return v;

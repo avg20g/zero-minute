@@ -4,13 +4,13 @@
 import { TEAM } from '../ui/teamColors.js';
 import THREE from '../lib/three.js';
 import { N, CELL, PLAYER, NEUTRAL, angDiff } from '../sim/defs.js';
-import { UNITS, BLDGS, WEAPONS, POWERS } from '../sim/factionRegistry.js';
+import { UNITS, BLDGS, WEAPONS, POWERS, HERO_CALL } from '../sim/factionRegistry.js';
 import { heightAt, WATER_Y } from '../sim/map.js';
 import { strikeVisible, fxVisible, SCUD_GAP } from '../sim/powers.js';
 import { fowUniforms } from './gfx.js';
 import { buildTerrain, buildRocks, buildWater, buildBridges, buildTrees } from './terrain.js';
 import { Environment, makeTerrainTextures, terrainMaterial } from './environmentFX.js';
-import { createModel, createPlane, createRocket, createMissile, buildGhost, buildCrate, buildBomb, bakeStats } from './modelFactory.js';
+import { createModel, createPlane, createRocket, createMissile, createChute, buildGhost, buildCrate, buildBomb, bakeStats } from './modelFactory.js';
 import { VFX, VET_TRACER } from './vfxManager.js';
 
 const AIR_Y = 13, LASER = [0.4, 0.9, 1], PDL = [0.6, 1, 1], PBEAM = [0.56, 0.85, 1];
@@ -172,6 +172,16 @@ export class View {
           else { fx.tracer(e.sx, sy, e.sz, e.x, y + 0.3, e.z, 520, [1, 0.8, 0.45], 2.4); fx.flash(e.sx, sy, e.sz, 24, 0.1); fx.explosion(e.x, y, e.z, 1.7); fx.crater(e.x, e.z, 7.5); fx.shock(e.x, y + 0.4, e.z, 8, 0.35, 0xffd9a0); fx.shake(e.x, e.z, 0.35); }
           break;
         }
+        case 'hack': { // Fook Mie's call: a thin beam from her phone to the unit, then a ring in the new owner's colour (recruit) or dust (resign)
+          if (!(this.reveal || e.team === PLAYER || e.victim === PLAYER || fog.visAt(PLAYER, e.tx, e.tz))) break;
+          const y = fx.h(e.tx, e.tz);
+          if (e.team === PLAYER || fog.visAt(PLAYER, e.x, e.z) || this.reveal) fx.beam(e.x, fx.h(e.x, e.z) + 1.9, e.z, e.tx, y + 1.4, e.tz, [1, 0.45, 0.8], 0.25);
+          fx.spark(e.tx, y + 1.6, e.tz, [1, 0.5, 0.85]);
+          if (e.k === 'recruit') fx.shock(e.tx, y + 0.3, e.tz, 4.5, 0.6, TEAM_HEX[e.team]); else if (e.k === 'resign') fx.dust(e.tx, y, e.tz, 6, 3, 1.4, 0.4);
+          break;
+        }
+        case 'vanish': if (see(e)) fx.dust(e.x, fx.h(e.x, e.z), e.z, e.inf ? 6 : 12, 3, e.inf ? 1.3 : 2.2, 0.4); break;
+        case 'airliner': if (see(e)) { fx.megaBlast(e.x, e.z, e.r); fx.smokeColumn(e.x, e.z, 8, 2); fx.shake(e.x, e.z, 1.4); } else fx.shake(e.x, e.z, 0.3); break;
         case 'superlaunch': { // what the launching building does; shown only if you can see that building right now
           if (!(this.reveal || e.team === PLAYER || fog.visAt(PLAYER, e.bx, e.bz))) break;
           const y = fx.h(e.bx, e.bz);
@@ -187,7 +197,6 @@ export class View {
         case 'pbeam': if (see(e)) { const y = fx.h(e.x, e.z); fx.beam(e.x + 6, y + 150, e.z - 10, e.x, y + 0.2, e.z, PBEAM, 0.16); fx.spark(e.x, y + 0.5, e.z); if (e.k % 6 === 0) { fx.explosion(e.x, y, e.z, 0.8); fx.crater(e.x, e.z, 5); } if (e.k % 10 === 0) fx.shake(e.x, e.z, 0.35); } break;
         case 'paradrop': if (see(e)) fx.dust(e.x, fx.h(e.x, e.z), e.z, 22, 7, 2.2, 0.36); break;
         case 'sneak': if (see(e)) { const y = fx.h(e.x, e.z); fx.dust(e.x, y, e.z, 30, 9, 3, 0.45); fx.shock(e.x, y + 0.4, e.z, 10, 0.6, 0xd9b27a); fx.shake(e.x, e.z, 0.5); } break;
-        case 'emp': if (see(e)) fx.empBlast(e.x, e.z, e.r); break;
         case 'toxin': if (see(e)) fx.toxinBurst(e.x, e.z, e.r); break;
         case 'ambush': if (e.team === PLAYER) fx.dust(e.x, fx.h(e.x, e.z), e.z, 18, 6, 2.4, 0.4); break; // an enemy ambush gives no tell
         case 'cleared': if (fog.visAt(PLAYER, e.x, e.z)) { fx.dust(e.x, fx.h(e.x, e.z) + 3, e.z, 16, 8, 2.4, 0.4); fx.flash(e.x, fx.h(e.x, e.z) + 4, e.z, 30, 0.2); } break;
@@ -210,7 +219,8 @@ export class View {
   viewFor(e) {
     let v = this.views.get(e.id);
     if (!v) {
-      v = createModel(e); v.id = e.id; v.recoil = 0; v.dustAcc = 0; v.spinT = 0; v.alt = 0; v.team = e.team;
+      const tm = e.kind === 'unit' && e.inert ? NEUTRAL : e.team;       // a unit that has resigned is drawn in neutral colours until it leaves
+      v = createModel(tm === e.team ? e : { kind: e.kind, type: e.type, team: tm, variant: e.variant }); v.id = e.id; v.recoil = 0; v.dustAcc = 0; v.spinT = 0; v.alt = 0; v.team = tm;
       if (e.kind === 'bldg') v.g.position.set(e.x, heightAt(this.map, e.x, e.z), e.z);
       this.scene.add(v.g); this.views.set(e.id, v);
     }
@@ -224,8 +234,8 @@ export class View {
     const el = p.T - p.t + alpha - (p.lift || 0), left = p.t - alpha, UP = nuke ? 56 : 30, DOWN = nuke ? 44 : 26, H = nuke ? 190 : 150;
     let x, y, z, pitch, hdg;
     if (el >= 0 && el < UP && (own || fog.visAt(PLAYER, p.sx, p.sz))) {
-      const u = el / UP, d = (nuke ? 9 : 5) + H * u * u, lean = nuke ? 0 : 0.32;            // Scud rails are raked back; the silo is vertical
-      x = p.sx - Math.sin(lean) * d; z = p.sz; y = fx.h(p.sx, p.sz) + Math.cos(lean) * d; hdg = Math.PI; pitch = Math.PI / 2 - lean;
+      const u = el / UP, d = (nuke ? 9 : 5) + H * u * u;                                   // straight up, off the rail or out of the silo
+      x = p.sx; z = p.sz; y = fx.h(p.sx, p.sz) + d; hdg = Math.PI; pitch = Math.PI / 2;
     } else if (left < DOWN && (own || fog.visAt(PLAYER, p.x, p.z))) {
       const u = Math.max(0, left / DOWN) * H;
       x = p.x - 0.2 * u; z = p.z - 0.085 * u; y = fx.h(p.x, p.z) + u; hdg = Math.atan2(0.085, 0.2); pitch = -1.36;
@@ -265,7 +275,7 @@ export class View {
       const show = this.reveal || fog.shouldShow(PLAYER, e);
       if (!show) { if (e.team !== PLAYER && e.kind === 'unit') hidden++; const v0 = this.views.get(e.id); if (v0) { v0.g.visible = false; v0.stamp = stamp; } continue; }
       let v = this.viewFor(e);
-      if (v.team !== e.team && e.kind === 'unit') { this.scene.remove(v.g); this.views.delete(e.id); v = this.viewFor(e); }
+      if (e.kind === 'unit' && v.team !== (e.inert ? NEUTRAL : e.team)) { this.scene.remove(v.g); this.views.delete(e.id); v = this.viewFor(e); }   // recruited or resigned: rebuild in the new colours
       v.stamp = stamp; v.g.visible = true;
       if (e.kind === 'unit') {
         shownUnits++;
@@ -313,7 +323,6 @@ export class View {
           const back = Math.max(0, Math.min(1, (cd - W.cd * 0.3) / (W.cd * 0.25)));                    // 1 = not loaded yet, 0 = fully on the cradle
           v.round.visible = cd < W.cd * 0.55; v.round.position.x = -3.4 * back;
         }
-        if (e.emp && fx.rnd() < dt * 7) fx.spark(x, y + 1.6, z);
         // tread / wheel dust
         if (!e.air && e.cls === 1 && e.spd > 1.5) {
           v.dustAcc += dt * e.spd * 1.15;
@@ -369,6 +378,7 @@ export class View {
         // the sim gives the dive profile (height above the aim point); the nose follows the flight path
         const gy = fx.h(p.tx, p.tz), py = p.py || p.y, y = gy + py + (p.y - py) * alpha, rig = m.userData.rig;
         m.position.set(x, y, z); m.rotation.y = -p.a; rig.body.rotation.z = Math.atan2(p.y - py, 4.4);
+        if (rig.props) for (const pr of rig.props) pr.rotation.x += dt * 45;
         if (fx.rnd() < dt * 60) { const g = 0.9; for (const k of [-1, 1]) fx.smoke.spawn(x - p.dx * 5 - p.dz * k, y + 0.9, z - p.dz * 5 + p.dx * k, 0, 0, 0, 0.6, 0.8, 2.0, g, g, g, 0.22, 0, 0.3); }
         if (p.payload === 'strafe' && p.s > -44 && p.s < 6) { // GAU-8 burst: tracers from the nose gun down onto the line, with gun smoke
           const nx = x + p.dx * 6, nz = z + p.dz * 6, ny = y - 0.4;
@@ -380,6 +390,18 @@ export class View {
         const turning = p.s >= 0 && p.n < POWERS.ac130.secs * 20;
         rig.bank = (rig.bank || 0) + ((turning ? -0.36 : 0) - (rig.bank || 0)) * Math.min(1, dt * 1.8);
         m.position.set(x, fx.h(p.cx, p.cz) + p.y, z); m.rotation.y = -(p.phdg + angDiff(p.hdg, p.phdg) * alpha); rig.body.rotation.x = rig.bank;
+        if (rig.props) for (const pr of rig.props) pr.rotation.x += dt * 45;
+      } else if (p.kind === 'airliner') { // The Phantom's hijacked jet: a shallow dive onto the target, trailing smoke
+        const m = this.prop(p.id, () => { const r = createPlane('b737', sim.teams[p.team].faction, p.team); r.g.userData.rig = r; return r.g; }, stamp);
+        const y = fx.h(p.tx, p.tz) + p.py + (p.y - p.py) * alpha;
+        m.position.set(x, y, z); m.rotation.y = -p.a; m.userData.rig.body.rotation.z = Math.atan2(p.y - p.py, HERO_CALL.airliner.speed);
+        if (fx.rnd() < dt * 50) { const g = 0.25 + fx.rnd() * 0.15; fx.smoke.spawn(x - Math.cos(p.a) * 6, y + 0.3, z - Math.sin(p.a) * 6, 0, 0.5, 0, 1.6, 1.6, 4, g, g, g, 0.5, -0.1, 0.6); }
+      } else if (p.kind === 'para') { // five troopers come down under canopies onto the spots where their squads will form up
+        const n = POWERS.paradrop.n, up = Math.max(0, p.t - alpha) * 0.55;
+        for (let i = 0; i < n; i++) {
+          const a = i * 2.399963, cx = p.x + Math.cos(a) * (2 + i * 1.2), cz = p.z + Math.sin(a) * (2 + i * 1.2), m = this.prop(p.id + ':' + i, () => createChute().g, stamp);
+          m.position.set(cx + Math.sin(this.time * 1.3 + i) * 0.5, fx.h(cx, cz) + up * (1 + i * 0.04), cz); m.rotation.z = Math.sin(this.time * 1.7 + i * 2) * 0.12; m.rotation.y = i * 1.3;
+        }
       } else if (p.kind === 'rocket') {
         // rockets streak from the wing pylon down to the aim point, laying smoke the whole way
         const m = this.prop(p.id, () => { const r = createRocket(); r.g.userData.rig = r; return r.g; }, stamp);

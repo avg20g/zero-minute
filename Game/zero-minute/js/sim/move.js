@@ -20,7 +20,7 @@ function buildHash(sim) {
   }
 }
 
-function immovable(u) { return u.still || u.working || u.emp || u.deployed; }
+function immovable(u) { return u.still || u.working || u.deployed || u.inert; }
 
 export function stepMovement(sim) {
   const nav = sim.nav;

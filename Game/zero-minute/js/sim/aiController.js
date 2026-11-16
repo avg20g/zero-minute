@@ -74,7 +74,8 @@ export class AIController {
     this.homeDock = m.docks.map(d => ({ x: d.x + 4, z: d.z + 3 })).sort((a, b) => Math.hypot(a.x - this.home.x, a.z - this.home.z) - Math.hypot(b.x - this.home.x, b.z - this.home.z))[0];
     const Tm = sim.teams[team], can = new Set(this.F.build.flatMap(b => trainsOf(Tm, b)));   // what this side's general lets it build
     this.roster = Object.keys(UNITS).filter(k => UNITS[k].faction === this.F.id && can.has(k));
-    this.combat = this.roster.filter(k => UNITS[k].weapon && !UNITS[k].harvester && !UNITS[k].builder && !UNITS[k].scout);
+    this.combat = this.roster.filter(k => UNITS[k].weapon && !UNITS[k].harvester && !UNITS[k].builder && !UNITS[k].scout && !UNITS[k].hero);
+    this.heroType = this.roster.find(k => UNITS[k].hero) || null; this.heroAI = { last: -1e9, hunt: 0, solo: 0, army: 0 };   // one hero per side: trained once, played on its own schedule
     this.scout = { id: 0, route: null, i: 0, leg: 0, lastSweep: -1e9, asked: -1e9, lost: -1e9, sweeps: 0 };
     this.op = { mode: 'gather', ids: [], groups: null, wps: null, target: null, since: 0, strength0: 0, wave: 0, lastPush: 0, hunt: 0 };
     this.retreating = new Map(); this.reversing = new Map(); this.focus = null; this.capId = 0; this.buildHold = 0; this.lastBuild = null; this.badSites = new Set();
@@ -162,7 +163,7 @@ export class AIController {
   // ------------------------------------------------------------ own forces (full knowledge of own side is fair)
   census() {
     const sim = this.sim, team = this.team, tick = sim.tick, S = this.scout, R = this.F.roles;
-    const c = { builders: [], trucks: 0, army: [], types: {}, bl: {}, prod: [], undone: [], queued: {}, deployers: [], scout: null, strength: 0, mine: [] };
+    const c = { builders: [], trucks: 0, army: [], types: {}, bl: {}, prod: [], undone: [], queued: {}, deployers: [], scout: null, strength: 0, mine: [], hero: null };
     const live = sim.byId.get(S.id); const haveScout = live && !live.dead && live.team === team;
     if (!haveScout) { if (S.id) S.lost = tick; S.id = 0; }
     const cap = sim.byId.get(this.capId);
@@ -176,9 +177,10 @@ export class AIController {
         if (tick - e.lastHit < 40) this.attackedAt = tick;
         continue;
       }
-      if (e.inB) continue;
+      if (e.inB || e.inert || e.temp) continue;                          // resigned units take no orders; called-in units already have theirs
       const d = UNITS[e.type];
-      if (d.builder) c.builders.push(e);
+      if (d.hero) { c.hero = e; c.strength += d.cost; }
+      else if (d.builder) c.builders.push(e);
       else if (d.harvester) c.trucks++;
       else if (e.id === S.id) c.scout = e;
       else if (!S.id && e.type === R.scout && tick - S.lost >= 600) { S.id = e.id; c.scout = e; this.stats.scouts++; }   // a lost scout is replaced after 30 s
@@ -317,6 +319,7 @@ export class AIController {
     if (R.tunnel && cfg.retreat && n('tunnel') < 1 && nd('barracks') && c.strength >= 1500) bld('tunnel', R.tunnel, 42, 'front');
     for (const b of c.prod) for (const id of upgradesOf(T, b.type)) if (!T.upgrades.has(id) && !q('up:' + id) && b.queue.length < 2 && c.strength >= 3000) add('upgrade ' + id, 32, UPGRADES[id].cost + 1500, () => this.act({ t: 'train', id: b.id, type: 'up:' + id }));
     for (const type of this.roster) if (UNITS[type].deploy && c.deployers.length + q(type) < 2 && c.strength >= 2000) train(type, type, 31);
+    if (this.heroType && !c.hero && !q(this.heroType) && nd('factory') && c.strength >= 3500 && tick >= 3600) train('hero', this.heroType, 72);   // worth saving up for once there is an army
     // --- army: counter what has been seen
     let queuedArmy = 0; for (const type of this.combat) queuedArmy += q(type);
     if (c.army.length + queuedArmy < cfg.armyCap) {
@@ -335,6 +338,21 @@ export class AIController {
     }
     this.scouting(c);
     this.operations(c);
+    this.heroPlay(c);
+  }
+  // The hero either goes with the army or works alone. With an attack under way it follows the army's target. Otherwise
+  // it hunts by itself: the nearest enemy unit this AI has seen in the last 30 s (unarmed ones first), else the next
+  // point of interest on the way to the enemy start. Badly hurt, it goes home. Only memory and public map data are used.
+  heroPlay(c) {
+    const h = c.hero, H = this.heroAI, tick = this.sim.tick, op = this.op; if (!h || tick - H.last < 60) return;
+    const go = (x, z, attack) => { if (!this.act({ t: 'move', ids: [h.id], x, z, attack })) return false; H.last = tick; return true; };
+    if (h.hp < h.maxHp * 0.35) { if (dist(h, this.rally) > 16) go(this.rally.x, this.rally.z, false); return; }
+    if (op.mode !== 'gather' && op.target) { if (dist(h, op.target) > 30 && go(op.target.x, op.target.z, true)) H.army++; return; }
+    if (h.target) return;                                                              // busy with something in range
+    let best = null, bs = 1e9;
+    for (const m of this.aiMemoryMap.values()) { if (m.kind !== 'unit' || tick - m.tick > 600) continue; const s = dist(m, h) + (m.weapon ? 60 : 0); if (s < bs) { bs = s; best = m; } }
+    if (!best) { if (h.order) return; best = this.hunt[H.hunt++ % this.hunt.length]; }
+    if (dist(h, best) > 12 && go(best.x, best.z, true)) H.solo++;
   }
   spendPoints() {
     const T = this.T; if (T.points < 1) return;

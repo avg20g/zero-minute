@@ -5,6 +5,7 @@ import { DT, NEUTRAL, GARRISON_RANGE_BONUS, angDiff } from './defs.js';
 import { UNITS, BLDGS, WEAPONS, VET, HORDE, armorOf } from './factionRegistry.js';
 import { applyDamage, splashDamage, splashAll, moveTo, stopUnit, isMoving, kill } from './entities.js';
 import { addHazard } from './abilities.js';
+import { heroHack, phantomCall } from './heroes.js';
 
 const NONE = [];
 let _sim = null; // the simulation being stepped (slotsOf needs the team's upgrades)
@@ -26,9 +27,9 @@ export const groundTarget = (x, z) => ({ id: 0, ground: true, kind: 'ground', x,
 const groundOK = (w) => !w.garrisonOnly && ((w.vs.inf || 0) + (w.vs.light || 0) + (w.vs.heavy || 0) + (w.vs.tank || 0) + (w.vs.bldg || 0)) > 0;
 const GROUND_HIT = 1.8;   // metres: a direct-fire weapon aimed at the ground hurts whatever stands this close to the spot
 const canUse = (w, t) => t.ground ? groundOK(w) : (w.garrisonOnly ? t.kind === 'bldg' && t.garrison.length > 0 :
-  (w.vs[armorOf(t)] || 0) > 0 && !(w.noJets && t.kind === 'unit' && UNITS[t.type].based && !t.landed));   // noJets: cannot catch a strike aircraft in flight
+  (w.vs[armorOf(t)] || 0) > 0 && !(t.kind === 'unit' && UNITS[t.type].based && (w.noBased || (w.noJets && !t.landed))));   // noJets: not a strike aircraft in flight. noBased: not one at all
 // Can this unit be given a force-attack order at all?
-export function canForce(sim, u) { _sim = sim; const d = UNITS[u.type]; if (d.suicide) return false; for (const n of slotsOf(u)) if (groundOK(WEAPONS[n])) return true; return false; }
+export function canForce(sim, u) { _sim = sim; for (const n of slotsOf(u)) if (groundOK(WEAPONS[n])) return true; return false; }
 // Which slot leads against t. A garrison-clearing weapon is used on its own so
 // the building shell is not shot up alongside it. Returns -1 if nothing can hit t.
 function leadSlot(slots, t) {
@@ -46,7 +47,7 @@ export function canAttack(s, t) { return leadSlot(slotsOf(s), t) >= 0; }
 
 export function targetable(sim, team, t) {
   if (sim.tick < sim.treatyUntil) return false; // peace treaty
-  return !!t && !t.dead && !t.ruined && t.team !== team && t.team !== NEUTRAL && !(t.kind === 'unit' && t.inB) &&
+  return !!t && !t.dead && !t.ruined && !t.inert && t.team !== team && t.team !== NEUTRAL && !(t.kind === 'unit' && t.inB) &&
     !(t.kind === 'bldg' && BLDGS[t.type].indestructible) && sim.fog.canSee(team, t);
 }
 const edgeDist = (x, z, t) => Math.hypot(t.x - x, t.z - z) - t.radius;
@@ -89,6 +90,8 @@ function fire(sim, s, i, wname, ox, oz, t) {
   if (s.kind === 'unit') { s.revealUntil = sim.tick + 40; if (UNITS[s.type].ammo) s.ammo--; }
   const dmg = dmgOf(sim, s, w), a = Math.atan2(t.z - oz, t.x - ox), vet = s.vet || 0;
   const ff = s.kind === 'unit' && !!s.order && s.order.t === 'fattack';   // force attack: the shot hurts whatever it lands on, friend or foe
+  if (w.kind === 'hack') { const cd = heroHack(sim, s, wname, t); if (cd) s.cds[i] = cd; return; }   // Fook Mie's phone
+  if (w.kind === 'call') { phantomCall(sim, s, t); return; }                                          // The Phantom's call
   if (w.kind === 'hitscan' || w.kind === 'laser' || w.kind === 'spray') {
     sim.events.push({ t: w.kind === 'hitscan' ? 'tracer' : w.kind, w: wname, x: ox, z: oz, tx: t.x, tz: t.z, sid: s.id, tid: t.id, vet, sAir: !!s.air && !s.landed, tAir: !!t.air && !t.landed });
     if (t.ground) splashAll(sim, t.x, t.z, GROUND_HIT, dmg, wname, s, ox, oz); else applyDamage(sim, t, dmg, wname, ox, oz, s);
@@ -192,7 +195,8 @@ function suicideRun(sim, u, d, t, dist, W) {
   } else boom = dist <= W.range;
   if (!boom) return false;
   const y = u.air ? d.alt * u.altK : 0;
-  splashDamage(sim, u.x, u.z, S.r, S.dmg, S.w || 'fab', { team: u.team }, u.x, u.z, S.dive ? (tAir ? 'air' : 'ground') : null);
+  if (u.order && u.order.t === 'fattack') splashAll(sim, u.x, u.z, S.r, S.dmg, S.w || 'fab', u);       // force attack: the blast hurts whatever is there, friend or foe
+  else splashDamage(sim, u.x, u.z, S.r, S.dmg, S.w || 'fab', { team: u.team }, u.x, u.z, S.dive ? (tAir ? 'air' : 'ground') : null);
   sim.events.push({ t: 'suicide', x: u.x, z: u.z, y, r: S.r, team: u.team, air: !!u.air });
   kill(sim, u);
   return true;
@@ -213,7 +217,7 @@ function garrisonCombat(sim, e, d, slots) {
 
 function tryIntercept(sim, p, t) {
   for (const u of sim.pdlUnits) {
-    if (u.team === p.team || u.dead || u.emp || u.inB || u.pdlCd > 0) continue;
+    if (u.team === p.team || u.dead || u.inB || u.pdlCd > 0) continue;
     if (Math.hypot(u.x - p.x, u.z - p.z) > 13) continue;
     if (t && Math.hypot(u.x - t.x, u.z - t.z) > 16) continue; // only covers itself and close neighbours
     const base = UNITS[u.type].pdl || 70;
@@ -261,7 +265,7 @@ export function stepCombat(sim) {
       if (d.pdl || (d.pdlUpgrade && sim.teams[e.team].upgrades.has('v_pdl'))) { if (e.pdlCd > 0) e.pdlCd--; pdl.push(e); }
       if (!slots.length) continue;
       for (let i = 0; i < slots.length; i++) if (e.cds[i] > 0) e.cds[i]--;
-      if (e.emp || e.landed && e.as !== 'out') continue;
+      if (e.inert || e.landed && e.as !== 'out') continue;
       if (e.inB) garrisonCombat(sim, e, d, slots); else unitCombat(sim, e, d, slots);
     } else if (slots.length && e.done) {
       const d = BLDGS[e.type], w = WEAPONS[slots[0]];

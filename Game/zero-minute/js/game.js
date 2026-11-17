@@ -92,7 +92,7 @@ function start(o) {
     if (dt > 0) fps += (1 / dt - fps) * 0.05;
     audio.setListener(rig.tx, rig.tz, rig.dist, rig.yaw);
     if (!ui.paused) {
-      const speed = player ? ui.speed : 1, cap = 5 * speed;
+      const speed = ui.speed, cap = 5 * speed;   // 1x / 2x / 4x: the buttons work in live games as well as replays
       acc += dt * speed;
       let n = 0;
       while (acc >= DT && n < cap) {

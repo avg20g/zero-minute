@@ -8,6 +8,7 @@
 import THREE from '../lib/three.js';
 import { heightAt, WATER_Y } from '../sim/map.js';
 import { CELL } from '../sim/defs.js';
+import { WEAPONS } from '../sim/factionRegistry.js';
 import { patchFow, makeParticleTexture, makeCraterTexture } from './gfx.js';
 import { prismPositions } from './meshdata.js';
 
@@ -330,6 +331,7 @@ export class VFX {
     const c = Math.cos(a), s = Math.sin(a);
     if (kind === 'lob') {
       if (w === 'flashbang') { this.fire.spawn(x, y, z, 0, 0, 0, 0.05, 0.9, 0, 1, 1, 1, 1, 0, 0); return; }
+      if (WEAPONS[w] && WEAPONS[w].grenade) { this.smoke.spawn(x, y, z, 0, 0, 0, 0.1, 0.42, 0, 0.1, 0.1, 0.1, 0.95, 0, 0); return; }   // a launched grenade: a small dark round, no flame and no smoke trail
       this.fire.spawn(x, y, z, 0, 0, 0, 0.12, 2.6, 0, 1, 0.55, 0.15, 1, 0, 0);
       const g = 0.2 + r() * 0.1; this.smoke.spawn(x, y, z, 0, 0.4, 0, 0.8 + r() * 0.4, 0.9, 2.4, g, g, g, 0.4, -0.2, 1); return;
     }

@@ -56,7 +56,7 @@ export function stepProduction(sim) {
     let u;
     if (d.based) { // strike aircraft roll out onto a pad
       u = makeUnit(sim, item, b.team, b.x, b.z, -Math.PI / 2);
-      if (claimPad(sim, u)) { const p = sim.byId.get(u.home).pads[u.pad]; u.x = u.px = p.x; u.z = u.pz = p.z; u.landed = true; }
+      if (claimPad(sim, u)) { const p = sim.byId.get(u.home).pads[u.pad]; u.x = u.px = p.x; u.z = u.pz = p.z; u.facing = u.pfacing = u.turret = p.f; u.landed = true; }
     } else if (d.heli && b.heli) { // helicopters start on the helipad, spool up and climb (see air.js)
       u = makeUnit(sim, item, b.team, b.heli.x, b.heli.z, Math.PI / 2);
       u.altK = u.paltK = 0; u.landed = true; u.as = 'spool'; u.reloadT = 0;

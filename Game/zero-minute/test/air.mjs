@@ -59,7 +59,7 @@ for (const [type, fieldType, cx, cz, team, side] of [['v_raptor', 'v_airfield', 
   ok(L.finalUp === 0, 'height only ever falls on final approach');
   ok(Math.hypot(u.x - parkedAt.x, u.z - parkedAt.z) < 0.01 && u.altK === 0 && u.landed && b.rws.every(r => r.by === 0), 'parks back on its own pad and frees the runway');
   const up = (L.tAir - L.tOrder) / 20, down = (L.tPark - L.tFix) / 20;
-  ok(up <= (side === 'west' ? 5 : 7) && down <= 10, `ground handling is quick: ${up.toFixed(1)} s from order to wheels-up, ${down.toFixed(1)} s from approach fix to parked`);
+  ok(up <= (side === 'west' ? 6 : 8) && down <= 11, `ground handling is quick (jets start inside their hangars): ${up.toFixed(1)} s from order to wheels-up, ${down.toFixed(1)} s from approach fix to parked`);
   console.log(`${type.padEnd(9)}: order -> wheels-up ${up.toFixed(1)} s | lift-off at ${L.liftX.toFixed(1)} m / ${L.liftSpd.toFixed(1)} m/s | approach fix -> touchdown ${((L.tDown - L.tFix) / 20).toFixed(1)} s -> parked ${((L.tPark - L.tDown) / 20).toFixed(1)} s | touchdown ${Math.abs(L.td.z - Rin.z).toFixed(2)} m off centreline`);
 }
 

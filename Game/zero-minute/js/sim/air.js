@@ -86,7 +86,8 @@ function fighter(sim, u, d) {
   const pad = home.pads[u.pad], R = runway(home, u.rw >= 0 ? u.rw : 0), out = R.dir > 0 ? 0 : Math.PI; // its runway (once locked) and the take-off heading
   switch (u.as) {
     case 'parked': {
-      u.landed = true; u.altK = 0; u.goal = null; u.spd = 0; u.vx = u.vz = 0; u.x = pad.x; u.z = pad.z;
+      u.landed = true; u.altK = 0; u.goal = null; u.spd = 0; u.vx = u.vz = 0; u.x = pad.x; u.z = pad.z; u.onApron = false;
+      { const df = angDiff(pad.f, u.facing), ma = GROUND_TURN * DT; u.facing += Math.max(-ma, Math.min(ma, df)); }   // turned round in the hangar: nose to the door
       if (u.ammo < d.ammo && ++u.reloadT >= d.reload) { u.ammo = d.ammo; u.reloadT = 0; }
       if (u.hp < u.maxHp) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * HELI_REPAIR * DT);   // ground crew patch it up on the pad, at the helipad's rate
       const o = u.order;
@@ -94,7 +95,11 @@ function fighter(sim, u, d) {
       else if (o) u.order = null;
       return true;
     }
-    case 'taxi': u.landed = true; if (drive(u, pad.x, R.z, TAXI)) u.as = 'backtaxi'; return true;                 // pad -> runway centreline
+    case 'taxi': // out of the hangar door onto the apron, then down to the runway centreline
+      u.landed = true;
+      if (!u.onApron) { if (drive(u, pad.ax, pad.az, TAXI)) u.onApron = true; return true; }
+      if (drive(u, pad.ax, R.z, TAXI)) { u.as = 'backtaxi'; u.onApron = false; }
+      return true;
     case 'backtaxi': if (drive(u, R.ax + R.dir * 2.5, R.z, TAXI)) u.as = 'lineup'; return true;                     // down to the far end
     case 'lineup': {
       const df = angDiff(out, u.facing), ma = GROUND_TURN * DT; u.facing += Math.max(-ma, Math.min(ma, df)); u.spd = 0; u.vx = u.vz = 0;
@@ -157,14 +162,15 @@ function fighter(sim, u, d) {
     case 'rollout': { // brake along the centreline toward the far end, then turn off for the pad
       const land = R.dir > 0 ? Math.PI : 0, df = angDiff(land, u.facing); u.facing += Math.max(-0.2, Math.min(0.2, df));
       u.spd = Math.max(TAXI, u.spd - BRAKE * DT); u.vx = -R.dir * u.spd; u.vz = 0; u.x += u.vx * DT; u.z += (R.z - u.z) * 0.25;
-      const passed = (u.x - pad.x) * R.dir <= 0.5, end = (u.x - R.ax) * R.dir < 3;
+      const passed = (u.x - pad.ax) * R.dir <= 0.5, end = (u.x - R.ax) * R.dir < 3;
       if (end || (passed && u.spd <= TAXI + 0.01)) u.as = 'taxiin';
       return true;
     }
-    case 'taxiin': if (drive(u, pad.x, R.z, TAXI)) u.as = 'park'; return true;
+    case 'taxiin': if (drive(u, pad.ax, R.z, TAXI)) { u.as = 'park'; u.onApron = false; } return true;
     case 'park': {
       if (Math.abs(u.z - R.z) > 3.5) freeRunway(home, u);
-      if (drive(u, pad.x, pad.z, TAXI)) { freeRunway(home, u); u.as = 'parked'; u.target = 0; }
+      if (!u.onApron) { if (drive(u, pad.ax, pad.az, TAXI)) u.onApron = true; return true; }   // up to the hangar door, then inside
+      if (drive(u, pad.x, pad.z, TAXI)) { freeRunway(home, u); u.as = 'parked'; u.target = 0; u.onApron = false; }
       return true;
     }
   }

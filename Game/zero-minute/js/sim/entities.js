@@ -23,7 +23,7 @@ export function makeUnit(sim, type, team, x, z, facing = 0) {
     stealthMode: d.stealth || null, cloaked: false, detected: false, revealUntil: 0, stillT: 0,
     deployed: false, cashAcc: 0, horde: false, pdlCd: 0, capT: 0, windup: 0, dive: 0, charging: false,
     mode: d.modes ? d.modes[0] : null, inert: false, expires: 0, temp: false,   // hero ability mode; resigned (takes no part, about to leave); tick it vanishes; called-in unit that leaves no wreck or score
-    ammo: d.ammo || 0, as: d.based ? 'parked' : null, home: 0, pad: -1, rw: -1, loiterT: 0, loiterO: null, extend: 0, appr: 0, wps: null, hb: 0, hoverLow: false, landed: false, reloadT: 0,
+    ammo: d.ammo || 0, as: d.based ? 'parked' : null, home: 0, pad: -1, rw: -1, onApron: false, loiterT: 0, loiterO: null, extend: 0, appr: 0, wps: null, hb: 0, hoverLow: false, landed: false, reloadT: 0,
     altK: d.air && !d.based ? 1 : 0, paltK: d.air && !d.based ? 1 : 0, // height as a fraction of cruise altitude (see air.js)
   };
   sim.ents.push(u); sim.byId.set(u.id, u);
@@ -37,9 +37,14 @@ function outfit(sim, u, d) {
   if (d.nuke && T.upgrades.has('r_nuke')) u.ms = d.speed * 1.15;
   const G = generalOf(T);
   if (!d.air && !d.ship && (d.amph || d.infantry) && G && G.amph) u.nc = d.cls + 2;                       // Marine Corps: these units cross water
-  if (G && G.cloak && !u.stealthMode && !d.air && (d.infantry || d.armor === 'light')) u.stealthMode = 'still'; // Stealth General: hidden when standing still
+  if (G && G.cloak && !u.stealthMode && !d.air && !d.noCloak && (d.infantry || d.armor === 'light')) u.stealthMode = 'still'; // Stealth General: hidden when standing still
   if (u.type === 'v_comanche' && T.upgrades.has('v_stealthrotor')) u.stealthMode = 'always';
   if (d.salvage && T.flags.scrap) { u.tier = 1; }
+  if (G) { // generals that change how tough things are, or how experienced they start
+    const k = (G.hpMult || 1) * (d.tank && G.tankHp ? G.tankHp : 1);
+    if (k !== 1 && !d.hero) { u.maxHp = Math.round(d.hp * k); u.hp = u.maxHp; }
+    if (G.vet === 'tank' && d.tank) setVet(u, 1);
+  }
   for (const id of T.promos) {
     const v = promoNode(T.faction, id).vetBuild; if (!v) continue;
     if ((v === 'tank' && d.tank) || (v === 'infantry' && d.infantry && d.weapon) || v === u.type) { setVet(u, 1); break; }
@@ -48,7 +53,7 @@ function outfit(sim, u, d) {
 const team_ = (e) => e.team;
 
 export function setVet(u, rank) {
-  const base = UNITS[u.type].hp, nm = base * (1 + VET.hp * rank);
+  const base = u.maxHp / (1 + VET.hp * (u.vet || 0)), nm = base * (1 + VET.hp * rank);   // from the unit's own base health (a general may have changed it)
   u.hp += nm - u.maxHp; u.maxHp = nm; u.vet = rank;
 }
 
@@ -67,6 +72,7 @@ export function makeBldg(sim, type, team, cx, cz, done = true) {
     superReady: 0, superCd: 0, superShot: -1e9,   // superweapon buildings: tick it can fire, length of its countdown, tick it last fired
   };
   b.px = b.x; b.pz = b.z;
+  if (team < 2 && d.faction) { const G = generalOf(sim.teams[team]); if (G && G.hpMult) { b.maxHp = Math.round(d.hp * G.hpMult); b.hp = done ? b.maxHp : b.maxHp * 0.1; } }   // Wagner Group: cheaper and flimsier
   b.rallyX = b.x; b.rallyZ = b.z + (d.h / 2 + 6) * CELL;
   if (d.shore) { // a shipyard faces the water: ships are launched off that end and gather a little further out
     const f = b.face = shoreFace(sim, type, cx, cz), fx = [1, 0, -1, 0][f], fz = [0, 1, 0, -1][f], hw = (f & 1 ? d.h : d.w) * CELL * 0.5;
@@ -85,7 +91,7 @@ export function makeBldg(sim, type, team, cx, cz, done = true) {
   }
   if (d.pads) { // airfield: parking spots, runways and helipad come from the building's layout in the registry (metres from the centre)
     const L = d.layout;
-    b.pads = L.spots.map(([x, z]) => ({ x: b.x + x, z: b.z + z, by: 0 }));
+    b.pads = L.spots.map(([x, z], i) => ({ x: b.x + x, z: b.z + z, by: 0, ax: b.x + L.aprons[i][0], az: b.z + L.aprons[i][1], f: L.hangars[i][2] === 'e' ? 0 : Math.PI / 2 }));   // ax, az: the apron outside the hangar door; f: the way a parked jet faces (out of the door)
     b.rws = L.runways.map(oz => ({ x0: b.x - 18, x1: b.x + 18, z: b.z + oz, by: 0 })); b.heli = { x: b.x + L.helipad[0], z: b.z + L.helipad[1] };
   }
   sim.nav.setRect(cx, cz, d.w, d.h, 1);
@@ -239,6 +245,8 @@ function credit(sim, src, t, dealt, killed) {
     const v = worth(t); xp += v * GENERAL.killXp;
     const T = sim.teams[src.team];
     if (T.flags.bounty && t.kind === 'unit') { const cash = Math.round(UNITS[t.type].cost * 0.2); T.money += cash; T.passive += cash; }
+    const G = generalOf(T);
+    if (G && G.loot) { const cash = Math.round((t.kind === 'unit' ? UNITS[t.type].cost : BLDGS[t.type].cost || 0) * G.loot); if (cash) { T.money += cash; T.passive += cash; sim.events.push({ t: 'cash', x: t.x, z: t.z, amt: cash, team: src.team }); } }   // Vacation Command Group: a cut of everything it destroys
     if (src.kind === 'unit' && !src.dead) {
       src.xp += v;
       const base = Math.max(300, UNITS[src.type].cost);

@@ -300,8 +300,45 @@ tactics (counters, retreat, focus fire, flanking, power combos) are switched on.
   Known weak spot: ISIS on the two sea maps (11-25%), from distance and no aircraft, not from ships.
 - Tests: `node test/batch11.mjs` (78 checks).
 
+## Batch 12: Russia, Europe and the batch 11 play notes
+- **Two new factions**, ids `ursa` (Russia) and `aegis` (Europe), each a full base, about a dozen units, a ship, a
+  superweapon, seven promotions, a hero and two generals. Which units they have, and their numbers, are a
+  **placeholder line-up** (`placeholder: true` in `js/sim/factionRegistry.js`) until the player's own lists arrive;
+  every unit is nevertheless modelled on a real machine and armed like it.
+  - Russia: Motor Rifle Squad, RPG Team, T-90, BMP-3, 2K22 Tunguska, TOS-1A, Su-27, Ka-52, Steregushchiy corvette.
+    *Wagner Group*: everything 12% cheaper with 15% less health, plus the Convict Squad. *Vacation Command Group*:
+    T-14 Armata and Su-57, and 6% of the price of everything it destroys paid in cash.
+  - Europe: Legion Squad, MILAN Team, Leopard 2A6, Puma, Flakpanzer Gepard, PzH 2000, Eurofighter Typhoon, Tiger,
+    FREMM frigate. *Laser General*: lasers +25%, the Laser Leopard, Laser Point Defense for tanks. *Panzer General*:
+    tanks 10% cheaper, 15% tougher and built as Veterans, plus the KF51 Panther.
+  - Heroes: **IT'S HIM!** (a man on a bear: minigun plus red eye-lasers, `beam` colour on the weapon) and
+    **Leonidas** (weapon kind `melee`, unit flag `berserk`: he charges anything in sight and is never pulled back).
+  - Their superweapons and powers reuse older strike code through `as:` on the power (`usePower` in
+    `js/sim/powers.js`), with their own numbers; strikes carry `pid`.
+  - Models: `ARMOR` (real hull sizes and one shared scale), `trackedHull`, and one builder per vehicle in
+    `js/render/modelFactory.js`; `SU27`, `SU57`, `TYPHOON` are specs for the shared fighter builder (new options:
+    `canard`, `chin`, `single`, no tailplane); `KA52`, `TIGER`, `H6`; infantry and heroes in `js/render/models.js`.
+    `test/models.mjs` checks each against its real counterpart (355 checks).
+- **Play notes fixed**: the minimap scales to the map; 1x / 2x / 4x speed buttons in every game; ships fire from
+  their gun mounts (`mounts` on the unit) and a deck gun cannot fire across its own superstructure: a stationary
+  ship turns to bring it to bear; the Frigate's laser is stronger and sits on the mast top; jets park inside their
+  hangars (`HANGAR`, `aprons` in the airfield layout); grenade launchers look like grenade launchers; the AC-130
+  minigun fires every tick with half the spread; China's Fuel-Air Bomb comes from an H-6; the Comanche is dark grey
+  and the Z-10 black; the RHIB bow and the Corvette's hull band are right; the Missile Boat never cloaks
+  (`noCloak`); your own cloaked units are drawn see-through.
+- **ISIS AI and tunnels**: on Medium and Hard it opens a forward Tunnel Network exit along the land route to the
+  enemy (by Sneak Attack, or a Worker builds it: at most three tries), sends attacks through it and retreats through
+  it (`forwardTunnel`, `tunnelEnds` in `js/sim/aiController.js`). On 2 km maps it takes Sneak Attack at Rank 5.
+- **Balance** (details in `balance/CHANGELOG.md`): Hard, five 1 km maps, 15 sides, 2,250 matches: every side between
+  40% and 60%. Medium: 31% to 62%. Not balanced: the two 2 km sea maps (11% to 80%), where the sides whose AI
+  fights mostly on the ground (ISIS, Russia) lose to the ones that fly; the tunnel work did not close that gap.
+- Tests: `node test/batch12.mjs` (76 checks).
+
 ## Tests
 Node (simulation only):
+
+    node test/batch12.mjs     Russia and Europe, the four new generals, both heroes, power aliases, ship gun
+                              mounts and arcs, hangars, speed buttons, minimap, the ISIS AI's tunnels
 
     node test/batch11.mjs     map sizes, doubled maps, roads, shipyards, every ship, Landing Craft,
                               missile defense at sea, Drone Boat, the AI's fleet

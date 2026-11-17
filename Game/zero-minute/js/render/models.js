@@ -6,7 +6,7 @@
 import { TEAM } from '../ui/teamColors.js';
 import THREE from '../lib/three.js';
 import { CELL } from '../sim/defs.js';
-import { UNITS, BLDGS, FACTIONS } from '../sim/factionRegistry.js';
+import { UNITS, BLDGS, FACTIONS, HANGAR } from '../sim/factionRegistry.js';
 import { std, makeFacadeTexture } from './gfx.js';
 
 let G = null, M = null;
@@ -33,9 +33,10 @@ function init() {
     tarmac: std(0x4a4c4f, 0.95, 0), dark: std(0x2a2b2e, 0.9, 0.1), ghillie: std(0x5b6a3a, 1, 0), cloth: std(0xb9a98c, 1, 0), red: std(0x9c2f25, 0.8, 0.1),
     toxin: std(0x5f8f3a, 0.75, 0.1),
     black: std(0x121214, 0.9, 0), dress: std(0xc21f2b, 0.75, 0.05), blue: std(0x1f5fd0, 0.8, 0.05), camo: std(0x4c5a33, 0.95, 0),   // hero clothing
+    fur: std(0x5a3d25, 0.98, 0), furDark: std(0x3a2616, 0.98, 0), bronze: std(0xa9793a, 0.45, 0.65), emr: std(0x55633f, 0.95, 0), fleck: std(0x5f6a4c, 0.95, 0), grey: std(0x80868c, 0.6, 0.5),   // bear fur, hoplite bronze, Russian and European field uniforms
     laser: std(0x24424f, 0.14, 0.7), // coated optic, not a light source
     salvage: std(0x6a5c40, 0.85, 0.2),
-    grey: std(0x80868c, 0.6, 0.5), jet: std(0x8a9096, 0.5, 0.6),
+    jet: std(0x8a9096, 0.5, 0.6),
     civ: null,
   };
   // one wall colour per building kind, in the order of CIV_KINDS (sim/map.js); every kind gets its own window texture
@@ -178,6 +179,12 @@ function man(parent, T, x, z, o) {
   else if (o.gun === 'laptop') { box(m, M.dark, 0.3, 0.03, 0.4, 0.35, 0.8, 0); box(m, M.laser, 0.03, 0.26, 0.38, 0.5, 0.94, 0); }
   else if (o.gun === 'tool') box(m, M.red, 0.3, 0.2, 0.16, 0.2, 0.55, 0.28);
   else if (o.gun === 'satchel') box(m, M.dark, 0.2, 0.3, 0.3, -0.2, 0.9, 0);
+  else if (o.gun === 'milan') { // MILAN launcher on its tripod in front of the gunner: a fat tube with the sight box beside it
+    for (const a of [0, 2.1, 4.2]) { const l = cyl(m, M.gun, 0.02, 0.6, 0.55 + Math.cos(a) * 0.14, 0.28, Math.sin(a) * 0.14); l.rotation.z = Math.cos(a) * 0.35; l.rotation.x = -Math.sin(a) * 0.35; }
+    cyl(m, M.olive, 0.085, 1.1, 0.6, 0.62, 0, 'x'); box(m, M.dark, 0.2, 0.18, 0.14, 0.45, 0.72, 0.16); cyl(m, M.gun, 0.1, 0.06, 1.16, 0.62, 0, 'x');
+  }
+  if (o.kepi) cyl(m, M.white, 0.14, 0.12, 0, 1.47, 0);                          // the Legion's white kepi
+  if (o.pack) box(m, o.pack, 0.2, 0.34, 0.32, -0.22, 0.9, 0);
   return m;
 }
 function squad(T, spots, o) {
@@ -296,14 +303,21 @@ function airfield(T, d) {
     for (let i = -6; i <= 6; i++) box(g, M.white, 1.5, 0.05, 0.22, i * 2.6, 0.38, rz);                              // centreline dashes
     for (const x of [-17.2, 17.2]) for (let k = -3; k <= 3; k++) box(g, M.white, 1.5, 0.05, 0.3, x, 0.38, rz + k * 0.78); // threshold bars
   }
-  // One hangar per jet. The door faces south ('s') or east ('e'); the jet parks on the marked spot in front of it.
+  // One hangar per jet, big enough for the largest fighter. The door faces south ('s') or east ('e') and stands open:
+  // the jet parks inside with its nose at the door.
+  const W = HANGAR.w, D = HANGAR.d, H = HANGAR.h;
   for (const [x, z, face] of L.hangars) {
     const h = grp(g, x, 0.35, z); if (face === 'e') h.rotation.y = Math.PI / 2;                                     // built facing south (+z), turned for an east door
-    box(h, T.wall, 6.2, 3.0, 0.3, 0, 1.5, -2.85); for (const s of [-1, 1]) box(h, T.wall, 0.3, 3.0, 6.0, s * 2.95, 1.5, 0);   // back and side walls
-    const roof = cyl(h, T.roof, 3.1, 6.0, 0, 3.0, 0, 'z', G.cyl8); roof.scale.set(3.25, 6.0, 0.9);                       // shallow arched roof
-    box(h, T.accent, 6.3, 0.3, 0.12, 0, 3.1, 3.0); box(h, M.dark, 5.5, 2.7, 0.1, 0, 1.4, -2.6);                          // door lintel in team colour, dark interior
+    box(h, T.wall, W, H, 0.3, 0, H / 2, -D / 2 + 0.15); for (const s of [-1, 1]) box(h, T.wall, 0.3, H, D, s * (W / 2 - 0.15), H / 2, 0);   // back and side walls
+    const roof = cyl(h, T.roof, 1, D, 0, H, 0, 'z', G.cyl8); roof.scale.set(W / 2 + 0.15, D, 1.0);                       // shallow arched roof
+    box(h, T.accent, W + 0.1, 0.3, 0.14, 0, H + 0.1, D / 2); box(h, M.dark, W - 0.7, H - 0.3, 0.1, 0, H / 2 - 0.1, -D / 2 + 0.36);   // door lintel in team colour, dark back wall
+    box(h, M.slab, W - 0.6, 0.04, D - 0.4, 0, 0.03, 0); for (const s of [-1, 1]) box(h, M.yellow, 0.12, 0.05, D - 1, s * 2.6, 0.06, 0.2);   // hangar floor and wingtip lines
   }
-  for (const [x, z] of L.spots) { box(g, M.yellow, 3.4, 0.05, 0.14, x, 0.38, z); box(g, M.yellow, 0.14, 0.05, 3.4, x, 0.38, z); box(g, M.yellow, 0.14, 0.05, Math.max(0.1, L.runways[0] - 3 - z), x, 0.38, (z + L.runways[0] - 3) / 2); } // parking cross and taxi line to the runway
+  for (let i = 0; i < L.aprons.length; i++) { // taxi line: out of the door to the apron, then down to the runway
+    const [ax, az] = L.aprons[i], [sx, sz] = L.spots[i], len = Math.hypot(ax - sx, az - sz);
+    const l = box(g, M.yellow, len, 0.05, 0.14, (ax + sx) / 2, 0.38, (az + sz) / 2); l.rotation.y = -Math.atan2(az - sz, ax - sx);
+    box(g, M.yellow, 0.14, 0.05, Math.max(0.1, L.runways[0] - 3 - az), ax, 0.38, (az + L.runways[0] - 3) / 2);
+  }
   const [hx, hz] = L.helipad;
   cyl(g, M.yellow, 3.0, 0.05, hx, 0.38, hz); cyl(g, M.tarmac, 2.7, 0.06, hx, 0.39, hz);                             // helipad ring
   for (const s of [-1, 1]) box(g, M.white, 0.3, 0.05, 2.0, hx + s * 0.7, 0.42, hz); box(g, M.white, 1.4, 0.05, 0.3, hx, 0.42, hz); // "H"
@@ -418,11 +432,54 @@ function dock() {
   return { g, crates: crates.map(c => c.m) };
 }
 
+// IT'S HIM! (Russia): a bare-chested man in camouflage trousers and a grey fur ushanka, riding a big brown bear and
+// firing a minigun from the hip. The bear's eyes are red: that is where its lasers come from.
+function bearrider(T) {
+  const r = heroRig((m) => {
+    const bear = grp(m, 0, 0, 0);
+    box(bear, M.fur, 1.5, 0.72, 0.72, 0, 0.82, 0); box(bear, M.fur, 0.7, 0.8, 0.8, 0.45, 0.9, 0);                  // body, heavier at the shoulders
+    for (const [x, z] of [[0.5, 0.25], [0.5, -0.25], [-0.55, 0.25], [-0.55, -0.25]]) { box(bear, M.fur, 0.26, 0.56, 0.26, x, 0.28, z); box(bear, M.furDark, 0.3, 0.1, 0.3, x + 0.03, 0.05, z); }   // legs and paws
+    box(bear, M.fur, 0.5, 0.5, 0.56, 1.0, 1.05, 0); box(bear, M.furDark, 0.3, 0.22, 0.26, 1.34, 0.96, 0); box(bear, M.black, 0.08, 0.1, 0.14, 1.5, 1.0, 0);   // head, muzzle, nose
+    for (const s of [-1, 1]) { add(bear, G.sph, M.fur, 0.1, 0.1, 0.06, 0.9, 1.36, s * 0.22); box(bear, M.red, 0.04, 0.07, 0.08, 1.26, 1.14, s * 0.15); }       // ears, red eyes
+    add(bear, G.sph, M.fur, 0.14, 0.14, 0.14, -0.8, 0.95, 0);                                                                                                   // tail
+    const man = grp(m, -0.1, 1.18, 0);                                                                                                                         // the rider, astride
+    for (const s of [-1, 1]) { box(man, M.camo, 0.2, 0.2, 0.5, 0.05, 0.05, s * 0.3).rotation.x = s * 0.5; box(man, M.black, 0.24, 0.1, 0.16, 0.12, -0.3, s * 0.46); }   // thighs down the bear's sides, boots
+    box(man, M.skin, 0.28, 0.56, 0.44, 0, 0.42, 0); box(man, M.black, 0.3, 0.07, 0.46, 0, 0.16, 0);                                                            // bare torso, belt
+    for (const s of [-1, 1]) box(man, M.skin, 0.4, 0.13, 0.13, 0.2, 0.5, s * 0.3);
+    add(man, G.sph, M.skin, 0.14, 0.15, 0.14, 0, 0.86, 0);
+    box(man, M.grey, 0.34, 0.16, 0.34, 0, 0.98, 0); for (const s of [-1, 1]) box(man, M.grey, 0.2, 0.2, 0.05, -0.02, 0.86, s * 0.17); box(man, M.red, 0.04, 0.07, 0.07, 0.175, 0.99, 0);   // ushanka: crown, ear flaps, red star
+    const gun = grp(man, 0.45, 0.36, 0.22); box(gun, M.gun, 0.5, 0.2, 0.2, 0, 0, 0); for (const [dy, dz] of [[0.05, 0.05], [0.05, -0.05], [-0.05, 0.05], [-0.05, -0.05]]) cyl(gun, M.gun, 0.025, 0.9, 0.65, dy, dz, 'x');
+    cyl(gun, M.gun, 0.09, 0.06, 1.08, 0, 0, 'x'); box(gun, M.yellow, 0.06, 0.3, 0.06, -0.1, -0.2, 0.1);                                                        // minigun: motor, six barrels' worth, muzzle ring, belt
+  });
+  r.muzzle = 2.0; r.muzzleY = 1.7; return r;
+}
+// Leonidas (Europe): a Spartan hoplite. Bare chest, bronze trunks and greaves, a long red cape, a bronze Corinthian
+// helmet with a red horsehair crest, a round bronze shield on the left arm and a spear levelled in the right hand.
+function leonidas(T) {
+  const r = heroRig((m) => {
+    for (const s of [-1, 1]) { box(m, M.skin, 0.18, 0.62, 0.18, 0, 0.31, s * 0.12); box(m, M.bronze, 0.2, 0.3, 0.2, 0.01, 0.2, s * 0.12); box(m, M.wood, 0.24, 0.05, 0.2, 0.03, 0.025, s * 0.12); }   // legs, greaves, sandals
+    box(m, M.bronze, 0.3, 0.2, 0.46, 0, 0.66, 0); box(m, M.skin, 0.28, 0.5, 0.46, 0, 0.98, 0);                                                                // bronze trunks, bare torso
+    const cape = box(m, M.dress, 0.06, 1.0, 0.56, -0.2, 0.74, 0); cape.rotation.z = 0.16; box(m, M.dress, 0.2, 0.08, 0.5, -0.06, 1.24, 0);                      // red cape from the shoulders
+    add(m, G.sph, M.skin, 0.13, 0.14, 0.13, 0, 1.36, 0); add(m, G.sph, M.bronze, 0.165, 0.17, 0.165, -0.01, 1.4, 0);                                            // head inside the helmet
+    box(m, M.bronze, 0.06, 0.2, 0.05, 0.15, 1.32, 0); for (const s of [-1, 1]) box(m, M.bronze, 0.1, 0.16, 0.04, 0.1, 1.27, s * 0.12);                          // nose guard and cheek plates
+    for (let i = 0; i < 5; i++) { const a = -0.9 + i * 0.5; box(m, M.red, 0.14, 0.16, 0.05, -0.02 + Math.sin(a) * 0.16, 1.5 + Math.cos(a) * 0.14, 0).rotation.z = -a; }   // the crest, front to back
+    box(m, M.skin, 0.4, 0.13, 0.13, 0.16, 1.1, 0.3); cyl(m, M.wood, 0.028, 2.5, 0.75, 1.12, 0.36, 'x'); add(m, G.cone, M.bronze, 0.06, 0.34, 0.06, 2.15, 1.12, 0.36).rotation.z = -Math.PI / 2; cyl(m, M.bronze, 0.035, 0.12, -0.52, 1.12, 0.36, 'x');   // spear arm, shaft, point, butt spike
+    box(m, M.skin, 0.3, 0.13, 0.13, 0.12, 1.02, -0.3); cyl(m, M.bronze, 0.46, 0.06, 0.26, 0.98, -0.42, 'z'); cyl(m, M.red, 0.3, 0.07, 0.26, 0.98, -0.43, 'z'); cyl(m, M.bronze, 0.1, 0.09, 0.26, 0.98, -0.44, 'z');   // shield arm and the round shield
+  });
+  r.muzzle = 2.4; r.muzzleY = 1.55; return r;
+}
 const UNIT = {
   avenger, inferno, scorpion, buggy, tractor, dozer, truck, // tanks, technical, helicopter and scouts are built in modelFactory.js
   mig: (T) => jet(T, false), // the Raptor and the Z-10 are built in modelFactory.js
-  vet, fookmie, phantom, car,
+  vet, fookmie, phantom, car, bearrider, leonidas,
   rifle: (T) => squad(T, FOUR, { gun: 'rifle' }),
+  // Russia: motor rifle infantry in green EMR camouflage with helmets and packs; a two-man RPG-7 team; convicts in mismatched dark kit and wool caps
+  motorrifle: (T) => squad(T, FOUR, { gun: 'rifle', cloth: M.emr, legs: M.emr, hat: M.olive, pack: M.olive }),
+  rpg7: (T) => squad(T, TWO, { gun: 'rpg', cloth: M.emr, legs: M.emr, hat: M.olive }),
+  convict: (T) => squad(T, FOUR, { gun: 'rifle', cloth: M.dark, legs: M.khaki, hat: M.black }),
+  // Europe: Legion infantry in flecked camouflage and white kepis; a two-man MILAN missile team behind its tripod
+  legion: (T) => squad(T, FOUR, { gun: 'rifle', cloth: M.fleck, legs: M.fleck, hat: M.fleck, kepi: true }),
+  milanteam: (T) => { const g = new THREE.Group(), b = grp(g), o = { cloth: M.fleck, legs: M.fleck, hat: M.fleck, kepi: true }; const men = [man(b, T, 0.1, 0.35, { ...o, gun: 'milan' }), man(b, T, -0.1, -0.35, { ...o, gun: 'rifle', pack: M.olive })]; return { g, body: b, men, muzzle: 1.2, muzzleY: 0.7 }; },
   seal: (T) => { // four operators in black: two carbines, a marksman with a long rifle, a grenadier
     const g = new THREE.Group(), b = grp(g), o = { cloth: M.black, legs: M.dark, hat: M.dark };
     const men = FOUR.map(([x, z], i) => { const m = man(b, T, x, z, { ...o, gun: i === 2 ? 'long' : 'rifle' }); box(m, M.dark, 0.2, 0.3, 0.3, -0.2, 0.92, 0); if (i === 3) cyl(m, M.gun, 0.07, 0.4, 0.42, 0.86, 0.24, 'x'); return m; });

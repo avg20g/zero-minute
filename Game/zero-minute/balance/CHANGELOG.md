@@ -1,5 +1,86 @@
 # Balance changelog
 
+## Batch 12 (2026-11-17): Russia and Europe; fifteen sides
+
+Hard v Hard, 2,250 matches (15 sides, five 1 km maps, two seeds), friendly fire on, 40-minute limit. Medium v
+Medium, 1,125 matches (one seed). Full tables: `report.md` (Hard), `report-medium.md` (Medium); the batch 11 table
+is kept as `report-batch11.md`. The two 2 km sea maps: `report-sea.md` (450 matches, one seed).
+
+| Side | As first written (Hard) | Final (Hard) | Final (Medium) |
+|---|---|---|---|
+| China: Cyber General | 53% | 60% | 62% |
+| United States (no general) | 44% | 60% | 39% |
+| China: Mass Assault General | 53% | 59% | 62% |
+| United States: Marine Corps General | 45% | 55% | 52% |
+| United States: Air Force General | 47% | 54% | 44% |
+| Europe (no general) | 62% | 53% | 46% |
+| Europe: Panzer General | 64% | 51% | 45% |
+| Russia: Wagner Group | 62% | 51% | 59% |
+| Europe: Laser General | 63% | 49% | 49% |
+| China (no general) | 41% | 49% | 62% |
+| Russia: Vacation Command Group | 71% | 44% | 61% |
+| ISIS (no general) | 31% | 42% | 39% |
+| ISIS: WMD General | 31% | 40% | 45% |
+| Russia (no general) | 45% | 40% | 52% |
+| ISIS: Stealth General | 36% | 40% | 31% |
+
+Start positions (Hard): Desert Canyon 50 / 50, Forest River 53 / 47, Urban Megacity 49 / 51, Open Desert 49 / 51,
+Arctic Refinery 37 / 63 (still open).
+
+What the sweeps showed and what was changed:
+
+| What | First written | Final | Why |
+|---|---|---|---|
+| Leonidas: spear | 240 damage every 0.6 s, 1,500 health | 195 every 0.7 s, 1,300 health | Europe won 62-64%; with him at 150 damage and 1,100 health it fell to 33-38%, so the answer is in between. Still the hardest-hitting and toughest hero |
+| Gepard and Tunguska guns against infantry | 0.9 | 0.7 (Gepard), 0.6 (Tunguska); light vehicles 0.7 / 0.6 | an anti-aircraft gun was the best infantry killer in both armies |
+| MILAN Team | 82 damage, 48 m, $380 | 70 damage, 44 m, $430 | Europe's cheap infantry carried it |
+| Legion Squad | $320, 280 health | $340, 260 health | same |
+| Puma | $900; Spike 125 damage, x1.8 against tanks | $950; 118 damage, x1.5 | same; and the AI now picks the MILAN Team against armor and the Puma against infantry instead of the Puma for both |
+| Wagner Group | 15% cheaper, 10% less health | 12% cheaper, 15% less health | 62% |
+| Vacation Command Group: cash from kills | 25% of the price | 6% | 71%, and it earned far more than anyone ($51,900 a match) |
+| T-14 Armata | $1,500, 700 health | $1,650, 640 health | same |
+| BMP-3 | $800; 100 mm 50 damage every 3 s; 30 mm 9 | $900; 40 damage every 3.5 s; 30 mm 8 | Russia built 32 a match and beat ISIS nine times in ten |
+| T-90 | $850 | $800 | Russia's AI hardly built it |
+
+AI changes that also move the numbers: the ISIS AI opens forward Tunnel Network exits and moves attacks through
+them (a second Worker does the walking, so the base keeps its builder).
+
+The two sea maps (Hard, one seed):
+
+| Side | Win rate of decided games | Draws of 60 |
+|---|---|---|
+| China: Cyber General | 80% | 1 |
+| United States: Air Force General | 78% | 24 |
+| China: Mass Assault General | 76% | 14 |
+| United States: Marine Corps General | 76% | 23 |
+| United States (no general) | 71% | 28 |
+| China (no general) | 61% | 12 |
+| Europe: Laser General | 51% | 19 |
+| Europe: Panzer General | 47% | 9 |
+| Europe (no general) | 39% | 15 |
+| ISIS (no general) | 29% | 25 |
+| Russia (no general) | 28% | 27 |
+| Russia: Wagner Group | 22% | 29 |
+| ISIS: Stealth General | 21% | 28 |
+| Russia: Vacation Command Group | 19% | 30 |
+| ISIS: WMD General | 11% | 20 |
+
+Start positions there: Strait of Sand 41 / 59, Emerald Isles 56 / 44. 37% of matches reach the 40-minute limit.
+
+Still open:
+- **Sea maps:** **the two 2 km maps are not balanced: 11% to 80%.** Teaching the ISIS AI to tunnel moved ISIS from 25 / 21 /
+  11% (batch 11) to 29 / 21 / 11%: it opens exits and uses them, but the exits are lost and the armies still arrive
+  piecemeal. Russia, new this batch, is as weak there (19-28%). What the weak sides share is an AI army of infantry
+  and ground vehicles; the United States and China put far more into aircraft, which ignore a 3 km land route. The
+  1 km maps do not show this. It needs its own pass: either the Russian and ISIS AIs must fly and ferry more, or
+  the sea maps need a shorter land route.
+- **Medium: 31% to 62%.** China's three sides and Russia's two generals win about 60%; ISIS Stealth General 31%, ISIS
+  and the United States without a general 39%. Hard is the level the numbers are tuned against.
+- Arctic Refinery favours the second start (37 / 63).
+- The Russia and Europe line-ups and all their numbers are placeholders until the player's unit lists arrive.
+  Their AIs lean on infantry and light vehicles (Russia builds about 30 BMP-3s and 2 T-90s a match).
+- Hero numbers come from AI-versus-AI matches; Leonidas in a person's hands will need another look.
+
 ## Batch 11 (2026-11-16): navy, sea maps, the five maps at 1 km
 
 Hard v Hard and Medium v Medium, 1,215 matches each on the five 1 km maps, friendly fire on, match limit raised

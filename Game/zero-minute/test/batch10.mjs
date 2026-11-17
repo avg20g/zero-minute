@@ -189,7 +189,7 @@ for (const [fac, type] of Object.entries(HEROES)) {
     const left = L.hangars.filter(h => h[2] === 'e'), top = L.hangars.filter(h => h[2] === 's');
     ok(L.hangars.length === 4 && P.length === 4 && inside && apart && Math.hypot(L.helipad[0] - P[3][0], L.helipad[1] - P[3][1]) > 6, `${BLDGS[type].name}: four hangars, four parking spots clear of the runways, the helipad and each other`);
     ok(type === 'v_airfield' ? left.length === 2 && top.length === 2 && left.every(h => h[0] < -12) && top.every(h => h[1] < -8) : top.length === 4 && top.every(h => h[1] < -8), `${BLDGS[type].name}: ${want}`);
-    ok(L.hangars.every((h, i) => h[2] === 'e' ? P[i][0] > h[0] + 4 && Math.abs(P[i][1] - h[1]) < 0.1 : P[i][1] > h[1] + 4 && Math.abs(P[i][0] - h[0]) < 0.1), `${BLDGS[type].name}: every jet parks in front of its own hangar door`);
+    ok(L.hangars.every((h, i) => Math.hypot(P[i][0] - h[0], P[i][1] - h[1]) < 1 && (h[2] === 'e' ? L.aprons[i][0] > h[0] + 5 && b.pads[i].f === 0 : L.aprons[i][1] > h[1] + 5 && b.pads[i].f === Math.PI / 2)), `${BLDGS[type].name}: every jet parks inside its own hangar, nose to the door, with an apron outside it`);
   }
   const s = bare({ factions: ['vanguard', 'redhammer'] }); s.teams[PLAYER].promos.add('v_pathfinder'); s.teams[PLAYER].promos.add('v_para'); makeBldg(s, 'v_cc', PLAYER, 20, 220); s.nav.rebuild();
   ok(usePower(s, PLAYER, 'paradrop', 300, 200) && s.strikes[0].model === 'c130', 'paratroopers are dropped by a C-130');

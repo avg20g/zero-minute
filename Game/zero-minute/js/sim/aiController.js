@@ -8,7 +8,7 @@
 // Difficulty changes behaviour caps only (actions per minute, reaction delay,
 // which tactics are allowed), never resources or vision.
 import { N, CELL, WORLD } from './defs.js';
-import { UNITS, BLDGS, FACTIONS, POWERS, UPGRADES, WEAPONS, trainsOf, upgradesOf, unitCost, nodePower } from './factionRegistry.js';
+import { UNITS, BLDGS, FACTIONS, POWERS, UPGRADES, WEAPONS, trainsOf, upgradesOf, unitCost, bldgCost, nodePower } from './factionRegistry.js';
 import { hasBldg } from './entities.js';
 import { powerError, hasPower, superOf } from './powers.js';
 import { padCount } from './air.js';
@@ -80,6 +80,8 @@ export class AIController {
     // The fleet (maps flagged `naval` only): which ships to build, and the open sea they must be able to reach.
     this.navy = sim.map.naval ? (this.F.aiNavy || []).filter(k => can.has(k)) : []; this.navRot = 0; this.sea = -2; this.yardSite = null; this.yardTry = -1e9;
     this.fleet = { mode: 'guard', next: 0, target: null, raids: 0, shots: 0 };
+    // Tunnel factions (ISIS), Medium and Hard: a forward tunnel exit toward the enemy, and armies that travel through it.
+    this.tun = { tried: -1e9, sneaks: 0, built: 0, trips: 0, home: 0 };
     this.heroType = this.roster.find(k => UNITS[k].hero) || null; this.heroAI = { last: -1e9, hunt: 0, solo: 0, army: 0 };   // one hero per side: trained once, played on its own schedule
     this.scout = { id: 0, route: null, i: 0, leg: 0, lastSweep: -1e9, asked: -1e9, lost: -1e9, sweeps: 0 };
     this.op = { mode: 'gather', ids: [], groups: null, wps: null, target: null, since: 0, strength0: 0, wave: 0, lastPush: 0, hunt: 0 };
@@ -269,7 +271,7 @@ export class AIController {
     const bld = (name, type, score, anchor) => {
       if (!type || score <= 0) return;
       const pre = !BLDGS[type].needs || hasBldg(sim, team, BLDGS[type].needs);
-      add(name, score, BLDGS[type].cost, () => this.build(builder, type, anchor), !!builder && pre && tick >= this.buildHold && !c.undone.some(b => b.type === type), true);
+      add(name, score, bldgCost(T, type), () => this.build(builder, type, anchor), !!builder && pre && tick >= this.buildHold && !c.undone.some(b => b.type === type), true);
     };
     const train = (name, type, score) => { const b = this.trainer(c, type); add(name, score, unitCost(T, type), () => { if (this.act({ t: 'train', id: b.id, type })) { this.stats.trained++; if (F.aiArmy[this.rot % F.aiArmy.length] === type) this.rot++; return true; } return false; }, !!b); };
 
@@ -323,6 +325,7 @@ export class AIController {
     if (R.income && n('income') < 1 && nd('factory') && c.strength >= 3000) bld('income', R.income, 46, 'base');
     if (R.super && cfg.superweapon && !sim.noSuper && n('super') < 1 && nd('factory') && c.strength >= 3500) bld('super', R.super, 45, 'base');
     if (R.tunnel && cfg.retreat && n('tunnel') < 1 && nd('barracks') && c.strength >= 1500) bld('tunnel', R.tunnel, 42, 'front');
+    if (R.tunnel && cfg.retreat) this.forwardTunnel(c, builder, add, train, q);
     for (const b of c.prod) for (const id of upgradesOf(T, b.type)) if (!T.upgrades.has(id) && !q('up:' + id) && b.queue.length < 2 && c.strength >= 3000) add('upgrade ' + id, 32, UPGRADES[id].cost + 1500, () => this.act({ t: 'train', id: b.id, type: 'up:' + id }));
     for (const type of this.roster) if (UNITS[type].deploy && c.deployers.length + q(type) < 2 && c.strength >= 2000) train(type, type, 31);
     // --- navy (sea maps): one shipyard on the nearest usable shore, then a fleet sized by difficulty
@@ -330,7 +333,7 @@ export class AIController {
       if (!n('shipyard')) {
         if (builder && tick >= this.buildHold && tick - this.yardTry > 400) { this.yardTry = tick; this.yardSite = this.shoreSite(R.shipyard); }
         const s = this.yardSite;
-        add('shipyard', s ? 60 : 0, BLDGS[R.shipyard].cost, () => { if (!this.act({ t: 'build', id: builder.id, type: R.shipyard, cx: s[0], cz: s[1] })) return false; this.lastBuild = { key: R.shipyard + s[0] + ',' + s[1], tick, id: builder.id }; this.buildHold = tick + 60; this.stats.builds++; this.yardSite = null; return true; }, !!builder && !!s && tick >= this.buildHold && !c.undone.some(b => b.type === R.shipyard), true);
+        add('shipyard', s ? 60 : 0, bldgCost(T, R.shipyard), () => { if (!this.act({ t: 'build', id: builder.id, type: R.shipyard, cx: s[0], cz: s[1] })) return false; this.lastBuild = { key: R.shipyard + s[0] + ',' + s[1], tick, id: builder.id }; this.buildHold = tick + 60; this.stats.builds++; this.yardSite = null; return true; }, !!builder && !!s && tick >= this.buildHold && !c.undone.some(b => b.type === R.shipyard), true);
       } else if (nd('shipyard')) {
         let queued = 0, afloat = 0; for (const type of this.navy) { queued += q(type); afloat += q(type) * UNITS[type].cost; } for (const u of c.fleet) afloat += UNITS[u.type].cost;
         // the fleet never outgrows the army: at most 60% of the land force's value, so a lost fleet is not rebuilt at the army's expense
@@ -358,6 +361,36 @@ export class AIController {
     this.operations(c);
     this.heroPlay(c);
     if (c.fleet.length) this.navalOps(c);
+  }
+  // ---- tunnels as transport (ISIS). `ends`: this side's finished tunnels, the one nearest home and the one nearest the enemy start.
+  tunnelEnds(c) {
+    const ts = (c.bl.tunnel || []).filter(b => b.done && !b.dead); if (ts.length < 2) return null;
+    const foe = { x: WORLD - this.homeW.x, z: WORLD - this.homeW.z };
+    let home = ts[0], fwd = ts[0]; for (const b of ts) { if (dist(b, this.homeW) < dist(home, this.homeW)) home = b; if (dist(b, foe) < dist(fwd, foe)) fwd = b; }
+    return home !== fwd && dist(fwd, home) > 120 ? { home, fwd } : null;
+  }
+  // Open an exit toward the enemy once there is a tunnel at home and an army worth moving: by Sneak Attack if the
+  // side has it (the exit appears on explored ground far forward), otherwise a Worker walks out and builds one.
+  forwardTunnel(c, builder, add, train, q) {
+    const sim = this.sim, tick = sim.tick, T = this.T, R = this.F.roles, U = this.tun;
+    if (!(c.bl.tunnel || []).some(b => b.done) || this.tunnelEnds(c) || c.strength < 2500 || tick - U.tried < 300 || c.undone.some(b => b.type === R.tunnel) || dist(this.homeW, { x: WORLD - this.homeW.x, z: WORLD - this.homeW.z }) < 500) return;   // not worth it on a small map
+    // Points are taken along the land route to the enemy start (the terrain is public; who is on it is not), never across water.
+    if (!U.route) { const r = sim.nav.findPath(this.homeW.x, this.homeW.z, WORLD - this.homeW.x, WORLD - this.homeW.z, 1).path; if (!r) { U.tried = 1e12; return; } let L = 0; const pts = [[this.homeW.x, this.homeW.z, 0]]; for (let i = 0; i < r.length; i += 2) { const q = pts[pts.length - 1]; L += Math.hypot(r[i] - q[0], r[i + 1] - q[1]); pts.push([r[i], r[i + 1], L]); } U.route = pts; }
+    const at = (f) => { const pts = U.route, want = pts[pts.length - 1][2] * f; for (let i = 1; i < pts.length; i++) if (pts[i][2] >= want) { const a = pts[i - 1], b = pts[i], t = (want - a[2]) / ((b[2] - a[2]) || 1); return { x: a[0] + (b[0] - a[0]) * t, z: a[1] + (b[1] - a[1]) * t }; } return { x: pts[0][0], z: pts[0][1] }; };
+    const quiet = (p) => { for (const m of this.aiMemoryMap.values()) if (m.kind === 'unit' && m.weapon && tick - m.tick < 1200 && dist(m, p) < 160) return false; return true; };   // not where the enemy was seen in the last minute
+    if (hasPower(sim, this.team, 'sneaktunnel') && (T.powerReady.sneaktunnel || 0) <= tick) {
+      for (const f of [0.68, 0.6, 0.52, 0.44]) { const p = at(f); if (!quiet(p) || powerError(sim, this.team, 'sneaktunnel', p.x, p.z) !== null) continue; U.tried = tick; if (this.act({ t: 'power', id: 'sneaktunnel', x: p.x, z: p.z })) { U.sneaks++; this.stats.casts.push({ id: 'sneaktunnel', tick }); } return; }
+    }
+    if (U.built >= 3 || tick - U.tried < 2400) return;                                         // a Worker's walk is a risk: at most three tries, well apart
+    if (c.builders.length < 2) { if (!q(R.builder) && c.undone.length === 0) train('second builder', R.builder, 43); return; }   // the base keeps a builder of its own: the walk is for a second one
+    if (!builder || tick < this.buildHold) return;
+    const exp = this.aiExplored;
+    for (const f of [0.44, 0.38, 0.32]) { // the furthest of these points that this side has explored and that looks quiet
+      const p = at(f), cx = Math.floor(p.x / CELL), cz = Math.floor(p.z / CELL); if (!exp[cz * N + cx] || !quiet(p)) continue;
+      add('forward tunnel', 44, bldgCost(T, R.tunnel), () => { U.tried = tick; if (this.build(builder, R.tunnel, { id: -1, x: cx, z: cz })) { U.built++; return true; } return false; }, true, true);
+      return;
+    }
+    this.needIntel = true;   // nothing explored on the way yet: go and look
   }
   // The open sea: the largest body of water a boat can sail. Counted once (map data, like reading the minimap).
   seaComp() {
@@ -430,7 +463,7 @@ export class AIController {
   heroPlay(c) {
     const h = c.hero, H = this.heroAI, tick = this.sim.tick, op = this.op; if (!h || tick - H.last < 60) return;
     const go = (x, z, attack) => { if (!this.act({ t: 'move', ids: [h.id], x, z, attack })) return false; H.last = tick; return true; };
-    if (h.hp < h.maxHp * 0.35) { if (dist(h, this.rally) > 16) go(this.rally.x, this.rally.z, false); return; }
+    if (h.hp < h.maxHp * 0.35 && !UNITS[h.type].berserk) { if (dist(h, this.rally) > 16) go(this.rally.x, this.rally.z, false); return; }   // a berserk hero (Leonidas) is never pulled back
     if (op.mode !== 'gather' && op.target) { if (dist(h, op.target) > 30 && go(op.target.x, op.target.z, true)) H.army++; return; }
     if (h.target) return;                                                              // busy with something in range
     let best = null, bs = 1e9;
@@ -441,7 +474,8 @@ export class AIController {
   spendPoints() {
     const T = this.T; if (T.points < 1) return;
     const open = this.F.tree.filter(k => !T.promos.has(k.id) && T.rank >= k.tier && (!k.req || T.promos.has(k.req)));
-    const pick = (this.level !== 'easy' && open.find(k => k.power)) || open[0];
+    const far = N >= 1024 && this.level !== 'easy' && open.find(k => k.power === 'sneaktunnel');   // on the biggest maps distance is the enemy: take Sneak Attack as soon as it is on offer
+    const pick = far || (this.level !== 'easy' && open.find(k => k.power)) || open[0];
     if (pick) this.act({ t: 'promote', node: pick.id });
   }
 
@@ -510,6 +544,13 @@ export class AIController {
         return;
       }
       const ids = homeGroup.map(u => u.id);
+      const ends = this.F.roles.tunnel && cfg.retreat ? this.tunnelEnds(c) : null, walkers = homeGroup.filter(u => !u.air);
+      if (ends && walkers.length >= 3 && dist(ends.fwd, tg) + 60 < dist(ends.home, tg)) { // the army goes underground and comes up at the forward exit
+        if (this.budget < 2) return;
+        this.act({ t: 'tunnel', ids: walkers.map(u => u.id), target: ends.fwd.id }); const fl = homeGroup.filter(u => u.air).map(u => u.id); if (fl.length) this.act({ t: 'move', ids: fl, x: ends.fwd.x, z: ends.fwd.z, attack: true });
+        op.mode = 'tunnel'; op.via = ends.fwd.id; op.ids = ids; op.target = tg; op.since = op.lastPush = tick; op.strength0 = str; op.wave++; this.stats.attacks++; this.tun.trips++;
+        return;
+      }
       const wps = cfg.flank && ids.length >= 6 ? this.flankPoints(tg) : null;
       if (wps) {
         const A = [], B = []; homeGroup.forEach((u, i) => (u.air || i % 2 === 0 ? A : B).push(u.id));
@@ -522,12 +563,22 @@ export class AIController {
     }
     const alive = op.ids.map(id => sim.byId.get(id)).filter(u => u && !u.dead && u.team === this.team && !u.inB && !this.retreating.has(u.id));
     op.ids = alive.map(u => u.id);
-    const fallBack = () => { if (alive.length) this.act({ t: 'move', ids: op.ids, x: this.rally.x, z: this.rally.z }); op.mode = 'gather'; op.ids = []; };
+    const fallBack = () => {
+      const ends = this.F.roles.tunnel && cfg.retreat ? this.tunnelEnds(c) : null, cx = alive.reduce((a, u) => a + u.x, 0) / (alive.length || 1), cz = alive.reduce((a, u) => a + u.z, 0) / (alive.length || 1);
+      if (alive.length && ends && dist({ x: cx, z: cz }, ends.fwd) + 80 < dist({ x: cx, z: cz }, this.rally)) this.act({ t: 'tunnel', ids: alive.filter(u => !u.air).map(u => u.id), target: ends.home.id });   // home the quick way
+      else if (alive.length) this.act({ t: 'move', ids: op.ids, x: this.rally.x, z: this.rally.z });
+      op.mode = 'gather'; op.ids = [];
+    };
     if (!alive.length || (cfg.retreat && cost(alive) < 0.3 * op.strength0)) { fallBack(); return; }
     if (op.target.hill ? !this.sim.koth || (this.sim.koth.owner === this.team && tick - op.lastPush > 600 && !!this.pickTarget()) : !this.aiMemoryMap.has(op.target.id)) { // target confirmed gone (or the hill is ours and a base is known): next known target, or go home and scout
       const tg = this.pickTarget();
       if (!tg) { fallBack(); this.needIntel = true; return; }
       op.target = tg; op.mode = 'attack'; op.lastPush = -1e9;
+    }
+    if (op.mode === 'tunnel') { // wait for the column to come up at the forward exit, then attack from there
+      const ex = sim.byId.get(op.via), up = alive.filter(u => u.air || (ex && dist(u, ex) < 60)).length;
+      if (!ex || ex.dead || up >= alive.length * 0.6 || tick - op.since > 900) { if (this.act({ t: 'move', ids: op.ids, x: op.target.x, z: op.target.z, attack: true })) { op.mode = 'attack'; op.lastPush = tick; } }
+      return;
     }
     if (op.mode === 'flank') {
       const at = (g, wp) => { let k = 0, n = 0; for (const id of g) { const u = sim.byId.get(id); if (!u || u.dead) continue; n++; if (u.air || dist(u, wp) < 38) k++; } return !n || k / n >= 0.6; };

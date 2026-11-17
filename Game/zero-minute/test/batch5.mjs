@@ -17,7 +17,7 @@ const hold = (u) => { u.order = { t: 'hold' }; return u; };
 // ---------------------------------------------------------------- A. names and the roster of generals
 {
   ok(FACTIONS.vanguard.name === 'United States' && FACTIONS.redhammer.name === 'China' && FACTIONS.sandstorm.name === 'ISIS', 'factions are United States, China and ISIS');
-  ok(['vanguard', 'redhammer', 'sandstorm'].every(f => generalsOf(f).length === 2) && Object.keys(GENERALS).length === 6, 'two generals per faction, six in all');
+  ok(['vanguard', 'redhammer', 'sandstorm', 'ursa', 'aegis'].every(f => generalsOf(f).length === 2) && Object.keys(GENERALS).length === 10, 'two generals per faction, ten in all');
   const names = Object.values(GENERALS).map(g => g.name);
   ok(['General Drudgereport.com', "Secretary Yuec'an Tsie Mie", 'General Tsao, Chicken', 'EWSAMA BEN ALLADIN', 'Nuclear Nadal'].every(n => names.includes(n)), 'five generals carry the names given, letter for letter');
   const s = new Sim({ ai: false, factions: ['vanguard', 'redhammer'], generals: ['mass', 'airforce'] });

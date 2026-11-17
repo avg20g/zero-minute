@@ -248,10 +248,11 @@ ok(!WEAPONS.scud_missile.intercept && WEAPONS.rpg.intercept && WEAPONS.hellfire.
 
 // ---------------------------------------------------------------- the AI and its fleet
 {
-  const match = (map, f) => { const s = new Sim({ ai: 'both', difficulty: ['hard', 'hard'], factions: f, map, seed: 4, friendlyFire: true }); for (let i = 0; i < 12000 && s.winner < 0; i++) s.step(); return s; };
+  const match = (map, f) => { const s = new Sim({ ai: 'both', difficulty: ['hard', 'hard'], factions: f, map, seed: 4, friendlyFire: true }); s.yardsPlaced = [0, 0];   // a shipyard may be sunk again before the end: count the ones laid down
+    for (let i = 0; i < 12000 && s.winner < 0; i++) { s.step(); for (const e of s.events) if (e.t === 'place') { const b = s.byId.get(e.id); if (b && BLDGS[b.type].shore) s.yardsPlaced[e.team]++; } s.events.length = 0; } return s; };
   const count = (s, t) => ({ yards: s.ents.filter(e => e.team === t && e.kind === 'bldg' && BLDGS[e.type].shore).length, ships: s.ents.filter(e => e.team === t && e.kind === 'unit' && UNITS[e.type].ship).length });
   const a = match(STRAIT_MAP, ['vanguard', 'sandstorm']), a0 = count(a, 0), a1 = count(a, 1);
-  ok(a0.yards === 1 && a1.yards === 1 && a0.ships + a.ais[0].fleet.shots > 0 && a1.ships + a.ais[1].fleet.shots > 0, `Strait of Sand, Hard v Hard: both sides build one shipyard and a fleet (US ${a0.ships} ships afloat, ISIS ${a1.ships}; ${a.ais[0].fleet.shots + a.ais[1].fleet.shots} fleet attack orders, ${a.ais[0].fleet.raids + a.ais[1].fleet.raids} sweeps)`);
+  ok(a.yardsPlaced[0] >= 1 && a.yardsPlaced[1] >= 1 && a0.yards <= 1 && a1.yards <= 1 && a0.ships + a.ais[0].fleet.shots > 0 && a1.ships + a.ais[1].fleet.shots > 0, `Strait of Sand, Hard v Hard: both sides build a shipyard (never two at once) and a fleet (US ${a0.ships} ships afloat, ISIS ${a1.ships}; ${a.ais[0].fleet.shots + a.ais[1].fleet.shots} fleet attack orders, ${a.ais[0].fleet.raids + a.ais[1].fleet.raids} sweeps)`);
   ok(!a.ents.some(e => e.kind === 'unit' && UNITS[e.type].transport) && a.ents.filter(e => e.kind === 'unit' && UNITS[e.type].ship).every(e => a.nav.isWater(a.nav.cellOf(e.x, e.z))), 'the AI builds no Landing Craft, and every ship is on the water');
   const again = match(STRAIT_MAP, ['vanguard', 'sandstorm']);
   ok(again.hash() === a.hash(), 'a match on a sea map plays out identically from the same seed');

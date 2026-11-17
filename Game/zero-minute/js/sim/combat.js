@@ -2,8 +2,8 @@
 // firing, projectiles, point-defense interception. All content comes from the
 // faction registry; nothing here knows about specific units.
 import { DT, NEUTRAL, GARRISON_RANGE_BONUS, angDiff } from './defs.js';
-import { UNITS, BLDGS, WEAPONS, VET, HORDE, armorOf } from './factionRegistry.js';
-import { applyDamage, splashDamage, splashAll, moveTo, stopUnit, isMoving, kill } from './entities.js';
+import { UNITS, BLDGS, WEAPONS, VET, HORDE, armorOf, generalOf } from './factionRegistry.js';
+import { applyDamage, splashDamage, splashAll, moveTo, stopUnit, isMoving, kill, rectDist } from './entities.js';
 import { addHazard } from './abilities.js';
 import { heroHack, phantomCall } from './heroes.js';
 
@@ -81,11 +81,19 @@ function dmgOf(sim, s, w) {
     if (d.salvage && !d.salvageWeapons) m *= 1 + 0.25 * s.tier;
     if (d.nuke && sim.teams[s.team].upgrades.has('r_nuke')) m *= 1.25;
   }
+  if (w.kind === 'laser' && s.team < 2) { const G = generalOf(sim.teams[s.team]); if (G && G.laser) m *= G.laser; }   // Laser General
   return w.dmg * m;
 }
 
+// Weapon mounts (ships): where a slot's weapon sits and which way it can point. See `mounts` in the registry.
+const mountOf = (s, i) => (s.kind === 'unit' && UNITS[s.type].mounts && UNITS[s.type].mounts[i]) || null;
+const mountPos = (s, m) => [s.x + Math.cos(s.facing) * m.x, s.z + Math.sin(s.facing) * m.x];
+// Bearing of the direction `a` off the mount's own axis (0 = straight along it).
+const offAxis = (s, m, a) => angDiff(a, s.facing + (m.dir || 0));
+const bears = (s, m, a) => Math.abs(offAxis(s, m, a)) <= m.arc + 0.02;
+
 function fire(sim, s, i, wname, ox, oz, t) {
-  const w = WEAPONS[wname];
+  const w = WEAPONS[wname], M = mountOf(s, i), my = M ? M.y : undefined;   // my: height of the mount, for the effects
   s.cds[i] = Math.max(1, Math.round(w.cd / rateOf(sim, s)));
   s.lastFire = sim.tick;
   if (s.kind === 'unit') { s.revealUntil = sim.tick + 40; if (UNITS[s.type].ammo) s.ammo--; }
@@ -93,13 +101,18 @@ function fire(sim, s, i, wname, ox, oz, t) {
   const ff = s.kind === 'unit' && !!s.order && s.order.t === 'fattack';   // force attack: the shot hurts whatever it lands on, friend or foe
   if (w.kind === 'hack') { const cd = heroHack(sim, s, wname, t); if (cd) s.cds[i] = cd; return; }   // Fook Mie's phone
   if (w.kind === 'call') { phantomCall(sim, s, t); return; }                                          // The Phantom's call
+  if (w.kind === 'melee') { // a thrust at arm's length: no projectile, nothing to shoot down
+    sim.events.push({ t: 'melee', w: wname, x: ox, z: oz, tx: t.x, tz: t.z, sid: s.id, tid: t.id, onBldg: t.kind === 'bldg' });
+    if (t.ground) splashAll(sim, t.x, t.z, GROUND_HIT, dmg, wname, s, ox, oz); else applyDamage(sim, t, dmg, wname, ox, oz, s);
+    return;
+  }
   if (w.kind === 'hitscan' || w.kind === 'laser' || w.kind === 'spray') {
-    sim.events.push({ t: w.kind === 'hitscan' ? 'tracer' : w.kind, w: wname, x: ox, z: oz, tx: t.x, tz: t.z, sid: s.id, tid: t.id, vet, sAir: !!s.air && !s.landed, tAir: !!t.air && !t.landed });
+    sim.events.push({ t: w.kind === 'hitscan' ? 'tracer' : w.kind, w: wname, x: ox, z: oz, y: my, tx: t.x, tz: t.z, sid: s.id, tid: t.id, vet, sAir: !!s.air && !s.landed, tAir: !!t.air && !t.landed });
     if (t.ground) splashAll(sim, t.x, t.z, GROUND_HIT, dmg, wname, s, ox, oz); else applyDamage(sim, t, dmg, wname, ox, oz, s);
   } else {
     sim.projs.push({ id: sim.nextId++, kind: w.kind, w: wname, x: ox, z: oz, px: ox, pz: oz, sx: ox, sz: oz, tid: t.id, tx: t.x, tz: t.z,
-      speed: w.speed, dmg, team: s.team, srcId: s.id, vet, dead: false, a, ff, homing: w.kind !== 'lob', sAir: !!s.air && !s.landed, tAir: !!t.air && !t.landed, thermo: s.kind === 'unit' && !!UNITS[s.type].thermo });
-    sim.events.push({ t: 'fire', k: w.kind, w: wname, x: ox, z: oz, a, sid: s.id, vet });
+      speed: w.speed, dmg, team: s.team, srcId: s.id, vet, dead: false, a, ff, sy0: my, homing: w.kind !== 'lob', sAir: !!s.air && !s.landed, tAir: !!t.air && !t.landed, thermo: s.kind === 'unit' && !!UNITS[s.type].thermo });
+    sim.events.push({ t: 'fire', k: w.kind, w: wname, x: ox, z: oz, y: my, len: M ? M.len : undefined, a, sid: s.id, vet });
   }
 }
 
@@ -111,13 +124,15 @@ function fireSlots(sim, s, slots, ox, oz, t, dist, lead, bonus) {
     const w = WEAPONS[slots[i]];
     if (!canUse(w, t) || dist > w.range + bonus || (w.minRange && dist < w.minRange)) continue;
     if (usesAmmo && s.ammo <= 0) continue;
+    const M = mountOf(s, i); let mx = ox, mz = oz;
+    if (M) { if (!bears(s, M, Math.atan2(t.z - s.z, t.x - s.x))) { s.bursts[i] = 0; continue; } [mx, mz] = mountPos(s, M); }   // the ship's own structure is in the way: this weapon waits
     if (s.bursts[i] > 0) {
-      if (--s.burstCd[i] <= 0) { s.bursts[i]--; s.burstCd[i] = w.burstGap; const keep = s.cds[i]; fire(sim, s, i, slots[i], ox, oz, t); s.cds[i] = keep; }
+      if (--s.burstCd[i] <= 0) { s.bursts[i]--; s.burstCd[i] = w.burstGap; const keep = s.cds[i]; fire(sim, s, i, slots[i], mx, mz, t); s.cds[i] = keep; }
       continue;
     }
     if (s.cds[i] > 0) continue;
     if (w.windup && s.kind === 'unit') { if (isMoving(s)) { s.windup = 0; continue; } if (++s.windup < w.windup) continue; s.windup = 0; }   // erect the launcher first (Scud)
-    fire(sim, s, i, slots[i], ox, oz, t);
+    fire(sim, s, i, slots[i], mx, mz, t);
     if (w.burst) { s.bursts[i] = w.burst - 1; s.burstCd[i] = w.burstGap; }
   }
 }
@@ -144,6 +159,7 @@ function unitCombat(sim, u, d, slots) {
   } else {
     const canAuto = !o || o.t === 'amove' || (o.t === 'move' && d.fireMoving && !d.suicide);   // a suicide unit told to move just moves
     const acqR = (!o || o.t === 'amove') ? Math.max(maxR, d.sight) : maxR;
+    if (d.berserk && !o) { u.guardX = u.x; u.guardZ = u.z; }   // no post to go back to: he fights where he stands and goes after whatever he sees
     t = u.target ? sim.byId.get(u.target) : null;
     if (t && (!canAuto || !targetable(sim, u.team, t) || edgeDist(u.x, u.z, t) > acqR + 4 || leadSlot(slots, t) < 0)) { t = null; u.target = 0; }
     if (!t && canAuto && (sim.tick + u.id) % 5 === 0) { t = acquire(sim, u.team, u.x, u.z, acqR, slots); u.target = t ? t.id : 0; }
@@ -157,13 +173,19 @@ function unitCombat(sim, u, d, slots) {
     return;
   }
   const lead = leadSlot(slots, t), W = WEAPONS[slots[lead >= 100 ? lead - 100 : lead]];
-  const dist = edgeDist(u.x, u.z, t), a = Math.atan2(t.z - u.z, t.x - u.x);
+  const dist = W.kind === 'melee' && t.kind === 'bldg' ? rectDist(t, u.x, u.z) : edgeDist(u.x, u.z, t), a = Math.atan2(t.z - u.z, t.x - u.x);   // a spear has to reach the wall itself
   if (d.suicide && (suicideRun(sim, u, d, t, dist, W) || u.dive)) return;   // gone, or committed to its dive
   if (dist <= W.range) {
     const holdGround = forced || !o || o.t === 'amove';
     if (holdGround && !d.based && isMoving(u) && dist <= W.range * 0.92) stopUnit(u);
     let aimed;
-    if (d.turret) aimed = turn(u, 'turret', a, d.turret) < 0.2;
+    const LM = mountOf(u, lead >= 100 ? lead - 100 : lead);
+    if (LM && LM.arc < Math.PI) { // a deck gun with a blind arc: the turret trains as far as it can; a ship that is not under way turns the rest
+      const off = offAxis(u, LM, a), lim = Math.max(-LM.arc, Math.min(LM.arc, off));
+      aimed = turn(u, 'turret', u.facing + (LM.dir || 0) + lim, d.turret) < 0.2;
+      if (Math.abs(off) > LM.arc && !u.path && !u.pathReq) turn(u, 'facing', u.facing + Math.sign(off) * (Math.abs(off) - LM.arc * 0.9), d.turn);
+    }
+    else if (d.turret) aimed = turn(u, 'turret', a, d.turret) < 0.2;
     else if (d.based) aimed = Math.abs(angDiff(a, u.facing)) < 0.35; // strike aircraft aim by flying at the target
     else if (!u.path) { aimed = turn(u, 'facing', a, d.turn) < 0.2; u.turret = u.facing; }
     else aimed = false;
@@ -238,7 +260,8 @@ function tryIntercept(sim, p, t) {
     if (t && Math.hypot(u.x - t.x, u.z - t.z) > reach + 3) continue; // only covers itself and close neighbours
     const base = D.pdl || 70;
     u.pdlCd = Math.round(base * (sim.teams[u.team].flags.fastPdl ? 0.6 : 1));
-    sim.events.push({ t: 'pdl', x: u.x, z: u.z, tx: p.x, tz: p.z, sid: u.id, tAir: p.tAir, gun: !!D.pdlGun });
+    const PM = D.mounts && D.mounts[D.pdlAt], [px, pz] = PM ? mountPos(u, PM) : [u.x, u.z];
+    sim.events.push({ t: 'pdl', x: px, z: pz, y: PM ? PM.y : undefined, tx: p.x, tz: p.z, sid: u.id, tAir: p.tAir, gun: !!D.pdlGun });
     return true;
   }
   return false;
@@ -278,7 +301,7 @@ export function stepCombat(sim) {
     const slots = slotsOf(e);
     if (e.kind === 'unit') {
       const d = UNITS[e.type];
-      if (d.pdl || (d.pdlUpgrade && sim.teams[e.team].upgrades.has('v_pdl'))) { if (e.pdlCd > 0) e.pdlCd--; pdl.push(e); }
+      if (d.pdl || (d.pdlUpgrade && e.team < 2 && sim.teams[e.team].upgrades.has(d.pdlUpgrade))) { if (e.pdlCd > 0) e.pdlCd--; pdl.push(e); }
       if (!slots.length) continue;
       for (let i = 0; i < slots.length; i++) if (e.cds[i] > 0) e.cds[i]--;
       if (e.inert || e.landed && e.as !== 'out') continue;

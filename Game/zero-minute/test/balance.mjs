@@ -1,18 +1,18 @@
 // Balance harness check: a fixed set of six matches finishes, repeats exactly, and yields a well-formed report.
-import { runMatch, LOADOUTS, listJobs } from '../balance/match.mjs';
+import { runMatch, LOADOUTS, listJobs, MAX_TICKS } from '../balance/match.mjs';
 import { buildReport } from '../balance/report.mjs';
 
 let pass = 0, fail = 0;
 const ok = (c, msg) => { if (c) pass++; else { fail++; console.log('FAIL: ' + msg); } };
 
-ok(LOADOUTS.length === 9, 'nine loadouts (3 factions + 6 generals)');
-ok(listJobs().length === 9 * 9 * 2 * 3, 'default sweep is 486 matches');
+ok(LOADOUTS.length === 15, 'fifteen loadouts (5 factions + 10 generals)');
+ok(listJobs().length === 15 * 15 * 2 * 3, 'default sweep is 1,350 matches');
 
 const jobs = [['vanguard', 'redhammer'], ['redhammer', 'sandstorm'], ['sandstorm', 'vanguard'], ['airforce', 'mass'], ['wmd', 'marine'], ['cyber', 'cyber']]
   .map(([a, b], i) => ({ a, b, map: i % 2 ? 'forest' : 'canyon', seed: 1, difficulty: 'hard' }));
 const first = jobs.map(runMatch), second = jobs.map(runMatch);
 first.forEach((m, i) => {
-  ok(m.ticks > 0 && m.ticks <= 30000, `${m.a} v ${m.b}: finishes inside the cap`);
+  ok(m.ticks > 0 && m.ticks <= MAX_TICKS, `${m.a} v ${m.b}: finishes inside the cap`);
   ok(m.winner === -1 || m.winner === 0 || m.winner === 1, `${m.a} v ${m.b}: has a result`);
   ok(m.hash === second[i].hash && m.winner === second[i].winner && m.ticks === second[i].ticks, `${m.a} v ${m.b}: repeats exactly`);
   ok(JSON.stringify(m) === JSON.stringify(second[i]), `${m.a} v ${m.b}: telemetry repeats exactly`);

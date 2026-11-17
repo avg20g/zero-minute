@@ -136,7 +136,7 @@ function gunshipFire(sim, p) {
   const spot = (t, spread) => { const a = sim.rand() * 6.2831853, r = Math.sqrt(sim.rand()) * (t ? spread : P.radius); return [Math.min(WORLD - 3, Math.max(3, (t ? t.x : p.cx) + Math.cos(a) * r)), Math.min(WORLD - 3, Math.max(3, (t ? t.z : p.cz) + Math.sin(a) * r))]; };
   if (p.n % P.gun.every === 0) {
     if (p.n % 20 === 0 || !p.tid) { const t = pickTarget(false); p.tid = t ? t.id : 0; }
-    const t = p.tid ? sim.byId.get(p.tid) : null, [ix, iz] = spot(t && !t.dead ? t : null, 2.5);
+    const t = p.tid ? sim.byId.get(p.tid) : null, [ix, iz] = spot(t && !t.dead ? t : null, P.gun.spread);
     strikeDamage(sim, ix, iz, P.gun.r, P.gun.dmg, 'ac130gun', src, p.x, p.z);
     sim.events.push({ t: 'gunship', k: 'gun', x: ix, z: iz, sx: p.x, sz: p.z, sy: p.y, team: p.team });
   }
@@ -162,9 +162,10 @@ export function usePower(sim, team, id, x, z) {
   // Using a power lights up its target area for that team: you see what you hit (and what you missed).
   sim.reveals.push({ team, x, z, r: Math.max(P.radius, (P.line || 0) / 2, P.beam ? P.beam.sweep : 0) + REVEAL_PAD, until: sim.tick + (P.reveal || REVEAL_SECS) * 20 });
   if (P.super) sim.events.push({ t: 'superlaunch', id, team, bid: from.id, bx: from.x, bz: from.z });   // public warning: both sides hear the klaxon, nobody is told where it will land
-  switch (id) {
+  const n0 = sim.strikes.length;
+  switch (P.as || id) {   // a newer faction's power may reuse the strike of an older one (`as`), with its own numbers
     case 'paradrop': plane(sim, team, 'c130', 'paradrop', x, z); break;
-    case 'b2': plane(sim, team, 'b2', 'carpet', x, z); break;
+    case 'b2': plane(sim, team, P.plane || 'b2', 'carpet', x, z); break;
     case 'cashhack': {
       const b = hackTarget(sim, team, x, z), E = sim.teams[b.team], amt = Math.min(hk ? hk.amount : P.amount, Math.max(0, Math.floor(E.money)));
       E.money -= amt; T.money += amt; T.hacked = (T.hacked || 0) + amt;
@@ -183,7 +184,7 @@ export function usePower(sim, team, id, x, z) {
     case 'particle': { const [dx, dz] = approach(sim, team, x, z); sim.strikes.push({ id: sim.nextId++, kind: 'pbeam', team, x, z, px: x, pz: z, sx: x, sz: z, dx, dz, n: 0, bx: from.x, bz: from.z, dead: false }); break; }
     case 'ac130': gunship(sim, team, x, z); break;
     case 'a10': plane(sim, team, 'a10', 'strafe', x, z); if (T.flags.a10x2) plane(sim, team, 'a10', 'strafe', x, z, 9, 14); break;
-    case 'fab': plane(sim, team, 'bomber', 'fab', x, z); break;
+    case 'fab': plane(sim, team, P.plane || 'h6', 'fab', x, z); break;   // China's Fuel-Air Bomb comes from an H-6 bomber
     case 'toxinbomb': plane(sim, team, 'bomber', 'toxin', x, z); break;
     case 'barrage': {
       const n = T.flags.barrage2 ? 20 : 12;
@@ -195,13 +196,14 @@ export function usePower(sim, team, id, x, z) {
     }
     case 'ambush': sim.strikes.push({ id: sim.nextId++, kind: 'ambush', team, x, z, px: x, pz: z, t: 16, n: T.flags.ambush2 ? 10 : 6, dead: false }); break;
   }
+  for (let i = n0; i < sim.strikes.length; i++) sim.strikes[i].pid = id;   // which power this strike belongs to: its numbers are read from there
   return true;
 }
 
 function detonate(sim, p, x, z) {
   const src = { team: p.team };
   if (p.payload === 'fab') {
-    strikeDamage(sim, x, z, POWERS.fab.radius, 420, 'fab', src);
+    strikeDamage(sim, x, z, (POWERS[p.pid] || POWERS.fab).radius, 420, 'fab', src);
     addHazard(sim, 'thermal', x, z, 15, 7, 40, p.team, true);
     sim.events.push({ t: 'fab', x, z, r: POWERS.fab.radius, team: p.team });
   } else if (p.payload === 'toxin') {
@@ -228,7 +230,7 @@ export function stepPowers(sim) {
         while (p.rk < A.rockets.n && p.s >= -78 + (p.rk >> 1) * 13) launchRocket(sim, p, p.rk++);
       } else if (!p.dropped && p.s >= -30) { // bomb release: lands on the aim point 0.6 s later
         p.dropped = true;
-        sim.strikes.push({ id: sim.nextId++, kind: p.payload === 'paradrop' ? 'para' : p.payload === 'carpet' ? 'carpet' : 'bomb', dx: p.dx, dz: p.dz, payload: p.payload, team: p.team, x: p.tx, z: p.tz, px: p.tx, pz: p.tz, t: p.payload === 'paradrop' ? 60 : 12, dead: false });
+        sim.strikes.push({ id: sim.nextId++, kind: p.payload === 'paradrop' ? 'para' : p.payload === 'carpet' ? 'carpet' : 'bomb', pid: p.pid, dx: p.dx, dz: p.dz, payload: p.payload, team: p.team, x: p.tx, z: p.tz, px: p.tx, pz: p.tz, t: p.payload === 'paradrop' ? 60 : 12, dead: false });
       }
       if (p.s > 260) p.dead = true;
     } else if (p.kind === 'airliner') { stepAirliner(sim, p);
@@ -248,7 +250,7 @@ export function stepPowers(sim) {
         sim.events.push({ t: 'rockethit', x: p.tx, z: p.tz, team: p.team, guided: p.guided, id: p.id, sx: p.sx, sz: p.sz, sy: p.sy });
       }
     } else if (p.kind === 'pbeam') { // the beam walks along its line, burning whatever it crosses
-      const B = POWERS.particle.beam, u = p.n / B.ticks;
+      const B = (POWERS[p.pid] || POWERS.particle).beam, u = p.n / B.ticks;
       p.x = Math.min(WORLD - 3, Math.max(3, p.sx + p.dx * B.sweep * (u - 0.5))); p.z = Math.min(WORLD - 3, Math.max(3, p.sz + p.dz * B.sweep * (u - 0.5)));
       if (p.n % B.every === 0) { strikeDamage(sim, p.x, p.z, B.r, B.dmg, 'particle', { team: p.team }); sim.events.push({ t: 'pbeam', x: p.x, z: p.z, team: p.team, k: p.n, bx: p.bx, bz: p.bz }); }
       if (++p.n >= B.ticks) p.dead = true;
@@ -260,12 +262,12 @@ export function stepPowers(sim) {
         addHazard(sim, 'thermal', p.x, p.z, P.fallout.r, P.fallout.secs, P.fallout.dps, p.team, true);
         sim.events.push({ t: 'nuke', x: p.x, z: p.z, r: P.radius, team: p.team });
       } else if (p.kind === 'scud') {
-        const P = POWERS.scud;
+        const P = POWERS[p.pid] || POWERS.scud, H = P.toxin || P.fire;   // Scud Storm leaves toxin; the Iskander strike leaves fire
         strikeDamage(sim, p.x, p.z, P.r, P.dmg, 'scud', { team: p.team });
-        addHazard(sim, 'toxin', p.x, p.z, P.toxin.r, P.toxin.secs, P.toxin.dps, p.team, true);
-        sim.events.push({ t: 'scudhit', x: p.x, z: p.z, r: P.toxin.r, team: p.team });
+        addHazard(sim, P.toxin ? 'toxin' : 'fire', p.x, p.z, H.r, H.secs, H.dps, p.team, true);
+        sim.events.push({ t: 'scudhit', x: p.x, z: p.z, r: H.r, team: p.team, fire: !P.toxin });
       } else if (p.kind === 'para') {
-        const P = POWERS.paradrop; let made = 0;
+        const P = POWERS[p.pid] || POWERS.paradrop; let made = 0;
         for (let i = 0; i < P.n; i++) { const a = i * 2.399963, u = spawnNear(sim, P.unit, p.team, p.x + Math.cos(a) * (2 + i * 1.2), p.z + Math.sin(a) * (2 + i * 1.2), a); if (u) made++; }
         sim.events.push({ t: 'paradrop', x: p.x, z: p.z, team: p.team, n: made });
       } else if (p.kind === 'sneak') {
@@ -276,9 +278,9 @@ export function stepPowers(sim) {
       else if (p.kind === 'shell') { strikeDamage(sim, p.x, p.z, 7, 95, 'artillery', { team: p.team }); sim.events.push({ t: 'shellhit', x: p.x, z: p.z, team: p.team }); }
       else if (p.kind === 'bomb') detonate(sim, p, p.x, p.z);
       else if (p.kind === 'carpet') { // the stick of bombs walks along the bomber's track
-        const B = POWERS.b2; for (let i = 0; i < B.n; i++) { const a = (i / (B.n - 1) - 0.5) * B.line, lat = (i % 2 ? 3 : -3); sim.strikes.push({ id: sim.nextId++, kind: 'bomblet', team: p.team, x: p.x + p.dx * a - p.dz * lat, z: p.z + p.dz * a + p.dx * lat, px: 0, pz: 0, t: 2 + i * 3, dead: false }); }
+        const B = POWERS[p.pid] || POWERS.b2; for (let i = 0; i < B.n; i++) { const a = (i / (B.n - 1) - 0.5) * B.line, lat = (i % 2 ? 3 : -3); sim.strikes.push({ id: sim.nextId++, kind: 'bomblet', pid: p.pid, team: p.team, x: p.x + p.dx * a - p.dz * lat, z: p.z + p.dz * a + p.dx * lat, px: 0, pz: 0, t: 2 + i * 3, dead: false }); }
       }
-      else if (p.kind === 'bomblet') { strikeDamage(sim, p.x, p.z, POWERS.b2.r, POWERS.b2.dmg, 'artillery', { team: p.team }); sim.events.push({ t: 'shellhit', x: p.x, z: p.z, team: p.team }); }
+      else if (p.kind === 'bomblet') { const B = POWERS[p.pid] || POWERS.b2; strikeDamage(sim, p.x, p.z, B.r, B.dmg, 'artillery', { team: p.team }); sim.events.push({ t: 'shellhit', x: p.x, z: p.z, team: p.team }); }
       else if (p.kind === 'ambush') {
         const roster = FACTIONS[sim.teams[p.team].faction].ambush || ['s_rpg', 's_rpg', 's_guerrilla'];
         let made = 0;

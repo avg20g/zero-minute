@@ -262,4 +262,50 @@ const R = globalThis.__rigs;
   const a = R.b737, pb = parts(a); ok(named(pb, 'engine').length === 2 && named(pb, 'idpanel').length === 0 && named(pb, 'cheatline').length === 2, 'airliner: twin-jet with no team markings');
   console.log(`hercules       : span ${span.toFixed(1)}, length ${len.toFixed(1)}, fin ${fin.toFixed(1)}; 4 nacelles, 4 propellers; AC-130 guns to port | Z-10 ${MF.Z10.blades}-blade rotor`);
 }
+
+// ---------------------------------------------------------------- batch 12: Russia, Europe and the H-6, each against its real counterpart
+{
+  const A = MF.ASSEMBLY, K = MF.ARMOR.K, PU = MF.paint('ursa', 0), PE = MF.paint('aegis', 0), PC = MF.paint('redhammer', 0);
+  const X = (ps) => { const xs = []; for (const q of ps) { const h = Math.abs(q.sx) / 2; xs.push(q.x - h, q.x + h); } return [Math.min(...xs), Math.max(...xs)]; };
+  const hullLen = (rig) => { const t = named(parts(rig), 'track'); const a = t[0].m.geometry.attributes.position.array; let lo = 1e9, hi = -1e9; for (let i = 0; i < a.length; i += 3) { lo = Math.min(lo, a[i]); hi = Math.max(hi, a[i]); } return hi - lo; };
+  // tracked vehicles: hull length matches the real one at the shared scale, and each has what makes it recognisable
+  const tanks = { t90: [PU, 'u_tank'], t14: [PU, 'u_armata'], tunguska: [PU, 'u_tunguska'], tos1: [PU, 'u_tos'], leopard2: [PE, 'e_tank'], kf51: [PE, 'e_panther'], laserleo: [PE, 'e_laserleo'], gepard: [PE, 'e_gepard'], pzh2000: [PE, 'e_pzh'] };
+  const R = {}; for (const k in tanks) { R[k] = A[k](tanks[k][0]); const want = MF.ARMOR[k].length * K, got = hullLen(R[k]); ok(near(got, want, want * 0.06) && UNITS[tanks[k][1]].model === k, `${UNITS[tanks[k][1]].name}: hull ${got.toFixed(2)} long for a real ${MF.ARMOR[k].length} m (scale ${K})`); }
+  const P_ = (k) => parts(R[k]);
+  ok(named(P_('t90'), 'shtoralens').length === 2 && named(P_('t90'), 'fueldrum').length === 2 && named(P_('t90'), 'evacuator').length === 1 && named(P_('t90'), 'roadwheel').length === 12 && R.t90.turret, 'T-90: two red Shtora dazzlers, two fuel drums, fume extractor, six road wheels a side');
+  ok(named(P_('t14'), 'roadwheel').length === 14 && named(P_('t14'), 'crewhatch').length === 3 && named(P_('t14'), 'apstube').length === 8 && named(P_('t14'), 'evacuator').length === 0 && R.t14.turretX < -0.4, 'T-14 Armata: seven road wheels a side, three crew hatches in the hull, an unmanned turret set back with protection tubes, no fume extractor');
+  ok(named(P_('tunguska'), 'gunbarrel').length === 4 && named(P_('tunguska'), 'missiletube').length === 8 && named(P_('tunguska'), 'trackradar').length === 1 && named(P_('tunguska'), 'searchradar').length === 1, 'Tunguska: four 30 mm barrels, eight missile tubes, a tracking radar and a search radar');
+  ok(named(P_('tos1'), 'tube').length === MF.ARMOR.tos1.tubes && named(P_('tos1'), 'rocketpack').length === 1 && !R.tos1.turret && Math.abs(R.tos1.launcher.rotation.z) > 0.2, 'TOS-1A: 24 rocket tubes in a raised pack, no gun turret');
+  const leoGun = named(P_('leopard2'), 'barrel')[0], t90Gun = named(P_('t90'), 'barrel')[0];
+  ok(near(leoGun.sy, MF.ARMOR.leopard2.gun * K, 0.05) && leoGun.sy > t90Gun.sy * 1.15 && named(P_('leopard2'), 'roadwheel').length === 14 && named(P_('leopard2'), 'turretshell')[0].m.userData.profile.length === 5, 'Leopard 2A6: the L/55 gun is far longer than the T-90 gun, seven road wheels a side, a five-sided arrowhead turret');
+  ok(named(P_('kf51'), 'barrel')[0].sx > leoGun.sx * 1.2 && named(P_('kf51'), 'rws').length === 1 && named(P_('kf51'), 'dronetube').length === 2, 'KF51 Panther: a thicker 130 mm gun, a roof weapon station and a loitering-munition launcher');
+  ok(named(P_('laserleo'), 'beamdirector').length === 1 && named(P_('laserleo'), 'lens').length === 1 && named(P_('laserleo'), 'barrel').length === 0, 'Laser Leopard: a beam director with a lens, and no gun');
+  ok(named(P_('gepard'), 'gunbarrel').length === 2 && named(P_('gepard'), 'trackradar').length === 1 && named(P_('gepard'), 'searchradar').length === 1 && Math.abs(named(P_('gepard'), 'gunbarrel')[0].z) > 0.7, 'Gepard: one 35 mm gun out on each side of the turret, tracking radar in front, search radar behind');
+  const pg = named(P_('pzh2000'), 'barrel')[0];
+  ok(near(pg.sy, MF.ARMOR.pzh2000.gun * K, 0.05) && pg.sy > hullLen(R.pzh2000) * 0.95 && named(P_('pzh2000'), 'muzzlebrake').length === 1 && R.pzh2000.turretX < -0.5, 'PzH 2000: a gun as long as the hull with a muzzle brake, turret over the back half');
+  const bmp = A.bmp3(PU), pb = parts(bmp), puma = A.puma(PE), pp = parts(puma);
+  ok(named(pb, 'barrel').length === 1 && named(pb, 'autocannon').length === 1 && named(pb, 'barrel')[0].sx > named(pb, 'autocannon')[0].sx * 2 && named(pb, 'waterjet').length === 2 && named(pb, 'trimvane').length === 1, 'BMP-3: a thick 100 mm gun with a thin 30 mm beside it, two water jets and a trim vane');
+  ok(Math.abs(puma.turret.position.z) > 0.2 && named(pp, 'missilebox').length === 1 && named(pp, 'sidearmor').length === 8 && named(pp, 'rearramp').length === 1, 'Puma: turret off the centreline with a missile box on its side, bolt-on side armor, rear ramp');
+  // aircraft
+  const ka = A.ka52(PU), pk = parts(ka), ti = A.tiger(PE), pt = parts(ti);
+  ok(ka.rotor && ka.rotor2 && !ka.rotorTail && ka.rotor2.position.y > ka.rotor.position.y + 0.4 && named(pk, 'blade').length === 2 * MF.KA52.blades && named(pk, 'endplate').length === 2 && named(pk, 'canopy').length === 1, 'Ka-52: two three-blade rotors one above the other, no tail rotor, twin end-plate fins, one wide cockpit');
+  ok(ti.rotor && ti.rotorTail && named(pt, 'blade').length === MF.TIGER.blades && named(pt, 'tailblade').length === 3 && named(pt, 'canopy').length === 2 && named(pt, 'mastsight').length === 1 && named(pt, 'mastsight')[0].y > ti.rotor.position.y, 'Tiger: four-blade rotor with the sight above it, three-blade tail rotor, two stepped cockpits');
+  const ty = A.typhoon(PE), py = parts(ty), s27 = A.su27(PU), s57 = A.su57(PU);
+  ok(named(py, 'canard').length === 2 && named(py, 'fin').length === 1 && named(py, 'tailplane').length === 0 && named(py, 'chinintake').length === 1 && named(py, 'nozzle').length === 2 && ty.stores.length === 2, 'Eurofighter: two canards, one fin, no tailplane, a chin intake, two engines');
+  const wing = named(py, 'wing')[0].m.userData.profile, sweep = Math.atan2(Math.abs(wing[1][0] - wing[0][0]), Math.abs(wing[1][1] - wing[0][1])) * 180 / Math.PI;
+  ok(near(sweep, MF.TYPHOON.sweep, 1) && near(MF.TYPHOON.span / MF.TYPHOON.length, 10.95 / 15.96, 0.001), `Eurofighter: a ${sweep.toFixed(0)}-degree delta, span / length ${(MF.TYPHOON.span / MF.TYPHOON.length).toFixed(3)} as on the real aircraft`);
+  ok(named(parts(s27), 'fin').length === 2 && named(parts(s27), 'stinger').length === 1 && named(parts(s27), 'tailplane').length === 2 && s27.stores.length === 2 && MF.SU27.length === 21.9, 'Su-27: twin fins, tailplanes, the tail sting between the engines');
+  ok(named(parts(s57), 'fin').length === 2 && Math.abs(named(parts(s57), 'fin')[0].m.rotation.x) > 0.3 && named(parts(s57), 'lerx').length === 1 && s57.stores.length === 4 && near(MF.SU57.span / MF.SU57.length, 14.1 / 20.1, 0.001), 'Su-57: canted fins, leading-edge extensions, four missiles, real span / length');
+  const h = MF.AIRCRAFT.h6(PC), ph = parts(h), hx = X(ph), wz = Math.max(...named(ph, 'wing').map(q => Math.max(...q.m.userData.profile.map(v => Math.abs(v[1])))));
+  ok(near((hx[1] - hx[0]) / (2 * wz), MF.H6.length / MF.H6.span, 0.08) && named(ph, 'engine').length === 2 && named(ph, 'fin').length === 1 && named(ph, 'gearpod').length === 2 && named(ph, 'bomb').length === 1 && named(ph, 'radome').length === 1, `H-6: length / span ${((hx[1] - hx[0]) / (2 * wz)).toFixed(2)} (real ${(MF.H6.length / MF.H6.span).toFixed(2)}), two engines in the wing roots, gear pods, one fin, the bomb under the belly`);
+  // ships
+  const st = A.stereg(PU), fm = A.fremm(PE), ps = parts(st), pf = parts(fm);
+  ok(st.ship && st.turret && near(st.turretX, UNITS.u_corvette.mounts[0].x, 0.01) && named(ps, 'mast').length === 1 && named(ps, 'helideck').length === 1 && named(ps, 'canister').length === 4 && MF.SHIPS.stereg.length / MF.SHIPS.stereg.beam > 6, 'Steregushchiy corvette: gun on the forecastle where the game fires it from, enclosed mast, missile canisters, helicopter deck');
+  ok(fm.ship && near(fm.turretX, UNITS.e_fremm.mounts[0].x, 0.01) && named(pf, 'radome').length === 1 && named(pf, 'hangar').length === 1 && named(pf, 'cell').length === 9 && MF.SHIPS.fremm.length > MF.SHIPS.stereg.length, 'FREMM frigate: gun where the game fires it from, radar ball on a pyramid mast, missile cells, hangar; longer than the corvette');
+  const fr = A.frigate(P), cv = A.corvette(PR);
+  ok(near(fr.turretX, UNITS.v_frigate.mounts[0].x, 0.01) && near(cv.turretX, UNITS.r_corvette.mounts[0].x, 0.01) && named(parts(fr), 'lens')[0].y > 7.5 && named(parts(cv), 'waterline').length === 0, 'Frigate and Corvette: gun mounts match the models, the Frigate laser sits on the mast top, no stray waterline box on the Corvette');
+  const rh = A.rhib(P), tubes = named(parts(rh), 'collar').map(q => q.m).filter(m => m.rotation.y);
+  ok(tubes.length === 2 && tubes.every(m => Math.sign(m.rotation.y) === Math.sign(m.position.z)), 'RHIB: the two bow tubes angle inward and meet at the stem');
+  console.log(`batch 12       : 9 tracked vehicles at scale ${K}, BMP-3, Puma, Ka-52, Tiger, Eurofighter, Su-27, Su-57, H-6, 2 warships`);
+}
 console.log(fails ? `MODELS: ${fails} FAILURES of ${checks}` : `MODELS: all ${checks} checks passed`);

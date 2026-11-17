@@ -2,7 +2,7 @@
 // Nothing in here touches the DOM, the clock, or Math.random. All three
 // factions run through this one loop; their differences are registry data.
 import { N, CELL, WORLD, PLAYER, ENEMY, NEUTRAL, setMapSize } from './defs.js';
-import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS, GENERALS, GENERAL, trainsOf, upgradesOf, unitCost } from './factionRegistry.js';
+import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS, GENERALS, GENERAL, trainsOf, upgradesOf, unitCost, bldgCost } from './factionRegistry.js';
 import { generateMap } from './map.js';
 import { Nav } from './pathfinding.js';
 import { Fog } from './fog.js';
@@ -240,7 +240,7 @@ function applyCommand(sim, c) {
     }
     case 'cancelbuild': { // cancel an unfinished building: the full price comes back
       const b = own(sim, c.id, team); if (!b || b.kind !== 'bldg' || b.done) break;
-      const back = BLDGS[b.type].cost | 0; T.money += back; removeBldg(sim, b);
+      const back = bldgCost(T, b.type) | 0; T.money += back; removeBldg(sim, b);
       sim.events.push({ t: 'cancelbuild', id: b.id, x: b.x, z: b.z, team, amt: back });
       break;
     }
@@ -292,11 +292,12 @@ function applyCommand(sim, c) {
     case 'build': {
       const u = own(sim, c.id, team), d = BLDGS[c.type];
       if (!u || !UNITS[u.type].builder || !d || !F.build.includes(c.type)) break;
-      if (T.money < d.cost) { msg(sim, team, 'Insufficient funds'); break; }
+      const price = bldgCost(T, c.type);
+      if (T.money < price) { msg(sim, team, 'Insufficient funds'); break; }
       if (d.needs && !hasBldg(sim, team, d.needs)) { msg(sim, team, `Requires ${BLDGS[d.needs].name}`); break; }
       if (d.superPower && sim.noSuper) { msg(sim, team, 'Superweapons are disabled for this match'); break; }
       { const why = placeError(sim, c.type, c.cx, c.cz, team); if (why) { msg(sim, team, why); break; } }
-      T.money -= d.cost;
+      T.money -= price;
       const b = makeBldg(sim, c.type, team, c.cx, c.cz, false);
       sim.events.push({ t: 'place', id: b.id, team });
       freeUnit(sim, u); stopUnit(u); u.order = { t: 'construct', id: b.id };

@@ -72,7 +72,7 @@ const hold = (u) => { u.order = { t: 'hold' }; u.cds = [1e9, 1e9, 1e9]; return u
       for (const e of ev) if (e.t === 'gunship') { if (e.k === 'gun') gun++; else cannon++; if (Math.hypot(e.x - X, e.z - Z) > POWERS.ac130.radius + 3) wide++; }
     });
     ok(orbit >= 300 && orbit <= 302 && Math.abs(rMin - POWERS.ac130.orbit) < 0.5 && Math.abs(rMax - POWERS.ac130.orbit) < 0.5, `circles the target for 15 s at ${POWERS.ac130.orbit} m (${orbit} ticks, ${rMin.toFixed(1)} to ${rMax.toFixed(1)} m)`);
-    ok(gun === 150 && cannon >= 11 && cannon <= 12 && wide === 0, `fires both weapons: ${gun} rotary cannon bursts and ${cannon} howitzer shells, all inside the zone`);
+    ok(gun === 300 && cannon >= 11 && cannon <= 12 && wide === 0, `fires both weapons: ${gun} rotary cannon bursts and ${cannon} howitzer shells, all inside the zone`);
     ok(inf.every(u => u.dead) && (tank.dead || tank.hp < tank.maxHp * 0.5), `infantry in the zone killed, tank ${tank.dead ? 'destroyed' : 'at ' + Math.round(100 * tank.hp / tank.maxHp) + '%'}`);
     ok(far.hp === far.maxHp && air.hp === air.maxHp, 'a tank outside the zone and a helicopter above it are untouched');
     ok(!s.strikes.some(q => q.kind === 'gunship') && ticks > 380, `then it leaves (${(ticks / 20).toFixed(1)} s on screen)`);

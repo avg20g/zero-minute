@@ -3,7 +3,7 @@
 // so the sim stays deterministic.
 import THREE from '../lib/three.js';
 import { CELL, WORLD, PLAYER, NEUTRAL } from '../sim/defs.js';
-import { UNITS, BLDGS } from '../sim/factionRegistry.js';
+import { UNITS, BLDGS, bldgCost } from '../sim/factionRegistry.js';
 import { heightAt } from '../sim/map.js';
 import { placeError, capacityOf, isTransport, canRide } from '../sim/entities.js';
 import { canAttack } from '../sim/combat.js';
@@ -145,11 +145,11 @@ export class Controls {
     const d = BLDGS[pl.type];
     pl.cx = Math.round(g.x / CELL - d.w / 2); pl.cz = Math.round(g.z / CELL - d.h / 2);
     pl.why = placeError(this.sim.use(), pl.type, pl.cx, pl.cz, PLAYER);   // '' when the building fits; otherwise the reason, shown in the status line
-    pl.ok = !pl.why && this.sim.teams[PLAYER].money >= d.cost;
+    pl.ok = !pl.why && this.sim.teams[PLAYER].money >= bldgCost(this.sim.teams[PLAYER], pl.type);
   }
   confirmPlace(keep) {
     const pl = this.ui.place, sim = this.sim; this.updatePlace();
-    if (!pl.ok) { this.ui.toast && this.ui.toast(sim.teams[PLAYER].money < BLDGS[pl.type].cost ? 'Insufficient funds' : (pl.why || 'Cannot build there'), 'warn'); return; }
+    if (!pl.ok) { this.ui.toast && this.ui.toast(sim.teams[PLAYER].money < bldgCost(sim.teams[PLAYER], pl.type) ? 'Insufficient funds' : (pl.why || 'Cannot build there'), 'warn'); return; }
     const builders = this.selectedOwn('unit').filter(u => UNITS[u.type].builder); if (!builders.length) { this.ui.place = null; return; }
     const gx = (pl.cx + BLDGS[pl.type].w / 2) * CELL, gz = (pl.cz + BLDGS[pl.type].h / 2) * CELL;
     builders.sort((a, b) => Math.hypot(a.x - gx, a.z - gz) - Math.hypot(b.x - gx, b.z - gz));

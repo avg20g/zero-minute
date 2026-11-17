@@ -3,7 +3,7 @@
 // toasts, and the 2D overlay (health bars, veterancy chevrons, drag box, pings).
 import { TEAM } from './teamColors.js';
 import { N, CELL, WORLD, PLAYER, ENEMY, NEUTRAL, ZONE_MULT, ZONE_NAME, TICK_HZ } from '../sim/defs.js';
-import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS, GENERAL, VET, GENERALS, trainsOf, upgradesOf, unitCost, nodePower } from '../sim/factionRegistry.js';
+import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS, GENERAL, VET, GENERALS, trainsOf, upgradesOf, unitCost, bldgCost, nodePower } from '../sim/factionRegistry.js';
 import { heightAt, BIOMES } from '../sim/map.js';
 import { hasBldg, capacityOf, isTransport } from '../sim/entities.js';
 import { strikeVisible, hasPower, superOf, superBldgs } from '../sim/powers.js';
@@ -61,7 +61,7 @@ export class Hud {
     this.sim = sim; this.view = view; this.rig = rig; this.controls = controls; this.ui = ui;
     this.F = FACTIONS[sim.teams[PLAYER].faction];
     this.ov = $('ov'); this.octx = this.ov.getContext('2d');
-    this.mini = $('minimap'); this.mctx = this.mini.getContext('2d');
+    this.mini = $('minimap'); this.mctx = this.mini.getContext('2d'); this.mini.width = this.mini.height = 512;   // drawn at a fixed size whatever the map's size (see drawMinimap)
     this.fogCanvas = document.createElement('canvas'); this.fogCanvas.width = this.fogCanvas.height = N;
     this.fogCtx = this.fogCanvas.getContext('2d'); this.fogImg = this.fogCtx.createImageData(N, N); this.fogVer = -1;
     this.base = this.makeBase();
@@ -229,7 +229,8 @@ export class Hud {
     vol.addEventListener('input', () => { au.init(); au.setVolume(vol.value / 100); try { localStorage.setItem('cz-vol', vol.value); } catch (e) { /* ignore */ } });
     mute.addEventListener('click', () => { au.init(); au.setMuted(!au.muted); paint(); try { localStorage.setItem('cz-mute', au.muted ? '1' : '0'); } catch (e) { /* ignore */ } });
     // replay / observer bar
-    $('replay-bar').hidden = !this.ui.observer;
+    // The speed bar is there in every game; in a replay it is labelled Replay and also carries the Fog of War switch.
+    $('replay-bar').hidden = false; $('replay-bar').querySelector('.lbl').textContent = this.ui.observer ? 'Replay' : 'Speed'; $('rp-fog').hidden = !this.ui.observer;
     $('replay-bar').addEventListener('click', (ev) => {
       const b = ev.target.closest('button'); if (!b) return;
       if (b.dataset.speed) { this.ui.speed = +b.dataset.speed; for (const k of $('replay-bar').querySelectorAll('button[data-speed]')) k.setAttribute('aria-pressed', String(k === b)); }
@@ -265,8 +266,8 @@ export class Hud {
       for (const t of this.F.build) {
         const d = BLDGS[t]; let why = '';
         if (d.superPower && sim.noSuper) continue;                       // lobby rule: no superweapons
-        if (d.needs && !hasBldg(sim, PLAYER, d.needs)) why = 'Requires ' + BLDGS[d.needs].name; else if (d.shore && !sim.map.hasWater) why = 'This map has no water'; else if (T.money < d.cost) why = 'Insufficient funds';
-        out.push({ act: 'build:' + t, icon: iconFor(d, true), name: d.name, cost: d.cost, why, sub: d.power > 0 ? '+' + d.power + ' PWR' : d.power < 0 ? '−' + (-d.power) + ' PWR' : '', on: this.ui.place && this.ui.place.type === t });
+        if (d.needs && !hasBldg(sim, PLAYER, d.needs)) why = 'Requires ' + BLDGS[d.needs].name; else if (d.shore && !sim.map.hasWater) why = 'This map has no water'; else if (T.money < bldgCost(T, t)) why = 'Insufficient funds';
+        out.push({ act: 'build:' + t, icon: iconFor(d, true), name: d.name, cost: bldgCost(T, t), why, sub: d.power > 0 ? '+' + d.power + ' PWR' : d.power < 0 ? '−' + (-d.power) + ' PWR' : '', on: this.ui.place && this.ui.place.type === t });
       }
     } else if (units.length) {
       out.push({ act: 'stop', icon: ICON.stop, name: 'Stop', key: 'Z' });
@@ -286,7 +287,7 @@ export class Hud {
       // a civilian building you hold counts as yours while the garrison is inside: this is where its exit buttons go
       for (const id of this.ui.selection) { const e = sim.byId.get(id); if (e && e.type === 'civ' && e.team === PLAYER && e.garrison.length) { out.push({ act: 'evac', icon: ICON.evac, name: 'Evacuate all', key: 'U', tip: 'Every squad leaves the building. Or right-click the ground to send them straight there.' }); out.push({ act: 'evac1', icon: ICON.evac, name: 'Take out one squad', key: 'Shift+U', tip: 'Only the last squad that went in comes out.' }); break; } }
       const seen = new Set(), sites = bldgs.filter(b => !b.done);
-      if (sites.length) out.push({ act: 'cancelbuild', icon: ICON.cancel, name: 'Cancel construction', key: 'refund $' + fmt(sites.reduce((a, b) => a + BLDGS[b.type].cost, 0)), tip: 'Remove the unfinished building and get its full price back.' });
+      if (sites.length) out.push({ act: 'cancelbuild', icon: ICON.cancel, name: 'Cancel construction', key: 'refund $' + fmt(sites.reduce((a, b) => a + bldgCost(T, b.type), 0)), tip: 'Remove the unfinished building and get its full price back.' });
       for (const b of bldgs) {
         if (!b.done) continue;
         const bd = BLDGS[b.type];
@@ -327,7 +328,7 @@ export class Hud {
       if (e.cloaked) out.push(e.detected ? 'Cloak detected' : 'Cloaked'); else if (e.stealthMode === 'still') out.push('Cloaks when stationary');
       if (e.horde) out.push('Horde +' + (T.flags.hordePlus ? 25 : 15) + '% fire rate');
       if (d.salvage) out.push('Salvage tier ' + e.tier + '/2');
-      if (d.pdl || (d.pdlUpgrade && T.upgrades.has('v_pdl'))) out.push('Point defense ' + (e.pdlCd > 0 ? 'recharging' : 'ready'));
+      if (d.pdl || (d.pdlUpgrade && T.upgrades.has(d.pdlUpgrade))) out.push('Point defense ' + (e.pdlCd > 0 ? 'recharging' : 'ready'));
       if (d.based) out.push({ parked: e.ammo < d.ammo ? 'Rearming' : 'Ready on pad', out: 'On sortie', return: 'Returning to base' }[e.as] + ' · ' + e.ammo + '/' + d.ammo + ' missiles');
       if (e.addonQ) out.push('Fitting ' + d.hardpoints[e.addonQ.type].name + ' ' + Math.floor(e.addonQ.t / (d.hardpoints[e.addonQ.type].secs * 20) * 100) + '%');
       else if (e.addon) out.push(d.hardpoints[e.addon].name + (e.garrison ? ' ' + e.garrison.length + '/' + capacityOf(e) : ''));
@@ -454,6 +455,9 @@ export class Hud {
       for (let i = 0; i < N * N; i++) { d[i * 4] = 7; d[i * 4 + 1] = 9; d[i * 4 + 2] = 11; d[i * 4 + 3] = vis[i] ? 0 : 138; }   // no black shroud: ground you have not seen is only dimmed
       this.fogCtx.putImageData(this.fogImg, 0, 0);
     }
+    // The canvas is a fixed size; the map is not. Everything below is drawn in map cells and scaled to fit, and
+    // markers are sized by `u` so they look the same on a 0.5 km, 1 km or 2 km map.
+    const k = this.mini.width / N, u = N / 256; g.setTransform(k, 0, 0, k, 0, 0); g.imageSmoothingEnabled = true;
     g.drawImage(this.base, 0, 0);
     for (const e of sim.ents) { // structures under the fog layer so "last known" ones read as remembered
       if (e.kind !== 'bldg' || !this.shows(e)) continue;
@@ -462,31 +466,32 @@ export class Hud {
       const known = e.team === PLAYER || fog.canSee(PLAYER, e) || (d.faction && e.seen[PLAYER]); // never leak who holds a building we cannot see
       g.fillStyle = e.type === 'dock' ? (e.supplies > 0 ? '#f2a93b' : '#77705f') : e.ruined ? '#5d564d' : d.faction ? TEAM_CSS[e.team] : known ? TEAM_CSS[e.team] : TEAM_CSS[2];
       g.fillRect(e.cx, e.cz, e.w, e.h);
-      if (d.capturable) { g.strokeStyle = '#151b20'; g.lineWidth = 1; g.strokeRect(e.cx + 0.5, e.cz + 0.5, e.w - 1, e.h - 1); }
+      if (d.capturable) { g.strokeStyle = '#151b20'; g.lineWidth = u; g.strokeRect(e.cx + 0.5, e.cz + 0.5, e.w - 1, e.h - 1); }
     }
     g.fillStyle = 'rgba(120,255,90,0.35)';
     for (const h of sim.hazards) if (h.kind === 'toxin' && (h.team === PLAYER || fog.visAt(PLAYER, h.x, h.z))) { g.beginPath(); g.arc(h.x / CELL, h.z / CELL, h.r / CELL, 0, 6.283); g.fill(); }
     if (!this.ui.reveal) g.drawImage(this.fogCanvas, 0, 0);
     g.fillStyle = '#ffd34a';
-    for (const c of sim.crates) if (fog.visAt(PLAYER, c.x, c.z)) g.fillRect(c.x / CELL - 1, c.z / CELL - 1, 2, 2);
+    for (const c of sim.crates) if (fog.visAt(PLAYER, c.x, c.z)) g.fillRect(c.x / CELL - u, c.z / CELL - u, 2 * u, 2 * u);
     for (const e of sim.ents) {
       if (e.kind !== 'unit' || !this.shows(e)) continue;
       g.fillStyle = this.ui.selection.has(e.id) ? '#ffffff' : TEAM_CSS[e.team];
-      if (e.air) { g.beginPath(); g.moveTo(e.x / CELL, e.z / CELL - 2.6); g.lineTo(e.x / CELL + 2.4, e.z / CELL + 2); g.lineTo(e.x / CELL - 2.4, e.z / CELL + 2); g.fill(); }
-      else g.fillRect(e.x / CELL - 1.5, e.z / CELL - 1.5, 3, 3);
+      if (e.air) { g.beginPath(); g.moveTo(e.x / CELL, e.z / CELL - 2.6 * u); g.lineTo(e.x / CELL + 2.4 * u, e.z / CELL + 2 * u); g.lineTo(e.x / CELL - 2.4 * u, e.z / CELL + 2 * u); g.fill(); }
+      else g.fillRect(e.x / CELL - 1.5 * u, e.z / CELL - 1.5 * u, 3 * u, 3 * u);
     }
     for (const p of sim.strikes) { // off-map aircraft: own always, enemy only inside vision
       if (p.kind !== 'plane' || !strikeVisible(sim, PLAYER, p)) continue;
-      const x = p.x / CELL, z = p.z / CELL; g.strokeStyle = TEAM_CSS[p.team]; g.lineWidth = 1.6; g.beginPath(); g.moveTo(x - p.dx * 5, z - p.dz * 5); g.lineTo(x + p.dx * 4, z + p.dz * 4); g.moveTo(x - p.dz * 3, z + p.dx * 3); g.lineTo(x + p.dz * 3, z - p.dx * 3); g.stroke();
+      const x = p.x / CELL, z = p.z / CELL; g.strokeStyle = TEAM_CSS[p.team]; g.lineWidth = 1.6 * u; g.beginPath(); g.moveTo(x - p.dx * 5 * u, z - p.dz * 5 * u); g.lineTo(x + p.dx * 4 * u, z + p.dz * 4 * u); g.moveTo(x - p.dz * 3 * u, z + p.dx * 3 * u); g.lineTo(x + p.dz * 3 * u, z - p.dx * 3 * u); g.stroke();
     }
     // camera footprint
     const ctl = this.controls, v = this.view, pts = [[0, 0], [v.w, 0], [v.w, v.h], [0, v.h]].map(([x, y]) => this.planePoint(x, y));
-    g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 1.2; g.beginPath();
+    g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 1.2 * u; g.beginPath();
     pts.forEach((p, i) => { const x = p[0] / CELL, z = p[1] / CELL; if (i) g.lineTo(x, z); else g.moveTo(x, z); }); g.closePath(); g.stroke();
-    const pw = this.ui.power; if (pw && pw.x !== undefined) { g.strokeStyle = pw.ok ? '#f2a93b' : '#ff5a4d'; g.lineWidth = 1.5; g.beginPath(); g.arc(pw.x / CELL, pw.z / CELL, POWERS[pw.id].radius / CELL, 0, 6.283); g.stroke(); }
-    if (sim.koth) { const k = sim.koth; g.strokeStyle = k.owner === PLAYER ? '#7dffa0' : k.owner === ENEMY ? '#ff5a4d' : '#f2a93b'; g.lineWidth = 1.5; g.setLineDash([3, 2]); g.beginPath(); g.arc(k.x / CELL, k.z / CELL, k.r / CELL, 0, 6.283); g.stroke(); g.setLineDash([]); }
-    for (const a of this.alerts) { const r = 4 + (a.t % 0.8) * 16; g.strokeStyle = `rgba(255,90,77,${1 - (a.t % 0.8) / 0.8})`; g.lineWidth = 2; g.beginPath(); g.arc(a.x / CELL, a.z / CELL, r, 0, 6.283); g.stroke(); }
-    for (const mk of ctl.markers) { g.fillStyle = mk.color; g.fillRect(mk.x / CELL - 2, mk.z / CELL - 2, 4, 4); }
+    const pw = this.ui.power; if (pw && pw.x !== undefined) { g.strokeStyle = pw.ok ? '#f2a93b' : '#ff5a4d'; g.lineWidth = 1.5 * u; g.beginPath(); g.arc(pw.x / CELL, pw.z / CELL, POWERS[pw.id].radius / CELL, 0, 6.283); g.stroke(); }
+    if (sim.koth) { const k = sim.koth; g.strokeStyle = k.owner === PLAYER ? '#7dffa0' : k.owner === ENEMY ? '#ff5a4d' : '#f2a93b'; g.lineWidth = 1.5 * u; g.setLineDash([3 * u, 2 * u]); g.beginPath(); g.arc(k.x / CELL, k.z / CELL, k.r / CELL, 0, 6.283); g.stroke(); g.setLineDash([]); }
+    for (const a of this.alerts) { const r = (4 + (a.t % 0.8) * 16) * u; g.strokeStyle = `rgba(255,90,77,${1 - (a.t % 0.8) / 0.8})`; g.lineWidth = 2 * u; g.beginPath(); g.arc(a.x / CELL, a.z / CELL, r, 0, 6.283); g.stroke(); }
+    for (const mk of ctl.markers) { g.fillStyle = mk.color; g.fillRect(mk.x / CELL - 2 * u, mk.z / CELL - 2 * u, 4 * u, 4 * u); }
+    g.setTransform(1, 0, 0, 1, 0, 0);
   }
   planePoint(mx, my) { // view ray vs. the plane through the camera focus height
     const cam = this.view.camera, rig = this.rig, v = this.controls._v;

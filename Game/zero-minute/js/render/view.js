@@ -51,6 +51,7 @@ export class View {
     this.rocketDrawn = new Map(); // rocket id -> last point its smoke trail reached
     this.skyBeams = [];           // Particle Cannon buildings firing into the sky right now
     this.views = new Map(); this.props = new Map(); // props: crates, strike aircraft, bombs
+    this.ghosts = new Map();                        // material -> its see-through copy (cloaked units)
     this.rings = []; this.ringGeo = new THREE.RingGeometry(0.86, 1, 28); this.ringGeo.rotateX(-Math.PI / 2);
     this.sqGeo = new THREE.RingGeometry(0.93, 1, 4, 1, Math.PI / 4); this.sqGeo.rotateX(-Math.PI / 2);
     this.thinGeo = new THREE.RingGeometry(0.965, 1, 64); this.thinGeo.rotateX(-Math.PI / 2);
@@ -81,7 +82,7 @@ export class View {
       switch (e.t) {
         case 'tracer': {
           if (!fog.visAt(PLAYER, e.x, e.z) && !fog.visAt(PLAYER, e.tx, e.tz)) break;
-          const y0 = fx.h(e.x, e.z) + (e.sAir ? AIR_Y - 0.6 : 1.1), y1 = fx.h(e.tx, e.tz) + (e.tAir ? AIR_Y : 0.9), a = Math.atan2(e.tz - e.z, e.tx - e.x);
+          const y0 = fx.h(e.x, e.z) + (e.sAir ? AIR_Y - 0.6 : e.y ?? 1.1), y1 = fx.h(e.tx, e.tz) + (e.tAir ? AIR_Y : 0.9), a = Math.atan2(e.tz - e.z, e.tx - e.x);
           const sx = e.x + Math.cos(a) * 0.9, sz = e.z + Math.sin(a) * 0.9, col = VET_TRACER[e.vet || 0], glow = 1 + (e.vet || 0) * 0.4;
           const n = WEAPONS[e.w].cd <= 4 ? 1 : e.w === 'sniper' ? 1 : 3;
           for (let i = 0; i < n; i++) {
@@ -94,7 +95,13 @@ export class View {
         }
         case 'laser': {
           if (!fog.visAt(PLAYER, e.x, e.z) && !fog.visAt(PLAYER, e.tx, e.tz)) break;
-          fx.beam(e.x, fx.h(e.x, e.z) + (e.sAir ? AIR_Y : 1.9), e.z, e.tx, fx.h(e.tx, e.tz) + (e.tAir ? AIR_Y : 1.2), e.tz, e.vet ? VET_TRACER[e.vet] : LASER);
+          fx.beam(e.x, fx.h(e.x, e.z) + (e.sAir ? AIR_Y : e.y ?? 1.9), e.z, e.tx, fx.h(e.tx, e.tz) + (e.tAir ? AIR_Y : 1.2), e.tz, WEAPONS[e.w].beam || (e.vet ? VET_TRACER[e.vet] : LASER));   // a weapon may have its own beam colour (the bear's eyes are red)
+          break;
+        }
+        case 'melee': { // a spear thrust: sparks where it lands, and the figure lunges (recoil forward)
+          if (!fog.visAt(PLAYER, e.x, e.z)) break;
+          const y = fx.h(e.tx, e.tz) + (e.onBldg ? 1.6 : 1.1), dx = e.tx - e.x, dz = e.tz - e.z, l = Math.hypot(dx, dz) || 1, r = Math.min(l, 2.6);
+          fx.spark(e.x + dx / l * r, y, e.z + dz / l * r, [1, 0.85, 0.5]); fx.dust(e.x + dx / l * r, y - 0.8, e.z + dz / l * r, 3, 1.2, 0.9, 0.3);
           break;
         }
         case 'spray': {
@@ -105,8 +112,9 @@ export class View {
         }
         case 'fire': {
           if (!fog.visAt(PLAYER, e.x, e.z)) break;
-          const v = this.views.get(e.sid), len = v && v.muzzle ? v.muzzle : 2, my = v && v.muzzleY !== undefined ? v.muzzleY : 1.6, alt = v && v.alt ? v.alt : 0;
-          fx.muzzle(e.x + Math.cos(e.a) * len, fx.h(e.x, e.z) + my + alt, e.z + Math.sin(e.a) * len, e.a, e.k === 'shell' || e.w === 'inferno');
+          const v = this.views.get(e.sid), len = e.len ?? (v && v.muzzle ? v.muzzle : 2), my = e.y ?? (v && v.muzzleY !== undefined ? v.muzzleY : 1.6), alt = v && v.alt ? v.alt : 0;   // a shot from a ship's mount carries its own height and barrel length
+          if (WEAPONS[e.w].grenade) { const g = 0.8; fx.smoke.spawn(e.x + Math.cos(e.a) * len, fx.h(e.x, e.z) + my + alt, e.z + Math.sin(e.a) * len, Math.cos(e.a) * 2, 0.6, Math.sin(e.a) * 2, 0.35, 0.5, 1.2, g, g, g, 0.4, 0, 2); }   // a grenade launcher thumps: a puff, no flash
+          else fx.muzzle(e.x + Math.cos(e.a) * len, fx.h(e.x, e.z) + my + alt, e.z + Math.sin(e.a) * len, e.a, e.k === 'shell' || e.w === 'inferno');
           if (v) v.recoil = 1;
           if (e.w === 'scud_missile') { const y = fx.h(e.x, e.z); fx.dust(e.x, y, e.z, 18, 5, 2.6, 0.4); fx.flash(e.x, y + 3, e.z, 40, 0.25); }   // launch blast round the truck
           break;
@@ -121,9 +129,9 @@ export class View {
         }
         case 'pdl': {
           if (!fog.visAt(PLAYER, e.x, e.z) && !fog.visAt(PLAYER, e.tx, e.tz)) break;
-          const ty = fx.h(e.tx, e.tz) + (e.tAir ? AIR_Y : 2.2);
-          if (e.gun) { for (let i = 0; i < 3; i++) fx.tracer(e.x, fx.h(e.x, e.z) + 3, e.z, e.tx + (fx.rnd() - 0.5), ty + (fx.rnd() - 0.5), e.tz + (fx.rnd() - 0.5)); }   // a gun-based defense (Corvette) fires a burst
-          else fx.beam(e.x, fx.h(e.x, e.z) + 2.7, e.z, e.tx, ty, e.tz, PDL, 0.18);
+          const ty = fx.h(e.tx, e.tz) + (e.tAir ? AIR_Y : 2.2), py = fx.h(e.x, e.z) + (e.y ?? 2.7);
+          if (e.gun) { for (let i = 0; i < 3; i++) fx.tracer(e.x, py, e.z, e.tx + (fx.rnd() - 0.5), ty + (fx.rnd() - 0.5), e.tz + (fx.rnd() - 0.5)); }   // a gun-based defense (Corvette) fires a burst
+          else fx.beam(e.x, py, e.z, e.tx, ty, e.tz, PDL, 0.18);
           fx.explosion(e.tx, ty, e.tz, 0.35);
           break;
         }
@@ -189,15 +197,16 @@ export class View {
         case 'superlaunch': { // what the launching building does; shown only if you can see that building right now
           if (!(this.reveal || e.team === PLAYER || fog.visAt(PLAYER, e.bx, e.bz))) break;
           const y = fx.h(e.bx, e.bz);
-          if (e.id === 'particle') { this.skyBeams.push({ x: e.bx, y: y + 14, z: e.bz, until: this.time + POWERS.particle.beam.ticks / 20 }); fx.flash(e.bx, y + 15, e.bz, 120, 0.5); }
-          else { fx.dust(e.bx, y, e.bz, 26, 9, 3, 0.45); fx.flash(e.bx, y + 4, e.bz, e.id === 'nuke' ? 160 : 70, 0.6); fx.shake(e.bx, e.bz, e.id === 'nuke' ? 0.9 : 0.4); }
+          const kind = POWERS[e.id].as || e.id;   // a newer faction's superweapon looks like the one whose strike it reuses
+          if (kind === 'particle') { this.skyBeams.push({ x: e.bx, y: y + 14, z: e.bz, until: this.time + POWERS[e.id].beam.ticks / 20 }); fx.flash(e.bx, y + 15, e.bz, 120, 0.5); }
+          else { fx.dust(e.bx, y, e.bz, 26, 9, 3, 0.45); fx.flash(e.bx, y + 4, e.bz, kind === 'nuke' ? 160 : 70, 0.6); fx.shake(e.bx, e.bz, kind === 'nuke' ? 0.9 : 0.4); }
           break;
         }
         case 'suicide': if (see(e)) { const up = e.y !== undefined ? e.y : e.air ? 6 : 0, y = fx.h(e.x, e.z) + up; fx.explosion(e.x, y, e.z, 2.0); if (up < 2.5) fx.crater(e.x, e.z, 6); fx.shock(e.x, y + 0.4, e.z, e.r * 1.3, 0.4, 0xffd9a0); fx.shake(e.x, e.z, 0.7); } break;
         case 'touchdown': if (see(e)) { const y = fx.h(e.x, e.z) + 0.5; fx.dust(e.x, y, e.z, 8, 3, 1.2, 0.3); } break; // tyre smoke
         case 'fab': if (see(e)) fx.megaBlast(e.x, e.z, e.r); break;
         case 'nuke': if (see(e)) { fx.megaBlast(e.x, e.z, e.r); fx.megaBlast(e.x, e.z, e.r * 0.55); fx.mushroom(e.x, e.z, e.r); fx.smokeColumn(e.x, e.z, 12); fx.shake(e.x, e.z, 2.2); } else fx.shake(e.x, e.z, 0.5); break; // the ground shakes for everyone
-        case 'scudhit': if (see(e)) { const y = fx.h(e.x, e.z); fx.streak(e.x - 14, y + 70, e.z - 6, e.x, y + 1, e.z); fx.explosion(e.x, y, e.z, 2.2); fx.crater(e.x, e.z, 9); fx.toxinBurst(e.x, e.z, e.r); fx.shake(e.x, e.z, 0.7); } break;
+        case 'scudhit': if (see(e)) { const y = fx.h(e.x, e.z); fx.streak(e.x - 14, y + 70, e.z - 6, e.x, y + 1, e.z); fx.explosion(e.x, y, e.z, 2.2); fx.crater(e.x, e.z, 9); if (!e.fire) fx.toxinBurst(e.x, e.z, e.r); fx.shake(e.x, e.z, 0.7); } break;
         case 'pbeam': if (see(e)) { const y = fx.h(e.x, e.z); fx.beam(e.x + 6, y + 150, e.z - 10, e.x, y + 0.2, e.z, PBEAM, 0.16); fx.spark(e.x, y + 0.5, e.z); if (e.k % 6 === 0) { fx.explosion(e.x, y, e.z, 0.8); fx.crater(e.x, e.z, 5); } if (e.k % 10 === 0) fx.shake(e.x, e.z, 0.35); } break;
         case 'paradrop': if (see(e)) fx.dust(e.x, fx.h(e.x, e.z), e.z, 22, 7, 2.2, 0.36); break;
         case 'sneak': if (see(e)) { const y = fx.h(e.x, e.z); fx.dust(e.x, y, e.z, 30, 9, 3, 0.45); fx.shock(e.x, y + 0.4, e.z, 10, 0.6, 0xd9b27a); fx.shake(e.x, e.z, 0.5); } break;
@@ -234,6 +243,21 @@ export class View {
       this.scene.add(v.g); this.views.set(e.id, v);
     }
     return v;
+  }
+  // A cloaked unit you are allowed to see (your own, or anything in a replay with the fog off) is drawn see-through:
+  // every mesh swaps to a translucent copy of its material, and back when the cloak drops.
+  ghostOf(m) {
+    let g = this.ghosts.get(m);
+    if (!g) { g = m.clone(); g.onBeforeCompile = m.onBeforeCompile; if (m.customProgramCacheKey) g.customProgramCacheKey = m.customProgramCacheKey; g.transparent = true; g.opacity = 0.4; g.depthWrite = false; this.ghosts.set(m, g); }
+    return g;
+  }
+  setGhost(v, on) {
+    if (!!v.ghost === on || !v.g.traverse) return; v.ghost = on;
+    v.g.traverse((o) => {
+      if (!o.isMesh) return;
+      if (on) { o.userData.solid = o.material; o.userData.shadow = o.castShadow; o.material = this.ghostOf(o.material); o.castShadow = false; }
+      else if (o.userData.solid) { o.material = o.userData.solid; o.castShadow = o.userData.shadow; o.userData.solid = null; }
+    });
   }
   rocketY(p, u) { return this.fx.h(p.tx, p.tz) + p.sy * (1 - u) * (1 - u * 0.25); }
   // Nuclear Missile and Scud Storm missiles. Each is drawn twice: climbing out of its launcher (if you can see the
@@ -318,6 +342,7 @@ export class View {
           v.body.rotation.x = -Math.atan2(heightAt(map, x - s * L, z + c * L) - heightAt(map, x + s * L, z - c * L), 2 * L);
         }
         v.g.position.set(x, y, z); v.g.rotation.y = -f;
+        this.setGhost(v, !!e.cloaked && (e.team === PLAYER || !e.detected));
         if (!d.infantry) {
           if (e.hp < e.maxHp * 0.4) fx.damage(x, y, z, dt, e.hp / e.maxHp);   // trailing engine smoke and sparks
           if (!e.air) env.headlight(x, y, z, f, e.radius);                    // no-op except at night
@@ -413,7 +438,7 @@ export class View {
         m.position.set(x, y, z); m.rotation.y = -p.a; m.userData.rig.body.rotation.z = Math.atan2(p.y - p.py, HERO_CALL.airliner.speed);
         if (fx.rnd() < dt * 50) { const g = 0.25 + fx.rnd() * 0.15; fx.smoke.spawn(x - Math.cos(p.a) * 6, y + 0.3, z - Math.sin(p.a) * 6, 0, 0.5, 0, 1.6, 1.6, 4, g, g, g, 0.5, -0.1, 0.6); }
       } else if (p.kind === 'para') { // five troopers come down under canopies onto the spots where their squads will form up
-        const n = POWERS.paradrop.n, up = Math.max(0, p.t - alpha) * 0.55;
+        const n = (POWERS[p.pid] || POWERS.paradrop).n, up = Math.max(0, p.t - alpha) * 0.55;
         for (let i = 0; i < n; i++) {
           const a = i * 2.399963, cx = p.x + Math.cos(a) * (2 + i * 1.2), cz = p.z + Math.sin(a) * (2 + i * 1.2), m = this.prop(p.id + ':' + i, () => createChute().g, stamp);
           m.position.set(cx + Math.sin(this.time * 1.3 + i) * 0.5, fx.h(cx, cz) + up * (1 + i * 0.04), cz); m.rotation.z = Math.sin(this.time * 1.7 + i * 2) * 0.12; m.rotation.y = i * 1.3;
@@ -453,7 +478,7 @@ export class View {
       const tot = Math.hypot(p.tx - p.sx, p.tz - p.sz) || 1, u = Math.min(1, Math.hypot(x - p.sx, z - p.sz) / tot);
       const W = WEAPONS[p.w], big = p.w === 'scud_missile';
       const arc = W.arc || (p.kind === 'lob' ? 10 : p.kind === 'shell' ? 0.4 : p.kind === 'rocket' ? 2.2 : 5);
-      const y0 = fx.h(p.sx, p.sz) + (p.sAir ? AIR_Y : big ? 6 : 1.7), y1 = fx.h(p.tx, p.tz) + (p.tAir ? AIR_Y : 1.0), y = y0 * (1 - u) + y1 * u + Math.sin(u * Math.PI) * arc;
+      const y0 = fx.h(p.sx, p.sz) + (p.sAir ? AIR_Y : big ? 6 : p.sy0 ?? 1.7), y1 = fx.h(p.tx, p.tz) + (p.tAir ? AIR_Y : 1.0), y = y0 * (1 - u) + y1 * u + Math.sin(u * Math.PI) * arc;
       if (big) { // a Scud Launcher's missile is a real missile: it climbs off the erector, arcs over and comes down nose first
         const m = this.prop(p.id, () => { const r = createMissile('scud'); r.g.userData.rig = r; return r.g; }, stamp), pitch = Math.atan2(y1 - y0 + Math.cos(u * Math.PI) * Math.PI * arc, tot);
         m.position.set(x, y, z); m.rotation.y = -p.a; m.userData.rig.body.rotation.z = pitch;

@@ -266,6 +266,7 @@ export class Hud {
       for (const t of this.F.build) {
         const d = BLDGS[t]; let why = '';
         if (d.superPower && sim.noSuper) continue;                       // lobby rule: no superweapons
+        if (d.general && d.general !== T.general) continue;              // a building that belongs to another general is not offered
         if (d.needs && !hasBldg(sim, PLAYER, d.needs)) why = 'Requires ' + BLDGS[d.needs].name; else if (d.shore && !sim.map.hasWater) why = 'This map has no water'; else if (T.money < bldgCost(T, t)) why = 'Insufficient funds';
         out.push({ act: 'build:' + t, icon: iconFor(d, true), name: d.name, cost: bldgCost(T, t), why, sub: d.power > 0 ? '+' + d.power + ' PWR' : d.power < 0 ? '−' + (-d.power) + ' PWR' : '', on: this.ui.place && this.ui.place.type === t });
       }
@@ -437,8 +438,9 @@ export class Hud {
     $('promo-pts').textContent = T.points + (T.points === 1 ? ' point' : ' points') + ' to spend';
     $('promo-tree').innerHTML = [1, 3, 5].map(tier => `<section class="tier${T.rank >= tier ? '' : ' locked'}"><h3>Rank ${tier}${T.rank >= tier ? '' : ' <small>locked</small>'}</h3>` + F.tree.filter(n => n.tier === tier).map(n => {
       const has = T.promos.has(n.id), req = n.req ? F.tree.find(k => k.id === n.req) : null;
-      const why = has ? '' : T.rank < tier ? `Reach Rank ${tier}` : req && !T.promos.has(req.id) ? `Needs ${req.name}` : T.points < 1 ? 'No points' : '';
-      return `<article class="node${has ? ' has' : why ? ' no' : ' can'}"><h4>${n.power ? ICON.jet : n.unlock ? ICON.man : ICON.star}${n.power && nodePower(T, n) !== n.power ? POWERS[nodePower(T, n)].name : n.name}</h4><p>${n.power && nodePower(T, n) !== n.power ? POWERS[nodePower(T, n)].desc : n.desc}</p>${req ? `<p class="req">Branch: after ${req.name}</p>` : ''}` +
+      const shown = (k) => k.power && nodePower(T, k) !== k.power ? POWERS[nodePower(T, k)].name : k.name;   // a general may swap a power for his own
+      const why = has ? '' : T.rank < tier ? `Reach Rank ${tier}` : req && !T.promos.has(req.id) ? `Needs ${shown(req)}` : T.points < 1 ? 'No points' : '';
+      return `<article class="node${has ? ' has' : why ? ' no' : ' can'}"><h4>${n.power ? ICON.jet : n.unlock ? ICON.man : ICON.star}${n.power && nodePower(T, n) !== n.power ? POWERS[nodePower(T, n)].name : n.name}</h4><p>${n.power && nodePower(T, n) !== n.power ? POWERS[nodePower(T, n)].desc : n.desc}</p>${req ? `<p class="req">Branch: after ${shown(req)}</p>` : ''}` +
         (has ? '<span class="tag">Unlocked</span>' : why ? `<span class="tag">${why}</span>` : `<button type="button" class="tbtn" data-node="${n.id}">Spend 1 point</button>`) + '</article>';
     }).join('') + '</section>').join('');
   }

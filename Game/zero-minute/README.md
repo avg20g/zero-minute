@@ -334,8 +334,65 @@ tactics (counters, retreat, focus fire, flanking, power combos) are switched on.
   fights mostly on the ground (ISIS, Russia) lose to the ones that fly; the tunnel work did not close that gap.
 - Tests: `node test/batch12.mjs` (76 checks).
 
+## Batch 13: detailed infantry and heroes, US aircraft as units, new ISIS units
+- **US aircraft are units now.** The A-10 Strafing Run, A-10 Wingman and AC-130 Gunship powers and promotions are
+  gone (their strike code is removed from `js/sim/powers.js`); the aircraft models are kept and are unit models too.
+  - **A-10** (`v_a10`): Air Field, every US general. A strike jet: 30 mm cannon (`free` weapon: it does not use up
+    the sortie) and four Mavericks, ground targets only.
+  - **Strategic Airfield** (`v_stratfield`, Air Force General only: `general` on the building, checked by the `build`
+    order and the build menu): one long runway, two large hangars (`big` aircraft only park in `big` hangars), a
+    helicopter pad. Layout is data (`STRAT_FIELD`: `runwayHalf`, `hangar` sizes).
+  - **AC-130** (`v_ac130`): flies to the target and circles it anti-clockwise (`orbit` radius; `stepAir` in
+    `js/sim/air.js`). Both guns are `mounts` pointing out of the left side, so it only fires with the target to
+    port. The rotary cannon is free; the twelve howitzer rounds are the sortie.
+  - **B-2** (`v_b2`): one pass, ten bombs in a line (weapon kind `carpet`). The B-2 support power stays for the Air
+    Force General but drops one Fuel-Air Bomb (`as: 'fab'`).
+  - **AH-64 Apache** (`v_apache`): chain gun and Hellfires. Upgrade **Longbow** (`up` on the unit, `applyUp` in
+    `js/sim/entities.js`): Hellfires reach 66 m instead of 50, sight +16 m, spots cloaked units within 30 m; the radar
+    dome above the rotor appears on the model.
+  - **AH-1Z Viper** (`v_viper`, Marine Corps General, Air Field): fires faster, jinks in random directions while it
+    fires (`jink`), has less health, and missiles, rockets and shells miss it 40% of the time (`dodge`); rifle and
+    machine-gun fire always lands.
+  - Promotions in the three empty slots: **Tomahawk Strike** (Rank 3: one cruise missile on a 12 m zone; the Air
+    Force General gets the B-2 Fuel-Air Bomb in its place), **Combat Pilots** (Rank 3: jets and helicopters are
+    built as Veterans), **Rapid Re-arm** (Rank 5: aircraft re-arm 40% faster).
+- **ISIS, every general**: **Quad Cannon** (`s_quad`, $500: the four-barrel 23 mm turret of a ZSU-23-4 on a pickup;
+  cheap anti-aircraft) and **Shahed Launcher** (`s_shahedtruck`: a container truck that stops, opens its rear doors
+  and launches three one-way drones 1.5 s apart, then reloads for 16 s; range 110 m; $1,200; weapon kind `launch`, the
+  drone is its own unit and can be shot down). The Scud Launcher now reaches 140 m. Sneak Attack recharges in 150 s
+  (was 300), opens after 2 s (was 5) and is a Rank 3 promotion; a Tunnel Network builds in 5 s.
+- **AI**: the ISIS AI takes Sneak Attack on every 1 km and 2 km map (after Cash Bounty) and uses it whenever it is
+  ready, each exit further forward; on a 1 km map the army marches together and the exits carry reinforcements and
+  retreats; it keeps a pair of long-range launchers. The Stealth General's AI keeps a standing swarm of FPV
+  quadcopters on top of its army (6 on Medium, 10 on Hard: `aiSwarm` on the general; nothing changes for a player)
+  and sends them at infantry, light vehicles and helicopters once an attack is under way. The Air Force General's AI builds the Air Field and the Strategic Airfield
+  as a matter of course (`aiAir`).
+- **Looks**
+  - Cloaked units are drawn solid again; the CLOAK tag above them marks them (the see-through look of batch 12 is
+    removed).
+  - Team colour: every factory model gets one more mark in its owner's colour, placed from the model's own
+    measurements (`teamMarks` in `js/render/modelFactory.js`): a pennant on a whip aerial and slightly larger roof
+    panels on ground vehicles, a band at each wingtip on aircraft, a band round the tail boom on helicopters, a
+    funnel band and masthead pennant on ships. Soldiers wear it on both arms, round the helmet and on the pack.
+  - Infantry rebuilt (`man`, `weapon`, `headgear`, `arms`, `kit` in `js/render/models.js`): boots, shins and thighs,
+    hips and belt, torso with vest and pouches, shoulders, arms brought to the weapon, neck, head, headgear, pack.
+    Each faction has its own uniform, headgear and rifle (US M4, China QBZ-95, ISIS and Russia AK, Europe FAMAS and
+    the white kepi). All five heroes are rebuilt to the same standard with their looks unchanged.
+  - Walking: each leg is its own node hinged at the hip and swings while the squad moves (the bear's four legs
+    too). A squad costs about twice the draw calls it did; legs cast no shadow of their own to keep that in check.
+- **Balance** (details in `balance/CHANGELOG.md`): Hard, five 1 km maps, 15 sides, 2,250 matches: thirteen sides
+  between 40% and 60%; China's Mass Assault General 61%, Russia without a general 36%. Medium: 35% to 61%. The
+  two 2 km sea maps: 10% to 75% (ISIS is now 50-57% there; Russia 10-20%). The biggest single finding: the ISIS AI
+  must take Cash Bounty before Sneak Attack (`ai: 5` on the promotion), worth about 12 points of win rate. The
+  Stealth General's infantry is 10% cheaper to pay for the swarm its AI keeps; Cyber General units 14% dearer.
+  `node balance/run.mjs --only side,side` runs just those sides' matches.
+- Tests: `node test/batch13.mjs` (107 checks); `test/a10.mjs` is rewritten for the A-10 unit.
+
 ## Tests
 Node (simulation only):
+
+    node test/batch13.mjs     US aircraft as units, Strategic Airfield, Longbow, AH-1Z, new promotions, Quad Cannon,
+                              Shahed Launcher, tunnels, the AI's swarm and airfields, team marks, detailed figures
 
     node test/batch12.mjs     Russia and Europe, the four new generals, both heroes, power aliases, ship gun
                               mounts and arcs, hangars, speed buttons, minimap, the ISIS AI's tunnels
@@ -352,13 +409,13 @@ Node (simulation only):
                               new maps and brushes
     node test/batch7.mjs      garrison size and exit, powers light fog and wreck buildings
     node test/balance.mjs     balance harness: six fixed matches repeat exactly, report is well formed
-    node test/batch9.mjs      friendly fire, many superweapons, AC-130, drone loiter, garrisons, FPV, bomber
+    node test/batch9.mjs      friendly fire, many superweapons, drone loiter, garrisons, FPV, bomber
     node test/batch10.mjs     heroes, AI hero use, force attack for suicide units, repair orders, airfields
     node test/bench.mjs       simulation speed benchmark
     node test/addon.mjs       superweapons, No-Superweapons rule, new powers,
                               King of the Hill, AI use of all of them
     node test/ai.mjs          no-cheat audit, blind swap, scouting, counters, micro, tiers
-    node test/a10.mjs         two-stage A-10 pass: cannon line, 6 rockets, armour kills, fog
+    node test/a10.mjs         the A-10 unit: cannon and four Mavericks per sortie, ground targets only
     node test/models.mjs      silhouette features, matte materials, geometry winding, GLB path
     node test/phase2.mjs      registry, factions, veterancy, garrison clearing, 9 match-ups
     node test/tunnel.mjs  test/powers.mjs  test/fog.mjs

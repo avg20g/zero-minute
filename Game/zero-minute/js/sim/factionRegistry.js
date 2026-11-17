@@ -26,7 +26,7 @@ export const WEAPONS = {
   tow:         { range: 46, dmg: 170, cd: 110, kind: 'missile', speed: 60, intercept: true, vs: { inf: 0.2, light: 1, heavy: 1.9, bldg: 0.9 } },      // TOW upgrade: built to kill tanks
   vest:        { range: 2.6, dmg: 1, cd: 999, kind: 'hitscan', vs: { inf: 1, light: 1, heavy: 1, bldg: 1 } },                                        // suicide units: reaching this range triggers the blast
   fpv_dive:    { range: 9, dmg: 1, cd: 999, kind: 'hitscan', noJets: true, vs: { inf: 1, light: 1, heavy: 0.4, bldg: 0.3, air: 1 } },                 // FPV drone: inside this range it dives; helicopters yes, jets in flight no
-  scud_missile: { range: 120, dmg: 320, cd: 240, kind: 'shell', speed: 55, arc: 36, windup: 40, splash: 10, hazard: { kind: 'toxin', r: 7, secs: 10, dps: 16 }, vs: { inf: 1, light: 1, heavy: 0.7, bldg: 1.1 } },
+  scud_missile: { range: 140, dmg: 320, cd: 240, kind: 'shell', speed: 55, arc: 36, windup: 40, splash: 10, hazard: { kind: 'toxin', r: 7, secs: 10, dps: 16 }, vs: { inf: 1, light: 1, heavy: 0.7, bldg: 1.1 } },
   raptor_missile: { range: 46, dmg: 80, cd: 20, kind: 'missile', speed: 95, burst: 2, burstGap: 4, intercept: true, splash: 4, vs: { inf: 0.5, light: 0.9, heavy: 0.8, bldg: 0.6, air: 1.6 } },   // F-22: four per sortie, best against aircraft
   mig_missile: { range: 44, dmg: 110, cd: 20, kind: 'missile', speed: 90, burst: 2, burstGap: 4, intercept: true, splash: 5, hazard: { kind: 'fire', r: 4.5, secs: 4, dps: 16 }, vs: { inf: 0.8, light: 1, heavy: 1, bldg: 1 } },
   tech_mg:     { range: 30, dmg: 6,  cd: 4,  kind: 'hitscan', vs: { inf: 1, light: 0.6, heavy: 0.12, bldg: 0.12, air: 0.6 } },
@@ -56,6 +56,22 @@ export const WEAPONS = {
   seal_rifle:  { range: 32, dmg: 12, cd: 5,  kind: 'hitscan', vs: { inf: 1, light: 0.5, heavy: 0.15, bldg: 0.2, air: 0.45 } },                       // SEAL Team: rapid-fire carbines
   seal_sniper: { range: 50, dmg: 80, cd: 60, kind: 'hitscan', vs: { inf: 1, light: 0.08 } },                                                         // SEAL Team: the marksman
   seal_gl:     { range: 34, dmg: 34, cd: 40, kind: 'lob', grenade: true, speed: 28, arc: 3.5, splash: 4.5, vs: { inf: 0.9, light: 1, heavy: 0.5, bldg: 0.7 } },     // SEAL Team: grenade launcher
+  // ---- batch 13: United States aircraft that used to be support powers, the two new gunships, and ISIS's new trucks.
+  // free: this weapon does not use up the aircraft's ammunition (its `ammo` counts the other weapon's rounds).
+  gau8:        { range: 40, dmg: 22, cd: 3,  kind: 'hitscan', free: true, vs: { inf: 0.5, light: 1, heavy: 0.7, bldg: 0.3 } },                           // A-10: 30 mm GAU-8, fired on the pass
+  maverick:    { range: 46, dmg: 150, cd: 24, kind: 'missile', speed: 85, intercept: true, splash: 4, vs: { inf: 0.3, light: 1.1, heavy: 1.6, bldg: 0.9 } },   // A-10: four AGM-65 a sortie
+  ac_gun:      { range: 64, dmg: 16, cd: 2,  kind: 'hitscan', free: true, vs: { inf: 1, light: 0.7, heavy: 0.15, bldg: 0.1 } },                           // AC-130: 25 mm rotary cannon, port side
+  ac_105:      { range: 64, dmg: 170, cd: 26, kind: 'shell', speed: 120, splash: 6, vs: { inf: 0.8, light: 1, heavy: 0.9, bldg: 1 } },                    // AC-130: 105 mm howitzer, port side; its rounds are the ammunition
+  // carpet: one pass lays `n` bombs along a `line` metres long, `r` metres blast each (the strike code in powers.js)
+  b2_bombs:    { range: 26, dmg: 190, cd: 60, kind: 'carpet', n: 10, line: 60, r: 8, vs: { inf: 1, light: 1, heavy: 1, bldg: 1 } },                      // B-2 Spirit
+  m230:        { range: 34, dmg: 8,  cd: 3,  kind: 'hitscan', vs: { inf: 1, light: 0.85, heavy: 0.25, bldg: 0.15, air: 0.7 } },                           // Apache: 30 mm chain gun
+  hellfire_lb: { range: 66, dmg: 150, cd: 120, kind: 'missile', speed: 78, intercept: true, vs: { inf: 0.2, light: 1, heavy: 1.8, bldg: 1 } },            // Apache with Longbow: the same missile, further
+  viper_gun:   { range: 32, dmg: 5,  cd: 2,  kind: 'hitscan', vs: { inf: 1, light: 0.8, heavy: 0.2, bldg: 0.15, air: 0.7 } },                             // AH-1Z: 20 mm three-barrel gun, fast
+  viper_rocket:{ range: 40, dmg: 30, cd: 50, kind: 'rocket', speed: 60, burst: 2, burstGap: 4, intercept: true, vs: { inf: 0.3, light: 1, heavy: 1.4, bldg: 1 } },   // AH-1Z: quicker salvos than the other gunships
+  zu23:        { range: 44, dmg: 7,  cd: 2,  kind: 'hitscan', vs: { air: 1.2, inf: 0.7, light: 0.6, heavy: 0.1, bldg: 0.08 } },                           // Quad Cannon: four 23 mm barrels
+  // launch: the weapon sends out a one-way drone unit instead of a shot (three, 1.5 s apart, then the reload)
+  shahed:      { range: 110, minRange: 24, dmg: 1, cd: 320, kind: 'launch', unit: 's_shahed', burst: 3, burstGap: 30, windup: 40, vs: { inf: 1, light: 1, heavy: 1, bldg: 1 } },
+  shahed_dive: { range: 9, dmg: 1, cd: 999, kind: 'hitscan', vs: { inf: 1, light: 1, heavy: 1, bldg: 1 } },                                               // the drone itself: inside this range it dives
   // ---- Russia (weapons follow what the real vehicle carries; numbers are placeholders set by the balance sweep)
   gun125:      { range: 36, dmg: 62, cd: 44, kind: 'shell', speed: 110, vs: { inf: 0.35, light: 1, heavy: 1, bldg: 1 } },                                  // T-90: 125 mm 2A46
   gun125a:     { range: 40, dmg: 82, cd: 46, kind: 'shell', speed: 120, vs: { inf: 0.35, light: 1, heavy: 1.1, bldg: 1.05 } },                            // T-14 Armata: 125 mm 2A82
@@ -85,6 +101,8 @@ export const WEAPONS = {
   spear:       { range: 3.4, dmg: 195, cd: 14, kind: 'melee', vs: { inf: 1, light: 1, heavy: 1, bldg: 1 } },                                             // Leonidas: a spear thrust; nothing in the air
   // damage profiles for off-map strikes and lingering hazards (never equipped)
   boatblast: { vs: { inf: 0.6, light: 1.2, heavy: 1.2, bldg: 1 } },     // Drone Boat: a hull full of explosive
+  shahedblast: { vs: { inf: 0.8, light: 1, heavy: 0.7, bldg: 1.6 } },    // Shahed drone: a 40 kg warhead, best against buildings
+  cruise:    { vs: { inf: 1, light: 1, heavy: 0.9, bldg: 1.2 } },        // Tomahawk Strike
   a10gun:    { vs: { inf: 1, light: 1, heavy: 1, bldg: 0.4 } },      // 30 mm depleted-uranium burst
   a10rocket: { vs: { inf: 0.8, light: 1.2, heavy: 1, bldg: 0.6 } },   // armor-piercing rockets
   artillery: { vs: { inf: 1, light: 1, heavy: 0.7, bldg: 1 } },
@@ -126,6 +144,21 @@ export const UNITS = {
                   weapon: 'chaingun', weapon2: 'heli_rocket', turret: 5, air: true, alt: 13, fireMoving: true, heli: true },
   v_raptor:     { model: 'raptor', name: 'F-22 Raptor', faction: 'vanguard', cost: 1400, secs: 12, hp: 220, speed: 36, turn: 2.3, radius: 2.4, cls: 1, sight: 40, armor: 'air',
                   weapon: 'raptor_missile', air: true, alt: 20, fireMoving: true, based: true, ammo: 4, reload: 140 },
+  // ---- batch 13: aircraft that were support powers are now built. `big`: needs a Strategic Airfield hangar.
+  // orbit: instead of flying at its target it circles it at this radius, anti-clockwise, so its left side faces in.
+  // jink: metres per second of random sideways movement while it is firing. dodge: chance that a rocket, missile or shell aimed at it misses (bullets and beams never miss).
+  // up: a team upgrade that changes this unit: more sight, a detector radius, a weapon swapped for another.
+  v_a10:        { model: 'a10', name: 'A-10 Thunderbolt', faction: 'vanguard', cost: 1500, secs: 13, hp: 320, speed: 28, turn: 2.0, radius: 2.6, cls: 1, sight: 40, armor: 'air',
+                  weapon: 'gau8', weapon2: 'maverick', air: true, alt: 18, fireMoving: true, based: true, ammo: 4, reload: 140 },
+  v_ac130:      { model: 'ac130', name: 'AC-130 Gunship', faction: 'vanguard', cost: 2800, secs: 22, hp: 700, speed: 22, turn: 1.0, radius: 5.5, cls: 1, sight: 50, armor: 'air',
+                  weapon: 'ac_gun', weapon2: 'ac_105', air: true, alt: 30, fireMoving: true, based: true, big: true, orbit: 44, ammo: 12, reload: 400,
+                  mounts: [{ x: 3.85, y: -0.4, len: 1, arc: 0.7, dir: -Math.PI / 2 }, { x: -1.75, y: -0.4, len: 1, arc: 0.7, dir: -Math.PI / 2 }] },   // both guns point out of the left side; y is measured from the aircraft
+  v_b2:         { model: 'b2', name: 'B-2 Spirit', faction: 'vanguard', cost: 3000, secs: 24, hp: 520, speed: 32, turn: 1.4, radius: 5.5, cls: 1, sight: 40, armor: 'air',
+                  weapon: 'b2_bombs', air: true, alt: 26, fireMoving: true, based: true, big: true, ammo: 1, reload: 500 },
+  v_apache:     { model: 'apache', name: 'AH-64 Apache', faction: 'vanguard', cost: 1600, secs: 14, hp: 320, speed: 15, turn: 2.4, radius: 2.4, cls: 1, sight: 44, armor: 'air',
+                  weapon: 'm230', weapon2: 'hellfire', turret: 5, air: true, alt: 13, fireMoving: true, heli: true, up: { id: 'v_longbow', sight: 16, detector: 30, weapon: { hellfire: 'hellfire_lb' } } },
+  v_viper:      { model: 'viper', name: 'AH-1Z Viper', faction: 'vanguard', cost: 1300, secs: 12, hp: 190, speed: 17, turn: 3.0, radius: 2.1, cls: 1, sight: 44, armor: 'air',
+                  weapon: 'viper_gun', weapon2: 'viper_rocket', turret: 6, air: true, alt: 12, fireMoving: true, heli: true, jink: 7, dodge: 0.4 },
   // ---- Red Hammer Pact
   r_dozer:      { ...DOZER, name: 'Dozer', faction: 'redhammer' },
   r_truck:      { ...TRUCK, name: 'Supply Truck', faction: 'redhammer' },
@@ -235,6 +268,12 @@ export const UNITS = {
   // berserk: charges every enemy in sight with no leash and is never pulled back
   e_hero:       { model: 'leonidas', name: 'Leonidas', faction: 'aegis', cost: 2500, secs: 20, hp: 1300, speed: 9, turn: 9, radius: 1.0, cls: 0, sight: 44, armor: 'inf',
                   weapon: 'spear', infantry: true, hero: true, berserk: true, stealth: 'always', needs: 'e_factory' },
+  // ---- batch 13: ISIS, every general
+  s_quad:       { model: 'zu23', name: 'Quad Cannon', faction: 'sandstorm', cost: 500, secs: 6, hp: 150, speed: 16, turn: 3.0, radius: 1.7, cls: 1, sight: 44, armor: 'light',
+                  weapon: 'zu23', turret: 5, fireMoving: true, salvage: false },                                                              // a ZSU-23-4 turret on a pickup
+  s_shahedtruck:{ model: 'shahedtruck', name: 'Shahed Launcher', faction: 'sandstorm', cost: 1200, secs: 15, hp: 240, speed: 8, turn: 1.5, radius: 2.8, cls: 1, sight: 30, armor: 'light', weapon: 'shahed' },
+  s_shahed:     { model: 'shahed', name: 'Shahed Drone', faction: 'sandstorm', cost: 300, secs: 1, hp: 60, speed: 26, turn: 2.2, radius: 1.4, cls: 1, sight: 20, armor: 'air',
+                  weapon: 'shahed_dive', air: true, alt: 14, fireMoving: true, drone: true, suicide: { r: 7, dmg: 170, w: 'shahedblast', dive: true } },   // only ever launched by the truck; flies to its target and dives
   // ---- Sandstorm Front
   s_worker:     { model: 'worker', name: 'Worker', faction: 'sandstorm', cost: 250, secs: 4, hp: 110, speed: 6.5, turn: 9, radius: 0.9, cls: 0, sight: 28, armor: 'inf', infantry: true, builder: true },
   s_truck:      { ...TRUCK, name: 'Supply Pickup', faction: 'sandstorm' },
@@ -264,6 +303,9 @@ const AIRFIELD= { model: 'airfield', role: 'airfield', cost: 1800, secs: 14, hp:
 // Shipyard: `shore` = it must stand half on land and half on water, and it turns to face the sea. It repairs ships near it.
 const SHIPYARD = { model: 'shipyard', role: 'shipyard', cost: 2000, secs: 16, hp: 2200, w: 10, h: 10, power: -1, sight: 34, shore: true, repair: 18 };
 const RUNWAYS = [4, 10.4];
+// Strategic Airfield (64 m x 36 m): one long runway, two hangars big enough for an AC-130 or a B-2, and a helicopter pad.
+const STRAT_FIELD = { runways: [11], runwayHalf: 29, helipad: [24, -9], tower: [29, -15.5], hangar: { w: 21.4, d: 15.6, h: 5.6 },
+  hangars: [[-20, -9.5, 's'], [2, -9.5, 's']], spots: [[-20, -9], [2, -9]], aprons: [[-20, 2.5], [2, 2.5]] };
 // Jets park INSIDE their hangars (`spots`), nose toward the open door; `aprons` is the point outside each door that a
 // jet rolls to first on its way to the runway, and last on its way back in. HANGAR: the building's width, depth and wall height.
 export const HANGAR = { w: 7.2, d: 8.2, h: 3.4 };
@@ -280,7 +322,9 @@ export const BLDGS = {
   v_supply:   { ...SUPPLY, name: 'Supply Center', faction: 'vanguard', trains: ['v_chinook'], needs: 'v_power' },
   v_barracks: { ...BARRACKS, name: 'Barracks', faction: 'vanguard', trains: ['v_ranger', 'v_pathfinder', 'v_hero'] },
   v_factory:  { ...FACTORY, name: 'War Factory', faction: 'vanguard', trains: ['v_tank', 'v_avenger'], upgrades: ['v_pdl'], needs: 'v_supply' },
-  v_airfield: { ...AIRFIELD, layout: US_FIELD, name: 'Air Field', faction: 'vanguard', trains: ['v_raptor', 'v_comanche'], needs: 'v_factory' },
+  v_airfield: { ...AIRFIELD, layout: US_FIELD, name: 'Air Field', faction: 'vanguard', trains: ['v_raptor', 'v_a10', 'v_comanche'], needs: 'v_factory' },
+  v_stratfield: { model: 'airfield', role: 'strategic', name: 'Strategic Airfield', faction: 'vanguard', cost: 3200, secs: 22, hp: 2600, w: 32, h: 18, power: -2, sight: 32, pads: 2, runway: true, big: true,
+                general: 'airforce', layout: STRAT_FIELD, trains: ['v_ac130', 'v_b2', 'v_apache'], upgrades: ['v_longbow'], needs: 'v_airfield' },   // general: only that general may build it
   v_shipyard: { ...SHIPYARD, name: 'Naval Yard', faction: 'vanguard', trains: ['v_rhib', 'v_frigate'], needs: 'v_factory' },
   v_patriot:  { model: 'patriot', role: 'defense', name: 'Patriot Battery', faction: 'vanguard', cost: 1000, secs: 8, hp: 1000, w: 4, h: 4, power: -3, sight: 50, weapon: 'patriot', turret: 3.0, detector: 30, needs: 'v_power' },
   v_uplink:   { model: 'uplink', role: 'income', name: 'Satellite Uplink', faction: 'vanguard', cost: 2500, secs: 20, hp: 1200, w: 6, h: 6, power: -3, sight: 30, income: { amt: 25, every: 40 }, needs: 'v_factory' },
@@ -297,10 +341,10 @@ export const BLDGS = {
   s_cc:       { ...CC, name: 'Command Hideout', faction: 'sandstorm', trains: ['s_worker'] },
   s_supply:   { ...SUPPLY, name: 'Supply Stash', faction: 'sandstorm', power: 0, trains: ['s_truck'] },
   s_barracks: { ...BARRACKS, name: 'Barracks', faction: 'sandstorm', trains: ['s_guerrilla', 's_rpg', 's_saboteur', 's_hero'] },
-  s_factory:  { ...FACTORY, name: 'Arms Dealer', faction: 'sandstorm', power: 0, cost: 1500, trains: ['s_technical', 's_scorpion', 's_tractor', 's_buggy'], needs: 's_supply' },
+  s_factory:  { ...FACTORY, name: 'Arms Dealer', faction: 'sandstorm', power: 0, cost: 1500, trains: ['s_technical', 's_quad', 's_scorpion', 's_tractor', 's_buggy', 's_shahedtruck'], needs: 's_supply' },
   s_shipyard: { ...SHIPYARD, name: 'Smuggler’s Dock', faction: 'sandstorm', power: 0, cost: 1700, trains: ['s_dboat', 's_mboat'], needs: 's_factory' },
   s_stinger:  { model: 'stinger', role: 'defense', name: 'Stinger Site', faction: 'sandstorm', cost: 900, secs: 8, hp: 900, w: 4, h: 4, power: 0, sight: 48, weapon: 'stinger', turret: 3.2, detector: 28, needs: 's_barracks' },
-  s_tunnel:   { model: 'tunnel', role: 'tunnel', name: 'Tunnel Network', faction: 'sandstorm', cost: 800, secs: 8, hp: 1000, w: 4, h: 4, power: 0, sight: 32, tunnel: true, repair: 10, needs: 's_barracks' },
+  s_tunnel:   { model: 'tunnel', role: 'tunnel', name: 'Tunnel Network', faction: 'sandstorm', cost: 800, secs: 5, hp: 1000, w: 4, h: 4, power: 0, sight: 32, tunnel: true, repair: 10, needs: 's_barracks' },
   // Superweapons: build as many as you can pay for and power. Each is announced to both players and runs its own countdown from completion.
   v_particle: { model: 'particle', role: 'super', name: 'Particle Cannon', faction: 'vanguard', cost: 5000, secs: 45, hp: 2400, w: 8, h: 8, power: -10, sight: 30, needs: 'v_factory', superPower: 'particle' },
   r_silo:     { model: 'silo', role: 'super', name: 'Nuclear Missile Silo', faction: 'redhammer', cost: 5000, secs: 45, hp: 2600, w: 8, h: 8, power: -10, sight: 30, needs: 'r_factory', superPower: 'nuke' },
@@ -341,6 +385,7 @@ export const UPGRADES = {
   r_nuke:   { name: 'Nuclear Tanks', cost: 2000, secs: 25, desc: 'Battlemasters and Overlords: +25% damage, +15% speed.' },
   v_stealthrotor: { name: 'Stealth Comanche', cost: 1500, secs: 20, desc: 'Comanches are hidden unless they have just fired or a detector is near.' },
   e_aps:    { name: 'Laser Point Defense', cost: 1500, secs: 20, desc: 'Leopard 2 and Panther tanks shoot down incoming rockets and missiles.' },
+  v_longbow: { name: 'Longbow Radar', cost: 1500, secs: 20, desc: 'Apaches gain the radar dome above the rotor: Hellfires reach 66 m (from 50), they see further and spot cloaked units.' },
   v_tow:    { name: 'TOW Missiles', cost: 1200, secs: 18, desc: 'LAV-25s add a TOW launcher: heavy damage to tanks at long range.' },
   s_anthrax: { name: 'Anthrax Beta', cost: 1500, secs: 20, desc: 'Every toxin cloud you make does 50% more damage.' },
   r_thermo: { name: 'Thermobaric Shells', cost: 1500, secs: 20, desc: 'Inferno Cannon and MiG firestorms are larger and last longer.' },
@@ -348,18 +393,15 @@ export const UPGRADES = {
 
 // ---------------------------------------------------------------- support powers
 export const POWERS = {
-  a10:     { name: 'A-10 Strafing Run', cd: 150, radius: 24, shape: 'line', desc: 'A-10 dives in: a 30 mm cannon burst along a 48 m line, then six armor-piercing rockets.',
-             gun: { dmg: 80, r: 4.5, step: 3.5 }, rockets: { n: 6, dmg: 270, r: 7, flight: 16, seek: 7 } },
   barrage: { name: 'Artillery Barrage', cd: 150, radius: 16, desc: '12 high-explosive shells fall on the target zone.' },
   fab:     { name: 'Fuel-Air Bomb', cd: 240, radius: 24, desc: 'Massive shockwave, then lingering heat that burns infantry, including garrisons.' },
   ambush:  { name: 'Ambush Squad', cd: 180, radius: 8, desc: '6 stealthed guerrillas appear at the target.' },
   toxinbomb: { name: 'Toxin Bomb', cd: 210, radius: 15, desc: 'Green cloud for 20 s: kills infantry in the open and inside buildings, and hurts light vehicles.' },
-  b2: { name: 'B-2 Carpet Bomb', cd: 240, radius: 14, line: 60, n: 10, dmg: 190, r: 8, desc: 'A B-2 Spirit lays ten bombs along a 60 m line.' },
+  b2: { name: 'B-2 Fuel-Air Bomb', cd: 240, radius: 24, as: 'fab', plane: 'b2', desc: 'A B-2 Spirit drops one fuel-air bomb: a massive shockwave, then lingering heat that burns infantry, including garrisons.' },
+  tomahawk: { name: 'Tomahawk Strike', cd: 150, radius: 14, dmg: 650, flight: 70, desc: 'One cruise missile hits a 14 m zone.' },
   paradrop: { name: 'Paratrooper Drop', cd: 240, radius: 9, n: 5, unit: 'v_ranger', desc: 'A transport drops 5 Ranger squads at the target.' },
   cashhack: { name: 'Cash Hack', cd: 240, radius: 14, amount: 1500, aim: 'supply', desc: 'Steals up to $1,500 from the enemy. Aim at an enemy supply building you have scouted.' },
-  sneaktunnel: { name: 'Sneak Attack', cd: 300, radius: 6, delay: 5, aim: 'site', desc: 'A Tunnel Network exit breaks ground at the target after 5 s. Needs clear, explored ground.' },
-  ac130: { name: 'AC-130 Gunship', cd: 240, radius: 18, reveal: 24, secs: 15, orbit: 44, alt: 30,
-           gun: { every: 1, dmg: 10, r: 1.8, spread: 1.2 }, cannon: { every: 26, dmg: 160, r: 6 }, desc: 'A gunship circles the zone for 15 s, raking it with a rotary cannon and a 105 mm howitzer.' },
+  sneaktunnel: { name: 'Sneak Attack', cd: 150, radius: 6, delay: 2, aim: 'site', desc: 'A Tunnel Network exit breaks ground at the target after 2 s. Needs clear, explored ground.' },
   // Superweapons. `super` is the building that owns the power; cd is each building's own countdown in seconds.
   particle: { name: 'Particle Cannon', cd: 210, radius: 12, super: 'v_particle', beam: { ticks: 100, every: 2, dmg: 55, r: 6, sweep: 24 }, desc: 'Orbital beam burns along a 24 m line for 5 s.' },
   nuke:     { name: 'Nuclear Missile', cd: 210, radius: 34, super: 'r_silo', flight: 120, dmg: 1400, fallout: { r: 20, secs: 12, dps: 40 }, desc: 'One warhead. Levels everything within 34 m and leaves fallout.' },
@@ -392,19 +434,19 @@ export const HORDE = { radius: 14, need: 4, bonus: 0.15, bonusPromo: 0.25 };
 export const FACTIONS = {
   vanguard: {
     id: 'vanguard', name: 'United States', doctrine: 'High-tech and air superiority',
-    blurb: 'Abrams tanks, F-22s, Comanche gunships and stealth snipers. Everything leans on the power grid.',
+    blurb: 'Abrams tanks, F-22s, A-10s, Comanche gunships and stealth snipers. Everything leans on the power grid.',
     hull: 0xc4b79a, dark: 0x8a8067, usesPower: true, radarNeedsPower: true,
-    build: ['v_power', 'v_barracks', 'v_supply', 'v_factory', 'v_airfield', 'v_shipyard', 'v_patriot', 'v_uplink', 'v_particle', 'v_cc'],
-    roles: { cc: 'v_cc', power: 'v_power', supply: 'v_supply', barracks: 'v_barracks', factory: 'v_factory', airfield: 'v_airfield', shipyard: 'v_shipyard', defense: 'v_patriot', income: 'v_uplink', super: 'v_particle', builder: 'v_dozer', truck: 'v_chinook', squad: 'v_ranger', scout: 'v_drone' },
+    build: ['v_power', 'v_barracks', 'v_supply', 'v_factory', 'v_airfield', 'v_stratfield', 'v_shipyard', 'v_patriot', 'v_uplink', 'v_particle', 'v_cc'],
+    roles: { cc: 'v_cc', power: 'v_power', supply: 'v_supply', barracks: 'v_barracks', factory: 'v_factory', airfield: 'v_airfield', strategic: 'v_stratfield', shipyard: 'v_shipyard', defense: 'v_patriot', income: 'v_uplink', super: 'v_particle', builder: 'v_dozer', truck: 'v_chinook', squad: 'v_ranger', scout: 'v_drone' },
     aiArmy: ['v_ranger', 'v_tank', 'v_ranger', 'v_avenger', 'v_tank', 'v_comanche'], aiNavy: ['v_rhib', 'v_frigate', 'v_frigate'],
     tree: [
       { id: 'v_pathfinder', tier: 1, name: 'Pathfinder Training', desc: 'Unlocks the Pathfinder Sniper at the Barracks.', unlock: 'v_pathfinder' },
       { id: 'v_vet', tier: 1, name: 'Armor Veterancy', desc: 'Tanks leave the War Factory as Veterans.', vetBuild: 'tank' },
-      { id: 'v_a10', tier: 3, name: 'A-10 Strafing Run', desc: POWERS.a10.desc, power: 'a10' },
+      { id: 'v_strike', tier: 3, name: 'Tomahawk Strike', desc: POWERS.tomahawk.desc, power: 'tomahawk' },   // the Air Force General gets the B-2 Fuel-Air Bomb here instead
       { id: 'v_para', tier: 3, req: 'v_pathfinder', name: 'Paratrooper Drop', desc: POWERS.paradrop.desc, power: 'paradrop' },
       { id: 'v_fastpdl', tier: 3, req: 'v_vet', name: 'Rapid Point Defense', desc: 'Point-defense lasers recharge 40% faster.', flag: 'fastPdl' },
-      { id: 'v_ac130', tier: 5, req: 'v_para', name: 'AC-130 Gunship', desc: POWERS.ac130.desc, power: 'ac130' },
-      { id: 'v_a10x2', tier: 5, req: 'v_a10', name: 'A-10 Wingman', desc: 'A second A-10 follows the first.', flag: 'a10x2' },
+      { id: 'v_pilots', tier: 3, req: 'v_strike', name: 'Combat Pilots', desc: 'Jets and helicopters leave the airfield as Veterans.', vetBuild: 'air' },
+      { id: 'v_rearm', tier: 5, req: 'v_pilots', name: 'Rapid Re-arm', desc: 'Aircraft re-arm 40% faster on the ground.', flag: 'fastRearm' },
     ],
   },
   redhammer: {
@@ -435,9 +477,9 @@ export const FACTIONS = {
       { id: 's_scrap', tier: 1, name: 'Scrap Mastery', desc: 'New vehicles start with one salvage upgrade.', flag: 'scrap' },
       { id: 's_saboteur', tier: 1, name: 'Saboteur Cell', desc: 'Unlocks the Saboteur at the Barracks.', unlock: 's_saboteur' },
       { id: 's_ambush', tier: 3, name: 'Ambush Squad', desc: POWERS.ambush.desc, power: 'ambush' },
-      { id: 's_bounty', tier: 3, req: 's_scrap', name: 'Cash Bounty', desc: 'Earn 20% of the cost of every enemy unit you destroy.', flag: 'bounty' },
+      { id: 's_bounty', tier: 3, req: 's_scrap', name: 'Cash Bounty', desc: 'Earn 20% of the cost of every enemy unit you destroy.', flag: 'bounty', ai: 5 },   // ai: the computer takes this one as soon as it is on offer (income first)
       { id: 's_toxin', tier: 5, req: 's_ambush', name: 'Toxin Bomb', desc: POWERS.toxinbomb.desc, power: 'toxinbomb' },
-      { id: 's_sneak', tier: 5, req: 's_saboteur', name: 'Sneak Attack', desc: POWERS.sneaktunnel.desc, power: 'sneaktunnel' },
+      { id: 's_sneak', tier: 3, req: 's_saboteur', name: 'Sneak Attack', desc: POWERS.sneaktunnel.desc, power: 'sneaktunnel' },
       { id: 's_ambush2', tier: 5, req: 's_ambush', name: 'Ambush II', desc: 'Ambush Squad brings 10 guerrillas.', flag: 'ambush2' },
     ],
   },
@@ -499,17 +541,18 @@ export function trainerOf(type) {
 //   discount            { infantry, tank } cost multipliers
 //   cloak               every infantry squad and light vehicle hides when it stands still
 //   toxin               damage multiplier for the side's toxin clouds;  superCd: superweapon countdown multiplier
+//   aiSwarm             AI only: [unit type, how many on Medium, on Hard] kept in the air on top of the normal army
 export const GENERALS = {
-  airforce: { faction: 'vanguard', name: 'General Drudgereport.com', title: 'Air Force General', desc: 'F-15E Strike Eagles with bunker-buster bombs, a Stealth Comanche upgrade, and a B-2 carpet bomb in place of the A-10 run.',
-    trains: { v_airfield: ['v_f15'] }, upgrades: { v_airfield: ['v_stealthrotor'] }, swap: { a10: 'b2' } },
-  marine: { faction: 'vanguard', name: 'General Maddox', title: 'Marine Corps General', desc: 'Infantry and LAV-25s cross water. Adds the LAV-25 (TOW missile upgrade), SEAL Teams at the Barracks and the Mk V Combat Boat at the Naval Yard.',
-    trains: { v_factory: ['v_lav'], v_barracks: ['v_seal'], v_shipyard: ['v_mkv'] }, upgrades: { v_factory: ['v_tow'] }, amph: true },
-  cyber: { faction: 'redhammer', name: "Secretary Yuec'an Tsie Mie", title: 'Cyber General', desc: 'From 5:00 on, keeps a permanent watch on every enemy building you have found, and on what stands next to it. Starts with Cash Hack (first use at 3:00), which steals more and recharges faster. Infantry and tanks cost 12% more.',
-    spy: 18, spyFrom: 300, spySeen: true, grant: ['r_hack'], hack: { amount: 2000, cd: 180 }, discount: { infantry: 1.12, tank: 1.12 } },
+  airforce: { faction: 'vanguard', name: 'General Drudgereport.com', title: 'Air Force General', desc: 'F-15E Strike Eagles with bunker-buster bombs, a Stealth Comanche upgrade, and the Strategic Airfield: AC-130 gunships, B-2 bombers and Apaches. Its strike power is a B-2 Fuel-Air Bomb.',
+    trains: { v_airfield: ['v_f15'] }, upgrades: { v_airfield: ['v_stealthrotor'] }, swap: { tomahawk: 'b2' }, aiAir: true },
+  marine: { faction: 'vanguard', name: 'General Maddox', title: 'Marine Corps General', desc: 'Infantry and LAV-25s cross water. Adds the LAV-25 (TOW missile upgrade), the AH-1Z Viper gunship, SEAL Teams at the Barracks and the Mk V Combat Boat at the Naval Yard.',
+    trains: { v_factory: ['v_lav'], v_barracks: ['v_seal'], v_shipyard: ['v_mkv'], v_airfield: ['v_viper'] }, upgrades: { v_factory: ['v_tow'] }, amph: true },
+  cyber: { faction: 'redhammer', name: "Secretary Yuec'an Tsie Mie", title: 'Cyber General', desc: 'From 5:00 on, keeps a permanent watch on every enemy building you have found, and on what stands next to it. Starts with Cash Hack (first use at 3:00), which steals more and recharges faster. Infantry and tanks cost 14% more.',
+    spy: 18, spyFrom: 300, spySeen: true, grant: ['r_hack'], hack: { amount: 2000, cd: 180 }, discount: { infantry: 1.14, tank: 1.14 } },
   mass: { faction: 'redhammer', name: 'General Tsao, Chicken', title: 'Mass Assault General', desc: 'Tanks and infantry cost 8% less.',
     discount: { infantry: 0.92, tank: 0.92 } },
-  stealth: { faction: 'sandstorm', name: 'EWSAMA BEN ALLADIN', title: 'Stealth General', desc: 'Infantry and light vehicles vanish when they stand still. Adds Suicide Bombers that charge and break tanks, and FPV Attack Drones that dive on infantry, light vehicles and helicopters.',
-    trains: { s_barracks: ['s_bomber', 's_fpv'] }, cloak: true },
+  stealth: { faction: 'sandstorm', name: 'EWSAMA BEN ALLADIN', title: 'Stealth General', desc: 'Infantry and light vehicles vanish when they stand still. Adds Suicide Bombers that charge and break tanks, and FPV Attack Drones that dive on infantry, light vehicles and helicopters. Infantry cost 10% less.',
+    trains: { s_barracks: ['s_bomber', 's_fpv'] }, cloak: true, discount: { infantry: 0.9 }, aiSwarm: ['s_fpv', 6, 10] },
   wmd: { faction: 'sandstorm', name: 'Nuclear Nadal', title: 'WMD General', desc: 'Scud Launchers, stronger toxin clouds, the Anthrax Beta upgrade, and a faster Scud Storm.',
     trains: { s_factory: ['s_scudtruck'] }, upgrades: { s_market: ['s_anthrax'] }, toxin: 1.25, superCd: 0.8 },
   // ---- Russia and Europe (rules first written for batch 12; tune with the sweep)

@@ -22,7 +22,7 @@ const src = (f) => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
   ok(/const k = this\.mini\.width \/ N, u = N \/ 256; g\.setTransform\(k, 0, 0, k, 0, 0\)/.test(hud) && /this\.mini\.width = this\.mini\.height = 512/.test(hud), 'minimap: drawn in map cells and scaled by canvas size / map size, so a 1 km or 2 km map fits');
   ok(/const speed = ui\.speed,/.test(game) && !/player \? ui\.speed : 1/.test(game) && /replay-bar'\)\.hidden = false/.test(hud), 'speed buttons: the 1x / 2x / 4x bar is shown in every game and the game loop always uses it');
   ok([html, play].every(h => /data-speed="2"/.test(h) && /data-speed="4"/.test(h) && /id="mb-mapsize"/.test(h)), 'index.html and play.html carry the same speed bar and map-size control');
-  ok(/setGhost\(v, !!e\.cloaked && \(e\.team === PLAYER \|\| !e\.detected\)\)/.test(view) && /g\.opacity = 0\.4/.test(view), 'a cloaked unit you can see is drawn see-through');
+  ok(!/setGhost|ghostOf/.test(view), 'batch 13 took the see-through cloak out again: cloaked units are drawn solid');
   ok(/rotation\.y = k \* 0\.45; \}   \/\/ the two bow tubes meet at the stem/.test(mf), 'RHIB: the bow tubes of the collar close to a point');
   ok(/shipHull\(b, s\.radome, L, B, 1\.3, 0\.8, 0\.28, 'hull', s\.red, 0\.42\)/.test(mf) && !/box\(b, s\.red, L \* 0\.9/.test(mf), 'Corvette: the red band follows the hull outline (no box sticking out past the bow)');
   ok(/P = \{ \.\.\.P, hull: s\.strike, dark: s\.strikeDark \}/.test(mf) && /P = \{ \.\.\.P, hull: s\.heloBlack, dark: s\.heloBlackDark \}/.test(mf), 'Comanche is dark grey and the Z-10 deep black whatever the faction paint');
@@ -32,7 +32,7 @@ const src = (f) => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
 // ---------------------------------------------------------------- play notes: rules
 {
   ok(WEAPONS.mk19.grenade && WEAPONS.seal_gl.grenade && !WEAPONS.rocket.grenade, 'grenade launchers are flagged so their shots are drawn as grenades, not rockets');
-  ok(POWERS.ac130.gun.every === 1 && POWERS.ac130.gun.spread <= 1.5 && POWERS.ac130.gun.dmg * 2 > 14, `AC-130 minigun: a burst every tick (was every second tick), spread ${POWERS.ac130.gun.spread} m (was 2.5), more damage in total`);
+  ok(WEAPONS.ac_gun.cd <= 2 && WEAPONS.ac_gun.free && WEAPONS.ac_gun.kind === 'hitscan', 'AC-130 rotary cannon (a unit weapon since batch 13): fires ten times a second, dead on, and does not use up the sortie');
   const s = bare({ factions: ['redhammer', 'vanguard'] }); s.teams[0].promos.add('r_barrage'); s.teams[0].promos.add('r_fab'); s.teams[0].powerReady.fab = 0; makeBldg(s, 'r_cc', PLAYER, 20, 220); s.nav.rebuild();
   ok(usePower(s, PLAYER, 'fab', 300, 200) && s.strikes[0].model === 'h6' && s.strikes[0].pid === 'fab', 'China’s Fuel-Air Bomb is delivered by an H-6 bomber');
   for (const type of ['v_airfield', 'r_airfield', 'u_airfield', 'e_airfield']) {

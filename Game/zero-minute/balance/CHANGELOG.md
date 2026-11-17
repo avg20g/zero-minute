@@ -1,5 +1,93 @@
 # Balance changelog
 
+## Batch 13 (2026-11-17): US aircraft as units, new ISIS units, the AI's promotions
+
+Hard v Hard, 2,250 matches (15 sides, five 1 km maps, two seeds), friendly fire on, 40-minute limit. Medium v
+Medium, 1,125 matches (one seed). Full tables: `report.md` (Hard), `report-medium.md` (Medium); the batch 12 table
+is kept as `report-batch12.md`. The two 2 km sea maps: `report-sea.md` (450 matches, one seed).
+
+| Side | Batch 12 (Hard) | As first written (Hard) | Final (Hard) | Final (Medium) |
+|---|---|---|---|---|
+| China: Mass Assault General | 59% | 65% | 61% | 59% |
+| China: Cyber General | 60% | 64% | 58% | 51% |
+| Europe: Panzer General | 51% | 57% | 56% | 47% |
+| United States: Air Force General | 54% | 59% | 53% | 53% |
+| Europe (no general) | 53% | 57% | 53% | 48% |
+| China (no general) | 49% | 53% | 52% | 49% |
+| United States (no general) | 60% | 55% | 52% | 35% |
+| Europe: Laser General | 49% | 54% | 52% | 50% |
+| ISIS: Stealth General | 40% | 28% | 50% | 43% |
+| ISIS: WMD General | 40% | 41% | 49% | 45% |
+| ISIS (no general) | 42% | 35% | 48% | 44% |
+| United States: Marine Corps General | 55% | 41% | 46% | 54% |
+| Russia: Wagner Group | 51% | 53% | 43% | 57% |
+| Russia: Vacation Command Group | 44% | 42% | 40% | 61% |
+| Russia (no general) | 40% | 46% | 36% | 53% |
+
+Thirteen of fifteen sides are between 40% and 60% at Hard. Outside it: China's Mass Assault General (61%) and
+Russia without a general (36%).
+
+Start positions (Hard): Desert Canyon 54 / 46, Forest River 53 / 47, Urban Megacity 55 / 45, Open Desert 51 / 49,
+Arctic Refinery 45 / 55 (was 37 / 63). A match lasts 17.2 minutes on average; 62 of 2,250 reach the limit.
+
+What the sweeps showed and what was changed:
+
+| What | First written | Final | Why |
+|---|---|---|---|
+| ISIS AI: order of promotions | Sneak Attack as soon as it is on offer (Rank 3 now), then Ambush, then Toxin Bomb | Cash Bounty first, then Sneak Attack, then Ambush | **the cause of ISIS falling to 28-35%.** With Sneak Attack at Rank 3 the AI spent its five points on three powers and never bought Cash Bounty (20% of the price of everything it destroys). Putting Sneak Attack back at Rank 5 in a trial gave 50%; keeping it at Rank 3 and telling the AI to take Cash Bounty first (`ai: 5` on the promotion) gives 48% with five Sneak Attacks a match |
+| ISIS AI: what the forward tunnel exits carry (1 km maps) | the whole army goes down the home tunnel and comes up at the exit | the army marches together; reinforcements come up through the exit, retreats go home through it | a column leaving a hole a few units at a time was beaten in detail (38% to 41% in a trial). On the 2 km maps the army still goes underground |
+| ISIS AI: Scud and Shahed launchers | keeps two, saving up for them ahead of everything else | keeps two, bought when the money is there | 6.5 launchers a match at $1,400, and the wait for each held up the army |
+| Shahed Launcher | $1,400 | $1,200 | same |
+| Stealth General's AI: quadcopter swarm | always topped up first, sent at the attack's target | topped up once there is an army and $900 to spare, not for 75 s after a wave; sent only at infantry, light vehicles and helicopters seen in the last 10 s, six at a time on the attack | 21 drones a match ($7,400) diving on buildings and tanks, which they barely scratch. Costs it about 5 points of win rate even so; see the next row |
+| Stealth General | no price rule | infantry 10% cheaper | to pay for the swarm its AI must keep. The FPV drone itself is unchanged |
+| Quad Cannon against infantry and light vehicles | 0.7 / 0.6 | unchanged | tried 0.4 / 0.26 so the AI would not buy it as an all-purpose unit: ISIS fell to 25-30%. It is the 23 mm quad; it stays good against soft ground targets |
+| AH-1Z Viper | 20 mm 7 damage; rockets 36 every 2.2 s | 5 damage; rockets 30 every 2.5 s | it out-shot the Comanche for less money and the Marine AI built little else (41%). It still fires faster than the other gunships |
+| A-10: cannon, Maverick against infantry | 30 damage, x1.0 infantry; Maverick x0.5 | 22 damage, x0.5 infantry, x0.7 tanks; Maverick x0.3 | the AI chose the A-10 against everything |
+| Tomahawk Strike | 520 damage, 12 m, every 180 s | 650, 14 m, every 150 s | it replaces the A-10 Strafing Run for two of the three US sides, which lost firepower (Marine 41%) |
+| China: Mass Assault General | tanks and infantry 8% cheaper | unchanged | tried 6%: 70% (one more Conscript wave changes the build order); back to 8% |
+| China: Cyber General | infantry and tanks 12% dearer | 14% dearer | 64% |
+
+Other AI changes that move the numbers: the Air Force General's AI builds the Air Field and the Strategic Airfield as
+a matter of course (3.2 A-10s, 1.1 F-15Es, 0.9 Apaches, 0.3 AC-130s a match; the B-2 hardly ever: $3,000 for one
+pass); an AI no longer plans for another general's aircraft.
+
+The two sea maps (Hard, one seed):
+
+| Side | Win rate of decided games | Draws of 60 |
+|---|---|---|
+| China: Cyber General | 75% | 4 |
+| United States: Marine Corps General | 70% | 19 |
+| United States (no general) | 68% | 22 |
+| United States: Air Force General | 67% | 13 |
+| China: Mass Assault General | 67% | 20 |
+| ISIS: WMD General | 57% | 12 |
+| China (no general) | 50% | 14 |
+| ISIS (no general) | 50% | 14 |
+| ISIS: Stealth General | 50% | 16 |
+| Europe: Laser General | 49% | 17 |
+| Europe: Panzer General | 43% | 7 |
+| Europe (no general) | 33% | 13 |
+| Russia (no general) | 20% | 26 |
+| Russia: Wagner Group | 14% | 28 |
+| Russia: Vacation Command Group | 10% | 25 |
+
+Start positions there: Strait of Sand 35 / 65, Emerald Isles 51 / 49. 30% of matches reach the 40-minute limit
+(37% in batch 12). ISIS was at 11%, 21% and 29% on these maps in batch 12 and is at 50% to 57% now: Cash Bounty,
+Sneak Attack exits every 150 s and the Shahed Launcher's reach all count for more on a long map. Russia fell from
+19-28% to 10-20%.
+
+Still open:
+- **Russia is the weakest faction at Hard (36 / 40 / 43%)** now that ISIS has recovered; its line-up and numbers
+  are placeholders until the player's unit lists arrive, so it was not retuned here.
+- **China: Mass Assault General 61%.** One point over; its only rule is the 8% discount, and 6% made it stronger.
+- **Sea maps: 10% to 75%, still not balanced**, but the gap is now Russia alone (10-20%) and Europe without a
+  general (33%); the other eleven sides are between 43% and 75%. Strait of Sand favours the second start (35 / 65).
+- **Medium: 35% to 61%** (was 31% to 62%). Fourteen sides are between 43% and 61%; the United States without a
+  general is at 35%. Hard is the level the numbers are tuned against.
+- The AI's B-2 and AC-130 use is thin: it builds few and loses most of them.
+- The Shahed Launcher and the Quad Cannon were tuned only through AI matches; in a person's hands the launcher
+  (three flying bombs every 16 s from 110 m) may want another look.
+
 ## Batch 12 (2026-11-17): Russia and Europe; fifteen sides
 
 Hard v Hard, 2,250 matches (15 sides, five 1 km maps, two seeds), friendly fire on, 40-minute limit. Medium v

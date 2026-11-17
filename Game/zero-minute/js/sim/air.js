@@ -5,7 +5,7 @@
 //  - Drones simply fly.
 // u.altK is the height above ground as a fraction of the type's cruise altitude (0 = wheels on the ground).
 import { DT, WORLD, angDiff } from './defs.js';
-import { UNITS } from './factionRegistry.js';
+import { UNITS, BLDGS } from './factionRegistry.js';
 import { kill } from './entities.js';
 
 export const TAXI = 11;           // m/s on the ground
@@ -46,7 +46,7 @@ function freeRunway(b, u) { if (b.rws) for (const r of b.rws) if (r.by === u.id)
 
 export function claimPad(sim, u) { // find an airfield of our team with a free pad
   for (const b of sim.ents) {
-    if (b.kind !== 'bldg' || b.dead || !b.done || b.team !== u.team || !b.pads) continue;
+    if (b.kind !== 'bldg' || b.dead || !b.done || b.team !== u.team || !b.pads || !!BLDGS[b.type].big !== !!UNITS[u.type].big) continue;   // big aircraft (AC-130, B-2) live at a Strategic Airfield; fighters do not
     for (let i = 0; i < b.pads.length; i++) {
       const p = b.pads[i];
       if (p.by && p.by !== u.id) { const o = sim.byId.get(p.by); if (o && !o.dead && o.home === b.id) continue; p.by = 0; }
@@ -88,7 +88,7 @@ function fighter(sim, u, d) {
     case 'parked': {
       u.landed = true; u.altK = 0; u.goal = null; u.spd = 0; u.vx = u.vz = 0; u.x = pad.x; u.z = pad.z; u.onApron = false;
       { const df = angDiff(pad.f, u.facing), ma = GROUND_TURN * DT; u.facing += Math.max(-ma, Math.min(ma, df)); }   // turned round in the hangar: nose to the door
-      if (u.ammo < d.ammo && ++u.reloadT >= d.reload) { u.ammo = d.ammo; u.reloadT = 0; }
+      if (u.ammo < d.ammo && ++u.reloadT >= d.reload * (sim.teams[u.team].flags.fastRearm ? 0.6 : 1)) { u.ammo = d.ammo; u.reloadT = 0; }   // Rapid Re-arm promotion: 40% faster
       if (u.hp < u.maxHp) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * HELI_REPAIR * DT);   // ground crew patch it up on the pad, at the helipad's rate
       const o = u.order;
       if (o && (o.t === 'attack' || o.t === 'fattack' || o.t === 'move' || o.t === 'amove')) { if (u.ammo > 0 && lockRunway(sim, home, u)) u.as = 'taxi'; } // holds on the pad while the runway is busy
@@ -122,6 +122,12 @@ function fighter(sim, u, d) {
       if (t && !t.dead) { // attack run. A jet cannot turn inside its own turning circle: if the target is close and
         // off the nose, it flies straight out for a moment, then turns back in with room to line up.
         const dx = t.x - u.x, dz = t.z - u.z;
+        if (d.orbit) { // a gunship does not fly at its target: it circles it anti-clockwise, so the guns on its left side bear the whole way round
+          const dist = Math.hypot(dx, dz), ang = Math.atan2(-dz, -dx);                       // bearing of the aircraft as seen from the target
+          if (dist > d.orbit + 30) u.goal = { x: clampW(t.x + Math.cos(ang + 0.9) * d.orbit), z: clampW(t.z + Math.sin(ang + 0.9) * d.orbit) };   // join the circle on a tangent
+          else u.goal = { x: clampW(t.x + Math.cos(ang - 0.55) * d.orbit), z: clampW(t.z + Math.sin(ang - 0.55) * d.orbit) };
+          break;
+        }
         if (u.extend > 0) u.extend--;
         else if (Math.hypot(dx, dz) < 30 && Math.abs(angDiff(Math.atan2(dz, dx), u.facing)) > 0.6) { u.extend = 30; u.goal = { x: clampW(u.x + Math.cos(u.facing) * 70), z: clampW(u.z + Math.sin(u.facing) * 70) }; }
         else u.goal = { x: t.x, z: t.z };
@@ -229,6 +235,9 @@ export function stepAir(sim) {
       const dx = g.x - u.x, dz = g.z - u.z, dist = Math.hypot(dx, dz);
       if (!d.based && dist < 1.5) { u.goal = null; u.arrived = true; }
       else { const sp = d.based ? u.ms : Math.min(u.ms, Math.max(2, dist * 1.5)); dvx = dx / (dist || 1) * sp; dvz = dz / (dist || 1) * sp; }
+    } else if (d.jink && sim.tick - u.lastFire < 30 && !u.landed && u.altK >= 1) { // an agile gunship never sits still while it shoots: every 0.6 s it darts off in a new direction
+      if (u.jinkT === undefined || sim.tick >= u.jinkT) { u.jinkT = sim.tick + 12; u.jinkA = sim.rand() * 6.2831853; }
+      dvx = Math.cos(u.jinkA) * d.jink; dvz = Math.sin(u.jinkA) * d.jink;
     } else if (d.loiter && !u.order) { // nothing to do: fly a slow circle around its station instead of hanging in the air (u.goal stays empty, so it still counts as idle)
       const a = Math.atan2(u.z - u.guardZ, u.x - u.guardX) + 0.8, tx = u.guardX + Math.cos(a) * d.loiter, tz = u.guardZ + Math.sin(a) * d.loiter, dist = Math.hypot(tx - u.x, tz - u.z) || 1;
       dvx = (tx - u.x) / dist * u.ms * LOITER_SPEED; dvz = (tz - u.z) / dist * u.ms * LOITER_SPEED;

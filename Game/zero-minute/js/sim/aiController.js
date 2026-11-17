@@ -8,7 +8,7 @@
 // Difficulty changes behaviour caps only (actions per minute, reaction delay,
 // which tactics are allowed), never resources or vision.
 import { N, CELL, WORLD } from './defs.js';
-import { UNITS, BLDGS, FACTIONS, POWERS, UPGRADES, WEAPONS, trainsOf, upgradesOf, unitCost, bldgCost, nodePower } from './factionRegistry.js';
+import { UNITS, BLDGS, FACTIONS, POWERS, UPGRADES, WEAPONS, generalOf, trainsOf, upgradesOf, unitCost, bldgCost, nodePower } from './factionRegistry.js';
 import { hasBldg } from './entities.js';
 import { powerError, hasPower, superOf } from './powers.js';
 import { padCount } from './air.js';
@@ -34,11 +34,12 @@ for (const fid in FACTIONS) {
     for (const wn of [d.weapon, d.weapon2]) {
       const w = wn && WEAPONS[wn]; if (!w || w.garrisonOnly) continue;
       // sustained damage per second; pad-based aircraft are limited by their rearm cycle
-      const cycle = d.based ? d.reload + 240 : w.cd, shots = d.based ? d.ammo : (w.burst || 1);
-      const dps = w.dmg * shots * 20 / cycle, hz = w.hazard ? w.hazard.dps * w.hazard.secs * 20 / cycle : 0;
+      const cycle = d.based ? d.reload + 240 : w.cd, shots = d.based ? (w.free ? 24 : d.ammo) : (w.burst || 1);   // a `free` gun fires all through the pass
+      const L = w.kind === 'launch' ? UNITS[w.unit].suicide : null, vsOf = L ? WEAPONS[L.w].vs : w.vs;                 // a launcher is as good as the drone it sends
+      const dps = (L ? L.dmg : w.kind === 'carpet' ? w.dmg * w.n * 0.35 : w.dmg) * shots * 20 / cycle, hz = w.hazard ? w.hazard.dps * w.hazard.secs * 20 / cycle : 0;
       // area weapons (splash, lingering hazards, sprays) hit several soft targets at once
       const area = (w.splash || w.kind === 'spray') ? 3 : 1;
-      for (const a of ARM) e[a] += (dps * (a === 'inf' || a === 'light' ? area : 1) * (w.vs[a] || 0) + (a === 'inf' ? hz * 3 : 0)) / Math.pow(d.cost, 0.7);
+      for (const a of ARM) e[a] += (dps * (a === 'inf' || a === 'light' ? area : 1) * (vsOf[a] || 0) + (a === 'inf' ? hz * 3 : 0)) / Math.pow(d.cost, 0.7);
       reach = Math.max(reach, w.range); if (w.kind === 'lob' && w.range >= 60) arty = true;
     }
     raw[type] = e; REACH[type] = reach; TAG[type] = { arty, hero: d.cost >= 1800, builder: !!d.builder, harvester: !!d.harvester };
@@ -74,9 +75,12 @@ export class AIController {
     this.pois.push({ x: WORLD - this.homeW.x, z: WORLD - this.homeW.z, k: 'start' });           // the other start position
     const es = this.pois[this.pois.length - 1]; this.hunt = this.pois.slice().sort((a, b) => dist(a, es) - dist(b, es));
     this.homeDock = m.docks.map(d => ({ x: d.x + 4, z: d.z + 3 })).sort((a, b) => Math.hypot(a.x - this.home.x, a.z - this.home.z) - Math.hypot(b.x - this.home.x, b.z - this.home.z))[0];
-    const Tm = sim.teams[team], can = new Set(this.F.build.flatMap(b => trainsOf(Tm, b)));   // what this side's general lets it build
+    const Tm = sim.teams[team], can = new Set(this.F.build.filter(b => !BLDGS[b].general || BLDGS[b].general === Tm.general).flatMap(b => trainsOf(Tm, b)));   // what this side's general lets it build
     this.roster = Object.keys(UNITS).filter(k => UNITS[k].faction === this.F.id && can.has(k));
-    this.combat = this.roster.filter(k => UNITS[k].weapon && !UNITS[k].harvester && !UNITS[k].builder && !UNITS[k].scout && !UNITS[k].hero && !UNITS[k].ship);
+    // A general may keep a standing swarm (Stealth General: FPV quadcopters) on top of the army: [type, Medium, Hard].
+    const sw = (generalOf(Tm) || {}).aiSwarm; this.swarmType = sw && level !== 'easy' && can.has(sw[0]) ? sw[0] : null; this.swarmSize = sw ? sw[level === 'hard' ? 2 : 1] : 0; this.swarm = { sent: 0, waves: 0 };
+    this.combat = this.roster.filter(k => UNITS[k].weapon && !UNITS[k].harvester && !UNITS[k].builder && !UNITS[k].scout && !UNITS[k].hero && !UNITS[k].ship && k !== this.swarmType);
+    this.strat = { tries: 0 };
     // The fleet (maps flagged `naval` only): which ships to build, and the open sea they must be able to reach.
     this.navy = sim.map.naval ? (this.F.aiNavy || []).filter(k => can.has(k)) : []; this.navRot = 0; this.sea = -2; this.yardSite = null; this.yardTry = -1e9;
     this.fleet = { mode: 'guard', next: 0, target: null, raids: 0, shots: 0 };
@@ -170,7 +174,7 @@ export class AIController {
   // ------------------------------------------------------------ own forces (full knowledge of own side is fair)
   census() {
     const sim = this.sim, team = this.team, tick = sim.tick, S = this.scout, R = this.F.roles;
-    const c = { builders: [], trucks: 0, army: [], types: {}, bl: {}, prod: [], undone: [], queued: {}, deployers: [], scout: null, strength: 0, mine: [], hero: null, fleet: [] };
+    const c = { builders: [], trucks: 0, army: [], types: {}, bl: {}, prod: [], undone: [], queued: {}, deployers: [], scout: null, strength: 0, mine: [], hero: null, fleet: [], swarm: [] };
     const live = sim.byId.get(S.id); const haveScout = live && !live.dead && live.team === team;
     if (!haveScout) { if (S.id) S.lost = tick; S.id = 0; }
     const cap = sim.byId.get(this.capId);
@@ -186,7 +190,8 @@ export class AIController {
       }
       if (e.inB || e.inert || e.temp) continue;                          // resigned units take no orders; called-in units already have theirs
       const d = UNITS[e.type];
-      if (d.ship) c.fleet.push(e);                                        // ships are run by navalOps, never by the land army code
+      if (e.type === this.swarmType) c.swarm.push(e);                     // the quadcopter swarm is sent on its own, ahead of the army
+      else if (d.ship) c.fleet.push(e);                                        // ships are run by navalOps, never by the land army code
       else if (d.hero) { c.hero = e; c.strength += d.cost; }
       else if (d.builder) c.builders.push(e);
       else if (d.harvester) c.trucks++;
@@ -321,13 +326,17 @@ export class AIController {
     let bestType = null, bestS = 0; const scores = {};
     for (const type of this.combat) { const s = this.unitScore(type, sh, c); scores[type] = s; if (s > bestS && !(UNITS[type].promo && !T.promos.has(UNITS[type].promo))) { bestS = s; bestType = type; } }
     const wantsAir = bestType && R.airfield && BLDGS[R.airfield].trains.includes(bestType);
-    if (R.airfield && !n('airfield') && nd('factory')) bld('airfield', R.airfield, wantsAir ? 66 : c.strength >= 3000 ? 44 : 0, 'base');
+    const airGen = !!(generalOf(T) || {}).aiAir;   // the Air Force General builds its airfields as a matter of course
+    if (R.airfield && !n('airfield') && nd('factory')) bld('airfield', R.airfield, wantsAir ? 66 : airGen && c.strength >= 2000 ? 71 : c.strength >= 3000 ? 44 : 0, 'base');
+    if (R.strategic && BLDGS[R.strategic].general === T.general && !n('strategic') && nd('airfield') && c.strength >= 3000 && this.strat.tries < 3 && builder && tick >= this.buildHold && !c.undone.length)
+      add('strategic airfield', airGen ? 68 : 47, bldgCost(T, R.strategic), () => { if (this.build(builder, R.strategic, 'base')) return true; this.strat.tries++; return false; }, true, true);   // a big footprint: give up after three failed searches for room
     if (R.income && n('income') < 1 && nd('factory') && c.strength >= 3000) bld('income', R.income, 46, 'base');
     if (R.super && cfg.superweapon && !sim.noSuper && n('super') < 1 && nd('factory') && c.strength >= 3500) bld('super', R.super, 45, 'base');
     if (R.tunnel && cfg.retreat && n('tunnel') < 1 && nd('barracks') && c.strength >= 1500) bld('tunnel', R.tunnel, 42, 'front');
     if (R.tunnel && cfg.retreat) this.forwardTunnel(c, builder, add, train, q);
     for (const b of c.prod) for (const id of upgradesOf(T, b.type)) if (!T.upgrades.has(id) && !q('up:' + id) && b.queue.length < 2 && c.strength >= 3000) add('upgrade ' + id, 32, UPGRADES[id].cost + 1500, () => this.act({ t: 'train', id: b.id, type: 'up:' + id }));
     for (const type of this.roster) if (UNITS[type].deploy && c.deployers.length + q(type) < 2 && c.strength >= 2000) train(type, type, 31);
+    for (const type of this.combat) if (REACH[type] >= 100 && (c.types[type] || 0) + q(type) < 2 && c.strength >= 3500 && !(UNITS[type].promo && !T.promos.has(UNITS[type].promo))) train('siege ' + type, type, 58);   // Scud and Shahed launchers
     // --- navy (sea maps): one shipyard on the nearest usable shore, then a fleet sized by difficulty
     if (this.navy.length && R.shipyard && nd('factory') && c.strength >= 1500) {
       if (!n('shipyard')) {
@@ -348,6 +357,8 @@ export class AIController {
       for (const type of this.combat) train(type, type, scores[type] + (noInf && type === R.squad ? 14 : 0));
     }
 
+    if (this.swarmType && c.swarm.length + q(this.swarmType) < this.swarmSize && c.strength >= 2500 && T.money >= 900 && tick - (this.swarm.last || -1e9) > 1500) train('swarm', this.swarmType, 52);   // once there is an army to go with it, never with the army's last dollar, and not straight after a wave has gone in
+
     cand.sort((a, b) => b.score - a.score || (a.name < b.name ? -1 : 1));
     this.lastScores = cand.map(k => ({ name: k.name, score: +k.score.toFixed(1), ok: k.ok }));
     let money = T.money, reserve = 0, ran = 0;
@@ -360,6 +371,7 @@ export class AIController {
     this.scouting(c);
     this.operations(c);
     this.heroPlay(c);
+    if (this.swarmType && c.swarm.length) this.sendSwarm(c);
     if (c.fleet.length) this.navalOps(c);
   }
   // ---- tunnels as transport (ISIS). `ends`: this side's finished tunnels, the one nearest home and the one nearest the enemy start.
@@ -373,14 +385,17 @@ export class AIController {
   // side has it (the exit appears on explored ground far forward), otherwise a Worker walks out and builds one.
   forwardTunnel(c, builder, add, train, q) {
     const sim = this.sim, tick = sim.tick, T = this.T, R = this.F.roles, U = this.tun;
-    if (!(c.bl.tunnel || []).some(b => b.done) || this.tunnelEnds(c) || c.strength < 2500 || tick - U.tried < 300 || c.undone.some(b => b.type === R.tunnel) || dist(this.homeW, { x: WORLD - this.homeW.x, z: WORLD - this.homeW.z }) < 500) return;   // not worth it on a small map
+    const sneak = hasPower(sim, this.team, 'sneaktunnel') && (T.powerReady.sneaktunnel || 0) <= tick, ends = this.tunnelEnds(c);   // Sneak Attack is used every time it is ready: each one opens an exit further forward
+    if (!(c.bl.tunnel || []).some(b => b.done) || (!sneak && (ends || c.strength < 2500)) || c.strength < 1500 || tick - U.tried < 300 || c.undone.some(b => b.type === R.tunnel) || dist(this.homeW, { x: WORLD - this.homeW.x, z: WORLD - this.homeW.z }) < 500) return;   // not worth it on a small map
     // Points are taken along the land route to the enemy start (the terrain is public; who is on it is not), never across water.
     if (!U.route) { const r = sim.nav.findPath(this.homeW.x, this.homeW.z, WORLD - this.homeW.x, WORLD - this.homeW.z, 1).path; if (!r) { U.tried = 1e12; return; } let L = 0; const pts = [[this.homeW.x, this.homeW.z, 0]]; for (let i = 0; i < r.length; i += 2) { const q = pts[pts.length - 1]; L += Math.hypot(r[i] - q[0], r[i + 1] - q[1]); pts.push([r[i], r[i + 1], L]); } U.route = pts; }
     const at = (f) => { const pts = U.route, want = pts[pts.length - 1][2] * f; for (let i = 1; i < pts.length; i++) if (pts[i][2] >= want) { const a = pts[i - 1], b = pts[i], t = (want - a[2]) / ((b[2] - a[2]) || 1); return { x: a[0] + (b[0] - a[0]) * t, z: a[1] + (b[1] - a[1]) * t }; } return { x: pts[0][0], z: pts[0][1] }; };
     const quiet = (p) => { for (const m of this.aiMemoryMap.values()) if (m.kind === 'unit' && m.weapon && tick - m.tick < 1200 && dist(m, p) < 160) return false; return true; };   // not where the enemy was seen in the last minute
-    if (hasPower(sim, this.team, 'sneaktunnel') && (T.powerReady.sneaktunnel || 0) <= tick) {
-      for (const f of [0.68, 0.6, 0.52, 0.44]) { const p = at(f); if (!quiet(p) || powerError(sim, this.team, 'sneaktunnel', p.x, p.z) !== null) continue; U.tried = tick; if (this.act({ t: 'power', id: 'sneaktunnel', x: p.x, z: p.z })) { U.sneaks++; this.stats.casts.push({ id: 'sneaktunnel', tick }); } return; }
+    if (sneak) {
+      const taken = (p) => (c.bl.tunnel || []).some(b => dist(b, p) < 70);
+      for (const f of ends ? [0.8, 0.72, 0.64, 0.56] : [0.68, 0.6, 0.52, 0.44]) { const p = at(f); if (taken(p) || !quiet(p) || powerError(sim, this.team, 'sneaktunnel', p.x, p.z) !== null) continue; U.tried = tick; if (this.act({ t: 'power', id: 'sneaktunnel', x: p.x, z: p.z })) { U.sneaks++; this.stats.casts.push({ id: 'sneaktunnel', tick }); } return; }
     }
+    if (ends) return;
     if (U.built >= 3 || tick - U.tried < 2400) return;                                         // a Worker's walk is a risk: at most three tries, well apart
     if (c.builders.length < 2) { if (!q(R.builder) && c.undone.length === 0) train('second builder', R.builder, 43); return; }   // the base keeps a builder of its own: the walk is for a second one
     if (!builder || tick < this.buildHold) return;
@@ -474,8 +489,9 @@ export class AIController {
   spendPoints() {
     const T = this.T; if (T.points < 1) return;
     const open = this.F.tree.filter(k => !T.promos.has(k.id) && T.rank >= k.tier && (!k.req || T.promos.has(k.req)));
-    const far = N >= 1024 && this.level !== 'easy' && open.find(k => k.power === 'sneaktunnel');   // on the biggest maps distance is the enemy: take Sneak Attack as soon as it is on offer
-    const pick = far || (this.level !== 'easy' && open.find(k => k.power)) || open[0];
+    const far = N >= 512 && this.level !== 'easy' && open.find(k => k.power === 'sneaktunnel');   // on the 1 km and 2 km maps distance is the enemy: take Sneak Attack as soon as it is on offer
+    const first = this.level !== 'easy' && open.filter(k => k.ai).sort((a, b) => b.ai - a.ai)[0];   // a promotion marked `ai` (Cash Bounty) is worth more to the computer than another power
+    const pick = first || far || (this.level !== 'easy' && open.find(k => k.power)) || open[0];
     if (pick) this.act({ t: 'promote', node: pick.id });
   }
 
@@ -545,7 +561,7 @@ export class AIController {
       }
       const ids = homeGroup.map(u => u.id);
       const ends = this.F.roles.tunnel && cfg.retreat ? this.tunnelEnds(c) : null, walkers = homeGroup.filter(u => !u.air);
-      if (ends && walkers.length >= 3 && dist(ends.fwd, tg) + 60 < dist(ends.home, tg)) { // the army goes underground and comes up at the forward exit
+      if (ends && N >= 1024 && walkers.length >= 3 && dist(ends.fwd, tg) + 60 < dist(ends.home, tg)) { // on the 2 km maps the whole army goes underground and comes up at the forward exit (on a 1 km map it marches together: a column coming out of a hole a few at a time was being beaten in detail)
         if (this.budget < 2) return;
         this.act({ t: 'tunnel', ids: walkers.map(u => u.id), target: ends.fwd.id }); const fl = homeGroup.filter(u => u.air).map(u => u.id); if (fl.length) this.act({ t: 'move', ids: fl, x: ends.fwd.x, z: ends.fwd.z, attack: true });
         op.mode = 'tunnel'; op.via = ends.fwd.id; op.ids = ids; op.target = tg; op.since = op.lastPush = tick; op.strength0 = str; op.wave++; this.stats.attacks++; this.tun.trips++;
@@ -590,7 +606,25 @@ export class AIController {
       if (!idle.length || this.act({ t: 'move', ids: idle, x: op.target.x, z: op.target.z, attack: true })) op.lastPush = tick;
     }
     const fresh = homeGroup.filter(u => !u.order && !u.target);                       // reinforcements follow in groups
-    if (fresh.length >= 3 && cost(fresh) >= 1500 && this.act({ t: 'move', ids: fresh.map(u => u.id), x: op.target.x, z: op.target.z, attack: true })) for (const u of fresh) op.ids.push(u.id);
+    if (fresh.length >= 3 && cost(fresh) >= 1500) {
+      // ... and they are what the forward tunnel exits are for: reinforcements come up close behind the army instead of walking the whole map
+      const ends = this.F.roles.tunnel && cfg.retreat ? this.tunnelEnds(c) : null, foot = fresh.filter(u => !u.air), near = ends && dist(ends.fwd, op.target) + 60 < dist(ends.home, op.target) && dist(ends.fwd, op.target) > 90;
+      if (near && foot.length >= 3 && this.budget >= 2) { this.act({ t: 'tunnel', ids: foot.map(u => u.id), target: ends.fwd.id }); const fl = fresh.filter(u => u.air).map(u => u.id); if (fl.length) this.act({ t: 'move', ids: fl, x: op.target.x, z: op.target.z, attack: true }); for (const u of fresh) op.ids.push(u.id); this.tun.trips++; }
+      else if (this.act({ t: 'move', ids: fresh.map(u => u.id), x: op.target.x, z: op.target.z, attack: true })) for (const u of fresh) op.ids.push(u.id);
+    }
+  }
+
+  // The quadcopter swarm. FPV drones are for infantry, light vehicles and helicopters, so they are never thrown at
+  // buildings or tanks: once an attack is under way (or the base is threatened) the idle drones go for the freshest
+  // such enemy this side has seen, and being much faster than the army they get there first.
+  sendSwarm(c) {
+    const tick = this.sim.tick, idle = c.swarm.filter(u => !u.order && !u.target); if (!idle.length || tick - (this.swarm.last || -1e9) < 60) return;
+    const near = this.op.mode === 'gather' ? this.homeW : this.op.target, reach = this.op.mode === 'gather' ? 140 : 220; if (!near) return;
+    if (this.op.mode !== 'gather' && idle.length < Math.ceil(this.swarmSize * 0.6)) return;                    // on the attack they go as a swarm: at least six of ten
+    let best = null, bs = 1e9;
+    for (const m of this.aiMemoryMap.values()) { if (m.kind !== 'unit' || tick - m.tick > 200 || !(m.armor === 'inf' || m.armor === 'light' || m.armor === 'air')) continue; const d = dist(m, near); if (d < reach && d < bs) { bs = d; best = m; } }
+    if (!best) return;
+    if (this.act({ t: 'move', ids: idle.map(u => u.id), x: best.x, z: best.z, attack: true })) { this.swarm.sent += idle.length; this.swarm.waves++; this.swarm.last = tick; }
   }
 
   // ------------------------------------------------------------ tactics: retreat, focus fire, support powers

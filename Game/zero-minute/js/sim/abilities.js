@@ -46,7 +46,7 @@ function stepStealth(sim) {
       if (o.team === u.team || o.team === NEUTRAL || o.dead || (o.kind === 'unit' && o.inB)) continue;
       const def = o.kind === 'unit' ? UNITS[o.type] : BLDGS[o.type];
       if (o.kind === 'bldg' && (!o.done || o.offline)) continue;
-      const r = Math.max(def.detector || 0, o.kind === 'unit' ? 7 : 0); if (!r) continue;
+      const r = Math.max(def.detector || 0, o.detect || 0, o.kind === 'unit' ? 7 : 0); if (!r) continue;
       if (Math.hypot(o.x - u.x, o.z - u.z) <= r) { det = true; break; }
     }
     u.detected = det;

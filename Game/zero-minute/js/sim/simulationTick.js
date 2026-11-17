@@ -291,7 +291,7 @@ function applyCommand(sim, c) {
       break;
     case 'build': {
       const u = own(sim, c.id, team), d = BLDGS[c.type];
-      if (!u || !UNITS[u.type].builder || !d || !F.build.includes(c.type)) break;
+      if (!u || !UNITS[u.type].builder || !d || !F.build.includes(c.type) || (d.general && d.general !== T.general)) break;   // some buildings belong to one general
       const price = bldgCost(T, c.type);
       if (T.money < price) { msg(sim, team, 'Insufficient funds'); break; }
       if (d.needs && !hasBldg(sim, team, d.needs)) { msg(sim, team, `Requires ${BLDGS[d.needs].name}`); break; }

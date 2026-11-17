@@ -66,14 +66,13 @@ const hold = (u) => { u.order = { t: 'hold' }; return u; };
   ok(minAmmo === 0 && (bunker.dead || hp0 - bunker.hp >= 1000), `F-15E drops both bunker busters: ${bunker.dead ? 'building destroyed' : Math.round(hp0 - bunker.hp) + ' damage'} of ${hp0} hp`);
   const foeHeli = makeUnit(s, 'r_hind', ENEMY, af.x + 60, af.z + 10, 0); hold(foeHeli); makeUnit(s, 'v_drone', PLAYER, foeHeli.x - 10, foeHeli.z, 0); run(s, 400);
   s.issue({ t: 'attack', ids: [jet.id], target: foeHeli.id }); run(s, 400); ok(foeHeli.hp === foeHeli.maxHp && jet.as === 'parked', 'it cannot attack aircraft: the order is refused');
-  T.promos.add('v_a10'); ok(hasPower(s, PLAYER, 'b2') && !hasPower(s, PLAYER, 'a10') && hasPower(none, PLAYER, 'a10') === false, 'the A-10 promotion gives this general the B-2 instead');
-  let hits = []; s.issue({ t: 'power', id: 'b2', x: 300, z: 300 }); run(s, 500, (ev) => { for (const e of ev) if (e.t === 'shellhit') hits.push([e.x, e.z]); });
-  const span = hits.length ? Math.max(...hits.map(h => Math.hypot(h[0] - hits[0][0], h[1] - hits[0][1]))) : 0;
-  ok(hits.length === POWERS.b2.n && span > 50 && span < 70, `B-2 lays ${hits.length} bombs along a ${span.toFixed(0)} m line`);
+  T.promos.add('v_strike'); ok(hasPower(s, PLAYER, 'b2') && !hasPower(s, PLAYER, 'tomahawk') && hasPower(none, PLAYER, 'tomahawk') === false, 'the Tomahawk Strike promotion gives this general the B-2 Fuel-Air Bomb instead');
+  let hits = []; s.issue({ t: 'power', id: 'b2', x: 300, z: 300 }); run(s, 500, (ev) => { for (const e of ev) if (e.t === 'fab') hits.push([e.x, e.z, e.r]); });
+  ok(hits.length === 1 && Math.hypot(hits[0][0] - 300, hits[0][1] - 300) < 2 && hits[0][2] === POWERS.fab.radius, `the B-2 power drops one fuel-air bomb on the aim point (the carpet bomb belongs to the buildable B-2 now)`);
   const heli = makeUnit(s, 'v_comanche', PLAYER, 200, 200, 0); s.issue({ t: 'train', id: af.id, type: 'up:v_stealthrotor' }); run(s, 500);
   const heli2 = makeUnit(s, 'v_comanche', PLAYER, 210, 200, 0); run(s, 40);
   ok(T.upgrades.has('v_stealthrotor') && heli.stealthMode === 'always' && heli.cloaked && heli2.cloaked, 'Stealth Comanche upgrade hides Comanches already flying and new ones');
-  console.log(`air force      : F-15E 2 bombs, ${bunker.dead ? 'kill' : Math.round(hp0 - bunker.hp) + ' dmg'}; no air-to-air | B-2 ${hits.length} bombs over ${span.toFixed(0)} m | Comanches cloaked`);
+  console.log(`air force      : F-15E 2 bombs, ${bunker.dead ? 'kill' : Math.round(hp0 - bunker.hp) + ' dmg'}; no air-to-air | B-2 power: ${hits.length} fuel-air bomb | Comanches cloaked`);
 }
 
 // ---------------------------------------------------------------- D2. Marine Corps General
@@ -118,7 +117,7 @@ const hold = (u) => { u.order = { t: 'hold' }; return u; };
   s.issue({ t: 'power', id: 'cashhack', x: sup.x, z: sup.z }); run(s, 2);
   ok(T.money === m0 + 2000 && E.money === 7000, 'Cash Hack takes $2,000 (others take $1,500)');
   ok(Math.abs((T.powerReady.cashhack - s.tick) / 20 - 180) < 1, 'and recharges in 180 s (others: 240 s)');
-  ok(unitCost(T, 'r_tank') === 840 && unitCost(T, 'r_conscript') === 280 && unitCost(T, 'r_mig') === UNITS.r_mig.cost, 'Cyber pays 12% more for tanks and infantry; aircraft are unchanged');
+  ok(unitCost(T, 'r_tank') === 850 && unitCost(T, 'r_conscript') === 290 && unitCost(T, 'r_mig') === UNITS.r_mig.cost, 'Cyber pays 14% more for tanks and infantry; aircraft are unchanged');
   const M = new Sim({ ai: false, factions: ['redhammer', 'vanguard'], generals: ['mass', null] }), TM = M.teams[0], TN = n.teams[0];
   ok(unitCost(TM, 'r_tank') === 690 && unitCost(TN, 'r_tank') === 750 && unitCost(TM, 'r_overlord') === 1840 && unitCost(TM, 'r_conscript') < unitCost(TN, 'r_conscript') && unitCost(TM, 'r_mig') === UNITS.r_mig.cost, 'tanks and infantry cost 8% less; aircraft do not');
   const fac = makeBldg(M, 'r_factory', PLAYER, 60, 180); M.nav.rebuild(); TM.money = 5000; M.issue({ t: 'train', id: fac.id, type: 'r_tank' }); run(M, 2);

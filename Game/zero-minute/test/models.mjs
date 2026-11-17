@@ -174,7 +174,7 @@ const R = globalThis.__rigs;
   ok(fins.length === 2 && fins.every(f => near(Math.abs(f.z), tp.sz / 2, 0.1) && f.y > tp.y) && !ps.some(p => p.name === 'fin' && p.z === 0), 'A-10: twin fins on the tailplane tips (H-tail), no centre fin');
   ok(can.m.geometry.kind === 'sphere' && can.x - can.sx > le && can.y > fr * 0.8, 'A-10: bubble canopy, forward of the wing');
   const gunTip = gun.x + gun.sy / 2; ok(gunTip > noseTip + 0.5 && gun.y < 0, `A-10: GAU-8 protrudes ${(gunTip - noseTip).toFixed(2)} m beyond the nose, below the centreline`);
-  ok(named(ps, 'rocket').length === POWERS.a10.rockets.n && named(ps, 'rocket').every(p => p.y < wings[0].y), `A-10: ${POWERS.a10.rockets.n} underwing rockets, matching the salvo the power fires`);
+  ok(r.stores.length === UNITS.v_a10.ammo && named(ps, 'maverick').length === 4 && r.stores.every(st => st.position.y < wings[0].y) && r.gear && r.ground > 1, `A-10: ${UNITS.v_a10.ammo} Mavericks under the wings, one node each, and landing gear`);
   ok(named(ps, 'gearpod').length === 2, 'A-10: main gear pods under the wing');
   console.log(`A-10           : ${length.toFixed(1)} m long, ${span.toFixed(1)} m span (ratio ${(span / length).toFixed(2)}), unswept wing, 2 high rear turbofans, H-tail, bubble canopy, GAU-8 ${(gunTip - noseTip).toFixed(2)} m proud of the nose, 6 rockets`);
 }

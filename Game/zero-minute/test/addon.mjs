@@ -83,12 +83,12 @@ const cellOf = (x, z) => Math.floor(z / CELL) * N + Math.floor(x / CELL);
   const s = new Sim({ ai: false, empty: true, factions: ['sandstorm', 'vanguard'] }); s.teams[PLAYER].promos.add('s_saboteur').add('s_sneak');
   ok(/explored/.test(powerError(s, PLAYER, 'sneaktunnel', 300, 300) || ''), 'Sneak Attack refused in unexplored territory');
   open(s); const home = makeBldg(s, 's_tunnel', PLAYER, 30, 30); s.nav.rebuild();
-  s.issue({ t: 'power', id: 'sneaktunnel', x: 300, z: 300 }); run(s, 99);
-  ok(s.ents.filter(e => e.type === 's_tunnel').length === 1, 'nothing appears before the 5 s delay');
+  s.issue({ t: 'power', id: 'sneaktunnel', x: 300, z: 300 }); run(s, 39);
+  ok(s.ents.filter(e => e.type === 's_tunnel').length === 1, 'nothing appears before the 2 s delay');
   let ev1 = null; run(s, 6, (ev) => { for (const e of ev) if (e.t === 'sneak') ev1 = e; });
   const exit = s.ents.find(e => e.type === 's_tunnel' && e.id !== home.id);
   ok(exit && exit.done && exit.team === PLAYER && Math.hypot(exit.x - 300, exit.z - 300) < 12 && ev1, 'a finished Tunnel Network exit breaks ground at the target');
-  console.log(`new powers     : Paratrooper Drop 5 squads within ${far.toFixed(1)} m | Cash Hack $900 then $1,500, fog-gated | Sneak Attack exit after 5.0 s, ${Math.hypot(exit.x - 300, exit.z - 300).toFixed(1)} m from the aim point`);
+  console.log(`new powers     : Paratrooper Drop 5 squads within ${far.toFixed(1)} m | Cash Hack $900 then $1,500, fog-gated | Sneak Attack exit after 2.0 s, ${Math.hypot(exit.x - 300, exit.z - 300).toFixed(1)} m from the aim point`);
 }
 
 // ---------------------------------------------------------------- C. King of the Hill

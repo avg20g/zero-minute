@@ -33,8 +33,8 @@ const civAt = (s, cx, cz, kind) => { const b = makeBldg(s, 'civ', NEUTRAL, cx, c
   const s = new Sim({ ai: false, noShroud: true, factions: ['vanguard', 'redhammer'] }); const T = s.teams[0];   // as in the game: the map is charted, but not watched
   const tx = 256, tz = 256; const foe = makeUnit(s, 'r_tank', ENEMY, tx + 6, tz, 0); run(s, 3);
   ok(!s.fog.visAt(PLAYER, tx, tz) && !s.fog.canSee(PLAYER, foe), 'before: the target area is fogged and the enemy tank in it is hidden');
-  T.promos.add('v_a10'); T.powerReady.a10 = 0; ok(usePower(s, PLAYER, 'a10', tx, tz), 'A-10 run ordered on fogged ground'); run(s, 2);
-  const R = Math.max(POWERS.a10.radius, 0) + REVEAL_PAD;
+  T.promos.add('v_strike'); T.powerReady.tomahawk = 0; ok(usePower(s, PLAYER, 'tomahawk', tx, tz), 'Tomahawk Strike ordered on fogged ground'); run(s, 2);
+  const R = Math.max(POWERS.tomahawk.radius, 0) + REVEAL_PAD;
   ok(s.fog.visAt(PLAYER, tx, tz) && s.fog.visAt(PLAYER, tx + R - 3, tz) && !s.fog.visAt(PLAYER, tx + R + 6, tz) && s.fog.canSee(PLAYER, foe), 'at once the area is visible out to ' + R + ' m and the tank can be seen');
   ok(!s.fog.visAt(ENEMY, tx - 33, tz), 'only the team that used the power gets the view');
   run(s, REVEAL_SECS * 20 - 40); ok(s.fog.visAt(PLAYER, tx, tz), 'it stays lit for ' + REVEAL_SECS + ' s');

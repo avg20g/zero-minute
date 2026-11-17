@@ -206,15 +206,12 @@ export class AudioEngine {
     if (!this.ready || this.muted) return;
     for (const e of events) {
       switch (e.t) {
-        case 'tracer': if (hear(e)) this.rifle(e.x, e.z, weaponCd && weaponCd(e.w) <= 4); break;
+        case 'tracer': if (hear(e)) { if (e.w === 'gau8') this.gau8(e.x, e.z); else this.rifle(e.x, e.z, weaponCd && weaponCd(e.w) <= 4); } break;
         case 'laser': if (hear(e)) this.laser(e.x, e.z); break;
         case 'fire': if (hear(e)) { if (e.k === 'shell' || e.k === 'arc') this.cannon(e.x, e.z, e.k === 'arc' ? 1.2 : 1); else this.rocket(e.x, e.z); } break;
         case 'impact': if (hear(e)) this.explosion(e.x, e.z, e.k === 'arc' ? 1.6 : 1); break;
         case 'shellhit': if (hear(e)) this.explosion(e.x, e.z, 2); break;
-        case 'rockethit': if (hear(e)) this.explosion(e.x, e.z, 1.8); break;
-        case 'rocketfire': if (hear(e)) this.whoosh(e.x, e.z); break;
-        case 'strafe': if (hear(e)) this.gau8(e.x, e.z); break;
-        case 'gunship': if (hear(e)) { if (e.k === 'cannon') { this.cannon(e.x, e.z, 1.3); this.explosion(e.x, e.z, 1.8); } else this.rifle(e.x, e.z, true); } break;
+        case 'launch': if (hear(e)) this.whoosh(e.x, e.z); break;
         case 'fab': if (hear(e)) this.explosion(e.x, e.z, 3.4); break;
         case 'suicide': if (hear(e)) this.explosion(e.x, e.z, 2.2); break;
         case 'airliner': this.explosion(e.x, e.z, hear(e) ? 3.6 : 1.4); break;
@@ -225,7 +222,7 @@ export class AudioEngine {
         case 'pbeam': if (e.k % 6 === 0 && hear(e)) this.laser(e.x, e.z); break;
         case 'superlaunch': this.klaxon(); break;                                              // public warning for both sides
         case 'superbuilt': this.ping(); break;
-        case 'power': if (e.id === 'a10' && hear(e)) this.flyby(e.x, e.z); break;
+        case 'power': if (e.id === 'b2' && hear(e)) this.flyby(e.x, e.z); break;
         case 'die': if (hear(e) && !e.inf) this.explosion(e.x, e.z, e.kind === 'bldg' ? 3 : 1.5); break;
       }
     }

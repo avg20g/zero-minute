@@ -57,30 +57,12 @@ const hold = (u) => { u.order = { t: 'hold' }; u.cds = [1e9, 1e9, 1e9]; return u
 }
 
 // ---------------------------------------------------------------- AC-130
+// The AC-130 support power of batch 9 became a buildable aircraft in batch 13 (Strategic Airfield, Air Force General).
+// Its orbit and left-side guns are tested in test/batch13.mjs; here only that the old power is really gone.
 {
-  const once = () => {
-    const s = bare({ factions: ['vanguard', 'redhammer'] }), T = s.teams[PLAYER];
-    ok(FACTIONS.vanguard.tree.some(n => n.id === 'v_ac130' && n.power === 'ac130' && n.tier === 5), 'AC-130 Gunship is a Rank 5 promotion for the United States');
-    T.promos.add('v_pathfinder'); T.promos.add('v_para'); T.promos.add('v_ac130'); makeBldg(s, 'v_cc', PLAYER, 20, 220); s.nav.rebuild();
-    const X = 300, Z = 200, inf = [0, 1, 2, 3].map(i => hold(makeUnit(s, 'r_conscript', ENEMY, X - 6 + i * 4, Z + 4, 0))), tank = hold(makeUnit(s, 'r_tank', ENEMY, X + 5, Z - 5, 0));
-    const far = hold(makeUnit(s, 'r_tank', ENEMY, X + POWERS.ac130.radius + 16, Z, 0)), air = hold(makeUnit(s, 'r_hind', ENEMY, X, Z, 0));
-    ok(usePower(s, PLAYER, 'ac130', X, Z), 'AC-130 called in');
-    let gun = 0, cannon = 0, orbit = 0, rMin = 1e9, rMax = 0, ticks = 0, wide = 0;
-    run(s, 900, (ev) => {
-      const p = s.strikes.find(q => q.kind === 'gunship'); if (p) ticks++;
-      if (p && p.s >= 0 && p.out === 0) { orbit++; const r = Math.hypot(p.x - X, p.z - Z); rMin = Math.min(rMin, r); rMax = Math.max(rMax, r); }
-      for (const e of ev) if (e.t === 'gunship') { if (e.k === 'gun') gun++; else cannon++; if (Math.hypot(e.x - X, e.z - Z) > POWERS.ac130.radius + 3) wide++; }
-    });
-    ok(orbit >= 300 && orbit <= 302 && Math.abs(rMin - POWERS.ac130.orbit) < 0.5 && Math.abs(rMax - POWERS.ac130.orbit) < 0.5, `circles the target for 15 s at ${POWERS.ac130.orbit} m (${orbit} ticks, ${rMin.toFixed(1)} to ${rMax.toFixed(1)} m)`);
-    ok(gun === 300 && cannon >= 11 && cannon <= 12 && wide === 0, `fires both weapons: ${gun} rotary cannon bursts and ${cannon} howitzer shells, all inside the zone`);
-    ok(inf.every(u => u.dead) && (tank.dead || tank.hp < tank.maxHp * 0.5), `infantry in the zone killed, tank ${tank.dead ? 'destroyed' : 'at ' + Math.round(100 * tank.hp / tank.maxHp) + '%'}`);
-    ok(far.hp === far.maxHp && air.hp === air.maxHp, 'a tank outside the zone and a helicopter above it are untouched');
-    ok(!s.strikes.some(q => q.kind === 'gunship') && ticks > 380, `then it leaves (${(ticks / 20).toFixed(1)} s on screen)`);
-    ok(T.powerReady.ac130 > s.tick + POWERS.ac130.cd * 20 - 1000, 'recharge started');
-    return s.hash();
-  };
-  ok(once() === once(), 'AC-130 strike is deterministic');
-  console.log('AC-130         : flies in, 15 s orbit at 44 m, 150 cannon bursts + howitzer shells into an 18 m zone, flies out');
+  ok(!POWERS.ac130 && !POWERS.a10 && !FACTIONS.vanguard.tree.some(n => n.power === 'ac130' || n.power === 'a10'), 'the AC-130 and A-10 support powers are gone');
+  ok(UNITS.v_ac130 && UNITS.v_ac130.orbit > 0 && UNITS.v_ac130.based, 'the AC-130 is a unit that orbits its target');
+  console.log('AC-130         : no longer a support power; a buildable aircraft since batch 13');
 }
 
 // ---------------------------------------------------------------- recon drone loiters

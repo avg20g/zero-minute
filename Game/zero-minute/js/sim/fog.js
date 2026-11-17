@@ -26,7 +26,7 @@ export class Fog {
     this.vis[0].fill(0); this.vis[1].fill(0);
     for (const e of sim.ents) {
       if (e.dead || e.team === NEUTRAL) continue;
-      if (e.kind === 'unit') { if (!e.inB) this.stamp(e.team, e.x, e.z, UNITS[e.type].sight); }
+      if (e.kind === 'unit') { if (!e.inB) this.stamp(e.team, e.x, e.z, UNITS[e.type].sight + (e.sightPlus || 0)); }
       else this.stamp(e.team, e.x, e.z, sightOf(e));
     }
     // Cyber General: a permanent watch on every enemy building and the ground around it

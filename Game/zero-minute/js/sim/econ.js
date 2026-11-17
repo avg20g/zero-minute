@@ -2,7 +2,7 @@
 // supply harvesting. Roles come from the faction registry.
 import { CELL, DT, LOAD_TICKS, UNLOAD_TICKS, angDiff } from './defs.js';
 import { UNITS, BLDGS, FACTIONS, UPGRADES, POWERS, generalOf } from './factionRegistry.js';
-import { rectDist, reqPath, moveTo, stopUnit, releaseSlot, spawnNear, makeUnit } from './entities.js';
+import { rectDist, reqPath, moveTo, stopUnit, releaseSlot, spawnNear, makeUnit, applyUp } from './entities.js';
 import { claimPad } from './air.js';
 import { syncSuper, superCd } from './powers.js';
 
@@ -47,7 +47,7 @@ export function stepProduction(sim) {
     b.prod = 0; b.queue.shift();
     if (up) {
       T.upgrades.add(up);
-      for (const u of sim.ents) if (u.kind === 'unit' && u.team === b.team) { u.wslots = null; if (up === 'v_stealthrotor' && u.type === 'v_comanche') u.stealthMode = 'always'; } // new weapons and stealth apply to units already built
+      for (const u of sim.ents) if (u.kind === 'unit' && u.team === b.team) { u.wslots = null; if (UNITS[u.type].up && UNITS[u.type].up.id === up) applyUp(u); if (up === 'v_stealthrotor' && u.type === 'v_comanche') u.stealthMode = 'always'; } // new weapons and stealth apply to units already built
       if (up === 'r_nuke') for (const u of sim.ents) if (u.kind === 'unit' && u.team === b.team && UNITS[u.type].nuke) u.ms = UNITS[u.type].speed * 1.15;
       sim.events.push({ t: 'upgrade', id: up, team: b.team });
       continue;

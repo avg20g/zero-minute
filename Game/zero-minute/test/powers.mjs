@@ -11,25 +11,25 @@ const visCells = (sim, team, x, z, r) => { let n = 0; for (let dz = -r; dz <= r;
 
 // 1. Targeting rule: explored territory only; fogged-but-explored is allowed; no vision is granted
 {
-  const sim = new Sim({ ai: false, factions: ['vanguard', 'redhammer'] }); grant(sim, PLAYER, 'v_a10', 'v_emp');
+  const sim = new Sim({ ai: false, factions: ['vanguard', 'redhammer'] }); grant(sim, PLAYER, 'v_strike');
   const far = [400, 110];                                         // enemy base: never explored by the player
-  ok(powerError(sim, PLAYER, 'a10', far[0], far[1]) === 'Target must be in explored territory', 'unexplored target refused');
-  sim.issue({ t: 'power', id: 'a10', x: far[0], z: far[1] }); let msg = false; run(sim, 2, s => { for (const e of s.events) if (e.t === 'msg') msg = true; });
-  ok(msg && sim.strikes.length === 0 && (sim.teams[0].powerReady.a10 || 0) <= sim.tick, 'refused strike costs no cooldown and spawns nothing');
-  ok(powerError(sim, PLAYER, 'a10', -50, 100) === 'Target is off the map', 'off-map target refused');
+  ok(powerError(sim, PLAYER, 'tomahawk', far[0], far[1]) === 'Target must be in explored territory', 'unexplored target refused');
+  sim.issue({ t: 'power', id: 'tomahawk', x: far[0], z: far[1] }); let msg = false; run(sim, 2, s => { for (const e of s.events) if (e.t === 'msg') msg = true; });
+  ok(msg && sim.strikes.length === 0 && (sim.teams[0].powerReady.tomahawk || 0) <= sim.tick, 'refused strike costs no cooldown and spawns nothing');
+  ok(powerError(sim, PLAYER, 'tomahawk', -50, 100) === 'Target is off the map', 'off-map target refused');
   // scout a spot, leave, then strike it while it is fogged
   const scout = spawnNear(sim, 's_buggy', PLAYER, 150, 330); sim.issue({ t: 'move', ids: [scout.id], x: 300, z: 330 }); run(sim, 260);
   sim.issue({ t: 'move', ids: [scout.id], x: 110, z: 400 }); run(sim, 400);
   const tx = 300, tz = 330; ok(sim.fog.exp[0][sim.nav.cellOf(tx, tz)] === 1 && !sim.fog.visAt(PLAYER, tx, tz), 'target is explored but currently fogged');
   const victim = makeUnit(sim, 'r_tank', ENEMY, tx, tz, 0); victim.order = { t: 'hold' };
   ok(!sim.fog.shouldShow(PLAYER, victim), 'enemy tank in the fog is hidden from the player');
-  sim.issue({ t: 'power', id: 'a10', x: tx, z: tz }); let seenCells = 0, strafes = 0, shown = 0;
-  run(sim, 200, s => { seenCells += visCells(s, PLAYER, tx, tz, 6); for (const e of s.events) if (e.t === 'strafe') strafes++; if (s.fog.shouldShow(PLAYER, victim)) shown++; });
-  ok(strafes >= 10, 'A-10 strafed the fogged zone (' + strafes + ' impacts)'); ok(victim.hp < victim.maxHp || victim.dead, 'damage is applied under fog');
+  sim.issue({ t: 'power', id: 'tomahawk', x: tx, z: tz }); let seenCells = 0, strafes = 0, shown = 0;
+  run(sim, 200, s => { seenCells += visCells(s, PLAYER, tx, tz, 6); for (const e of s.events) if (e.t === 'scudhit') strafes++; if (s.fog.shouldShow(PLAYER, victim)) shown++; });
+  ok(strafes === 1, 'the Tomahawk hit the fogged zone (' + strafes + ' impact)'); ok(victim.hp < victim.maxHp || victim.dead, 'damage is applied under fog');
   ok(seenCells > 0 && shown > 0, 'the strike lights its target area (rule changed in batch 7): the enemy tank is shown while it lasts');
   run(sim, 400); ok(!sim.fog.visAt(PLAYER, tx, tz) && !sim.fog.shouldShow(PLAYER, victim), 'and the fog closes again afterwards');
-  ok(sim.teams[0].powerReady.a10 === sim.tick - 200 + POWERS.a10.cd * 20 || sim.teams[0].powerReady.a10 > sim.tick, 'cooldown started');
-  ok(powerError(sim, PLAYER, 'a10', tx, tz) === 'A-10 Strafing Run is recharging', 'cannot fire again while recharging');
+  ok(sim.teams[0].powerReady.tomahawk === sim.tick - 200 + POWERS.tomahawk.cd * 20 || sim.teams[0].powerReady.tomahawk > sim.tick, 'cooldown started');
+  ok(powerError(sim, PLAYER, 'tomahawk', tx, tz) === 'Tomahawk Strike is recharging', 'cannot fire again while recharging');
   console.log('target rule    : unexplored refused, fogged-explored allowed, strike lit 0 fog cells, ' + strafes + ' impacts landed');
 }
 // 2. What the other side is shown: enemy aircraft and impacts only where the viewer has vision
@@ -60,7 +60,7 @@ const visCells = (sim, team, x, z, r) => { let n = 0; for (let dz = -r; dz <= r;
   const mk = (f) => { const s = new Sim({ ai: false, empty: true, factions: [f, 'vanguard'] }); const sc = spawnNear(s, 'v_ranger', PLAYER, 300, 300); sc.order = { t: 'hold' }; s.step(); return s; };
   { const s = mk('vanguard');   // the EMP Pulse Bomb was removed from the game in batch 10
     ok(!POWERS.emp && !FACTIONS.vanguard.tree.some(n => n.power === 'emp' || n.id === 'v_emp'), 'EMP is gone: no such power and no promotion for it');
-    s.fog.exp[PLAYER].fill(1); s.teams[PLAYER].promos.add('v_a10'); s.issue({ t: 'power', id: 'emp', x: 322, z: 302 }); run(s, 5);
+    s.fog.exp[PLAYER].fill(1); s.teams[PLAYER].promos.add('v_strike'); s.issue({ t: 'power', id: 'emp', x: 322, z: 302 }); run(s, 5);
     ok(s.strikes.length === 0 && !s.teams[PLAYER].powersUsed, 'an order to use it is refused'); }
   { const s = mk('redhammer'); grant(s, PLAYER, 'r_barrage', 'r_fab');
     const civ = makeBldg(s, 'civ', NEUTRAL, 158, 148); s.nav.rebuild(); const g1 = makeUnit(s, 'v_ranger', ENEMY, civ.x - 9, civ.z, 0);

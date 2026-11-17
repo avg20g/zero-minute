@@ -1,96 +1,37 @@
-// A-10 attack pass: two-stage (30 mm burst, then six rockets) along the flight vector.
+// The A-10 as a unit (batch 13; it used to be the A-10 Strafing Run support power). Built at the Air Field by every
+// US general: it flies out, makes its pass with the 30 mm cannon and four Mavericks, and comes home to re-arm.
 import { Sim } from '../js/sim/simulationTick.js';
-import { makeUnit } from '../js/sim/entities.js';
-import { usePower, strikeVisible, fxVisible } from '../js/sim/powers.js';
-import { POWERS } from '../js/sim/factionRegistry.js';
-import { CELL, PLAYER, ENEMY } from '../js/sim/defs.js';
+import { makeUnit, makeBldg } from '../js/sim/entities.js';
+import { canAttack } from '../js/sim/combat.js';
+import { UNITS, WEAPONS, POWERS, BLDGS, trainsOf } from '../js/sim/factionRegistry.js';
+import { PLAYER, ENEMY } from '../js/sim/defs.js';
+import { OPEN_BIG } from '../js/sim/map.js';
 let fails = 0, checks = 0; const ok = (c, msg) => { checks++; if (!c) { fails++; console.log('  FAIL', msg); } };
-const grant = (s, t, ...n) => { for (const k of n) { s.teams[t].promos.add(k); } s.teams[t].powerReady.a10 = 0; };
+const run = (s, n, f) => { for (let i = 0; i < n; i++) { s.step(); if (f) f(s.events); s.events.length = 0; } };
 
-function pass({ spot = true, targets = [], facing = null, flags = {} }) {
-  const sim = new Sim({ ai: false, empty: true, factions: ['vanguard', 'redhammer'] });
-  grant(sim, PLAYER, 'v_a10'); Object.assign(sim.teams[0].flags, flags);
-  const X = 300, Z = 300;
-  if (spot) { const s = makeUnit(sim, 'v_pathfinder', PLAYER, X - 30, Z + 26, 0); s.order = { t: 'hold' }; }
-  sim.fog.stamp(PLAYER, X, Z, 60); // explored either way
-  const made = targets.map(([type, dx, dz]) => { const u = makeUnit(sim, type, ENEMY, X + dx, Z + dz, facing ?? 0); u.order = { t: 'hold' }; u.cds && (u.cds[0] = u.cds[1] = u.cds[2] = 1e9); return u; });
-  for (let i = 0; i < 8; i++) sim.step();
-  ok(usePower(sim, PLAYER, 'a10', X, Z), 'power accepted');
-  const plane = sim.strikes.find(p => p.kind === 'plane'), d = [plane.dx, plane.dz];
-  const log = { strafe: [], fire: [], hit: [], rocketTicks: 0, rocketSeen: new Set(), minAlt: 1e9, altAtGun: 0, order: [], trailPts: 0, hpAt: {} };
-  for (let t = 0; t < 160; t++) {
-    for (const u of made) if (u.cds) u.cds[0] = u.cds[1] = u.cds[2] = 1e9;
-    sim.step();
-    for (const p of sim.strikes) { if (p.kind === 'rocket') { log.rocketTicks++; log.rocketSeen.add(p.id); if (strikeVisible(sim, PLAYER, p)) log.trailPts++; } if (p.kind === 'plane') log.minAlt = Math.min(log.minAlt, p.y); }
-    for (const e of sim.events) {
-      if (e.t === 'strafe') { log.strafe.push(e); if (log.order.at(-1) !== 'gun') log.order.push('gun'); }
-      if (e.t === 'rocketfire') { log.fire.push(e); if (log.order.at(-1) !== 'launch') log.order.push('launch'); }
-      if (e.t === 'rockethit') { log.hit.push(e); if (log.order.at(-1) !== 'impact') log.order.push('impact'); }
-    }
-    sim.events.length = 0;
-  }
-  const along = (e) => (e.x - X) * d[0] + (e.z - Z) * d[1], lat = (e) => Math.abs(-(e.x - X) * d[1] + (e.z - Z) * d[0]);
-  return { sim, made, log, along, lat, d };
-}
+const D = UNITS.v_a10;
+ok(!POWERS.a10 && D && D.based && D.air && D.ammo === 4 && D.weapon === 'gau8' && D.weapon2 === 'maverick', 'the A-10 is a strike aircraft with a cannon and four Mavericks, not a support power');
+ok(BLDGS.v_airfield.trains.includes('v_a10') && ['airforce', 'marine', null].every(g => trainsOf({ faction: 'vanguard', general: g }, 'v_airfield').includes('v_a10')), 'every US general builds it at the Air Field');
+ok(WEAPONS.gau8.free && WEAPONS.gau8.kind === 'hitscan' && WEAPONS.gau8.cd <= 4 && !WEAPONS.maverick.free && WEAPONS.maverick.vs.heavy > WEAPONS.maverick.vs.inf, 'the cannon fires all through the pass; the Mavericks are the sortie and are for armour');
 
-// 1. geometry and reliability of both stages on open ground (nothing to guide on)
-{
-  const { log, along, lat } = pass({});
-  const R = POWERS.a10.rockets;
-  ok(log.strafe.length === 14, '14 cannon impacts, got ' + log.strafe.length);
-  ok(log.strafe.every(e => lat(e) <= 1.76 && Math.abs(along(e)) <= 24.5), 'cannon impacts stay on the 48 m line');
-  ok(log.strafe.every((e, i) => i === 0 || along(e) > along(log.strafe[i - 1])), 'burst walks forward along the flight vector');
-  ok(log.fire.length === R.n && log.hit.length === R.n, `6 rockets launched and 6 impacted, got ${log.fire.length}/${log.hit.length}`);
-  ok(log.rocketSeen.size === R.n && log.rocketTicks === R.n * (R.flight - 1), 'every rocket is a tracked strike object for its whole flight (smoke-trail source): ' + log.rocketTicks);
-  ok(log.trailPts === log.rocketTicks, 'owner sees every rocket trail point');
-  ok(log.hit.every(e => lat(e) <= 2.6 && Math.abs(along(e)) <= 20.5), 'rocket impacts within 2.5 m of the flight vector');
-  const al = log.hit.map(along).sort((a, b) => a - b);
-  ok(al.every((a, i) => Math.abs(a - (-20 + i * 8)) < 0.01), 'rockets evenly spaced every 8 m: ' + al.map(a => a.toFixed(0)).join(','));
-  ok(log.order.join('>').startsWith('launch>gun') && log.order.includes('impact'), 'sequence: ' + log.order.join('>'));
-  ok(log.minAlt >= 14.9 && log.minAlt <= 16.5, 'dive bottoms out at ~15 m, got ' + log.minAlt.toFixed(1));
-  console.log(`open ground    : 14 cannon impacts on the line, 6/6 rockets hit at ${al.map(a => a.toFixed(0)).join(', ')} m along track, sequence ${log.order.join(' > ')}, dive floor ${log.minAlt.toFixed(1)} m`);
+function sortie(seed) {
+  const s = new Sim({ ai: false, empty: true, map: OPEN_BIG, factions: ['vanguard', 'redhammer'], seed }); s.fog.exp[0].fill(1); const T = s.teams[0]; T.money = 9999;
+  for (let i = 0; i < 4; i++) makeBldg(s, 'v_power', PLAYER, 40 + i * 8, 440); makeBldg(s, 'v_factory', PLAYER, 40, 400); const af = makeBldg(s, 'v_airfield', PLAYER, 60, 400); s.nav.rebuild();
+  s.issue({ t: 'train', id: af.id, type: 'v_a10' }); run(s, 20 * 20);
+  const jet = s.ents.find(e => e.type === 'v_a10'), tank = makeUnit(s, 'r_tank', ENEMY, 420, 700, 0), heli = makeUnit(s, 'r_hind', ENEMY, 430, 690, 0);
+  for (const u of [tank, heli]) { u.order = { t: 'hold' }; u.hp = u.maxHp = 5000; }
+  const out = { jet, tank, heli, built: !!jet && jet.as === 'parked' && jet.home === af.id && T.money === 9999 - D.cost, canHeli: jet && canAttack(jet, heli), gun: 0, mav: 0, order: [], minAmmo: 4, air: 0 };
+  jet.order = { t: 'fattack', id: tank.id, x: tank.x, z: tank.z, g: null };
+  run(s, 20 * 70, (ev) => { tank.cds = [1e9, 1e9, 1e9]; heli.cds = [1e9, 1e9, 1e9]; out.minAmmo = Math.min(out.minAmmo, jet.ammo); if (jet.altK > 0.9) out.air++;
+    for (const e of ev) if (e.sid === jet.id) { if (e.w === 'gau8') { out.gun++; if (!out.order.includes('gun')) out.order.push('gun'); } if (e.w === 'maverick' && e.t === 'fire') { out.mav++; if (!out.order.includes('mav')) out.order.push('mav'); } } });
+  out.hash = s.hash(); return out;
 }
-// 2. medium tanks anywhere on the line are destroyed (front armor facing the jet)
-{
-  let killed = 0, n = 0; const left = [];
-  for (const off of [-20, -14, -8, -4, 0, 4, 9, 16, 20]) {
-    const r = pass({ targets: [['r_tank', 0, 0]], facing: 0 });
-    // re-run with the tank shifted along the actual flight vector and facing the aircraft
-    const s2 = pass({ targets: [['r_tank', r.d[0] * off, r.d[1] * off]], facing: Math.atan2(-r.d[1], -r.d[0]) });
-    n++; if (s2.made[0].dead) killed++; else left.push(off + ':' + Math.round(s2.made[0].hp));
-  }
-  ok(killed === n, `medium tank destroyed at every point on the line: ${killed}/${n} ${left.join(' ')}`);
-  console.log(`medium tanks   : Battlemaster (440 HP, front armor to the jet) destroyed at ${killed}/${n} positions along the line`);
-}
-// 3. heavy armor is crippled, not deleted, from the front; splash reaches neighbours
-{
-  const r0 = pass({});
-  const f = Math.atan2(-r0.d[1], -r0.d[0]);
-  const r = pass({ targets: [['r_overlord', 0, 0], ['r_conscript', r0.d[0] * 12 + 3, r0.d[1] * 12], ['r_tank', -r0.d[1] * 6, r0.d[0] * 6]], facing: f });
-  const [ov, inf, side] = r.made;
-  ok(!ov.dead && ov.hp / ov.maxHp < 0.5 && ov.hp / ov.maxHp > 0.05, 'Overlord crippled (<50%) but alive: ' + (100 * ov.hp / ov.maxHp).toFixed(0) + '%');
-  ok(inf.dead || inf.hp < inf.maxHp * 0.5, 'infantry beside the line takes splash');
-  ok(side.hp < side.maxHp && !side.dead, 'tank 6 m off the line is splashed but survives: ' + Math.round(side.hp) + '/' + side.maxHp);
-  ok(r.log.hit.filter(e => e.guided === ov.id).length >= 2, 'rockets guided onto the visible Overlord');
-  console.log(`heavy armor    : Overlord left at ${(100 * ov.hp / ov.maxHp).toFixed(0)}% (${r.log.hit.filter(e => e.guided === ov.id).length} rockets guided onto it); tank 6 m off-line splashed to ${Math.round(side.hp)}/${side.maxHp}`);
-}
-// 4. Fog of War (rule changed in batch 7): calling the strike lights the target area for the caller, so rockets can guide inside it
-{
-  const r0 = pass({ spot: false });
-  const r = pass({ spot: false, targets: [['r_overlord', r0.d[0] * 0 - r0.d[1] * 5, r0.d[1] * 0 + r0.d[0] * 5]], facing: 0 });
-  ok(r.log.hit.some(e => e.guided), 'the strike lights its own target area, so rockets guide onto the tank standing in it');
-  ok(r.log.hit.every(e => r.lat(e) <= 9), 'every rocket still lands on or beside the line');
-  let lit = 0; for (const p of r.log.hit) if (r.sim.fog.visAt(PLAYER, p.x, p.z)) lit++;
-  ok(lit === r.log.hit.length && lit > 0, 'every impact is inside the area the strike lit');
-  ok(r.log.hit.every(e => fxVisible(r.sim, PLAYER, e)) && r.log.hit.every(e => !fxVisible(r.sim, ENEMY, e) || r.sim.fog.visAt(ENEMY, e.x, e.z)), 'effect visibility follows fog for the other side');
-  console.log('fog            : the strike lights its target area for the caller; rockets guide inside it; the other side sees only what its own units see');
-}
-// 5. wingman doubles both stages; determinism
-{
-  const r = pass({ flags: { a10x2: true } });
-  ok(r.log.strafe.length === 28 && r.log.hit.length === 12, `wingman: 28 cannon / 12 rockets, got ${r.log.strafe.length}/${r.log.hit.length}`);
-  const a = pass({ targets: [['r_tank', 3, 2]] }), b = pass({ targets: [['r_tank', 3, 2]] });
-  ok(a.sim.hash() === b.sim.hash(), 'deterministic');
-  console.log('wingman        : 28 cannon impacts, 12 rockets; repeat run identical');
-}
+const a = sortie(1), b = sortie(1);
+ok(a.built, 'trained at the Air Field for its price, it rolls out and parks');
+ok(a.gun >= 6 && a.mav === D.ammo && a.minAmmo === 0, `one sortie: ${a.gun} cannon bursts and all ${a.mav} Mavericks`);
+ok(a.tank.hp < 5000 - 600 && a.heli.hp === 5000 && !a.canHeli, `the tank takes ${Math.round(5000 - a.tank.hp)} damage; the helicopter beside it is untouched: the A-10 cannot attack aircraft`);
+ok(a.air > 100 && a.jet.as === 'parked' && a.jet.ammo === D.ammo, 'it flies home and is re-armed in its hangar');
+ok(a.hash === b.hash && a.gun === b.gun, 'a sortie is deterministic');
+console.log(`A-10 unit      : ${a.gun} bursts + ${a.mav} Mavericks per sortie, ${Math.round(5000 - a.tank.hp)} damage to a tank, home to re-arm`);
 console.log(fails ? `A10: ${fails} FAILURES of ${checks}` : `A10: all ${checks} checks passed`);
+process.exit(fails ? 1 : 0);

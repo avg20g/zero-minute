@@ -169,13 +169,13 @@ const X = 300, Z = 300;
 {
   const s = empty(['vanguard', 'redhammer']); const T = s.teams[0]; ok(T.rank === 1 && T.points === 1, 'start at Rank 1 with 1 point');
   const P = (n) => { s.issue({ t: 'promote', node: n }); s.step(); };
-  P('v_a10'); ok(!T.promos.has('v_a10') && T.points === 1, 'Rank 3 node refused at Rank 1'); P('v_vet'); ok(T.promos.has('v_vet') && T.points === 0, 'Rank 1 node bought'); P('v_pathfinder'); ok(!T.promos.has('v_pathfinder'), 'no points, no purchase');
+  P('v_strike'); ok(!T.promos.has('v_strike') && T.points === 1, 'Rank 3 node refused at Rank 1'); P('v_vet'); ok(T.promos.has('v_vet') && T.points === 0, 'Rank 1 node bought'); P('v_pathfinder'); ok(!T.promos.has('v_pathfinder'), 'no points, no purchase');
   const v = makeUnit(s, 'r_overlord', ENEMY, X, Z, 0); let ranks = []; for (let k = 0; k < 40 && T.rank < 5; k++) { const e = makeUnit(s, 'r_overlord', ENEMY, X, Z, 0); applyDamage(s, e, 1e5, 'cannon', X + 9, Z, { team: PLAYER }); for (const ev of s.events) if (ev.t === 'rank') ranks.push(ev.rank); s.events.length = 0; }
   ok(ranks.join() === '2,3,4,5' && T.points === 4, 'combat XP ranks the General up to 5: ' + ranks.join()); ok(T.xp >= GENERAL.rankXp[4], 'XP ' + Math.round(T.xp));
-  P('v_a10x2'); ok(!T.promos.has('v_a10x2'), 'A-10 Wingman needs A-10 first (branch)'); P('v_a10'); P('v_a10x2'); ok(T.promos.has('v_a10x2') && T.flags.a10x2 && T.powerReady.a10 <= s.tick, 'A-10 then A-10 Wingman unlocked and ready');
+  P('v_pilots'); ok(!T.promos.has('v_pilots'), 'Combat Pilots needs Tomahawk Strike first (branch)'); P('v_strike'); P('v_pilots'); ok(T.promos.has('v_pilots') && T.powerReady.tomahawk <= s.tick, 'Tomahawk Strike then Combat Pilots unlocked and ready');
   P('v_fastpdl'); ok(T.flags.fastPdl && T.points === 1, 'Rapid Point Defense (needs Armor Veterancy) bought'); const tk = makeUnit(s, 'v_tank', PLAYER, X + 40, Z, 0); ok(tk.vet === 1, 'Armor Veterancy: new tanks are Veterans');
   const b = makeBldg(s, 'v_barracks', PLAYER, 150, 170); s.nav.rebuild(); s.teams[0].money = 5000; s.issue({ t: 'train', id: b.id, type: 'v_pathfinder' }); s.step(); ok(b.queue.length === 0, 'Pathfinder locked without its promotion'); P('v_pathfinder'); s.issue({ t: 'train', id: b.id, type: 'v_pathfinder' }); s.step(); ok(b.queue.length === 1 && T.points === 0, 'unlocked after promotion');
-  for (const f of FACTION_IDS) { const t = FACTIONS[f].tree; ok(t.filter(n => n.tier === 1).length === 2 && t.length === 7 && [1, 3, 5].every(k => t.some(n => n.tier === k)) && t.filter(n => n.power).length === 3 && t.every(n => !n.req || t.some(p => p.id === n.req && p.tier <= n.tier)), f + ': 7 nodes over 3 tiers, 3 powers, every branch has its parent'); }
+  for (const f of FACTION_IDS) { const t = FACTIONS[f].tree; ok(t.filter(n => n.tier === 1).length === 2 && t.length === 7 && [1, 3, 5].every(k => t.some(n => n.tier === k)) && t.filter(n => n.power).length === (f === 'vanguard' ? 2 : 3) && t.every(n => !n.req || t.some(p => p.id === n.req && p.tier <= n.tier)), f + ': 7 nodes over 3 tiers, 3 powers (the United States: 2), every branch has its parent'); }
   console.log('promotions     : rank gates, point costs, branch prerequisites, unlocks and flags work; XP ranks 2,3,4,5');
 }
 // --- upgrades + tech gates through the normal command path

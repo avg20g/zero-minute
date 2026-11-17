@@ -114,7 +114,7 @@ function match(fa, fb, lv, ticks, extra) {
   const run = (variant) => {
     const sim = new Sim({ factions: ['vanguard', 'redhammer'], difficulty: 'hard' }); const a = sim.ais[0]; a.log = [];
     const T = sim.teams[PLAYER], cells = [], B = variant === 'B';
-    if (B) { T.money += 50000; T.rank = 5; T.points = 4; T.promos.add('v_a10'); T.upgrades.add('v_pdl'); T.xp = 5000; }
+    if (B) { T.money += 50000; T.rank = 5; T.points = 4; T.promos.add('v_strike'); T.upgrades.add('v_pdl'); T.xp = 5000; }
     const b = makeBldg(sim, B ? 'v_barracks' : 'v_power', PLAYER, B ? 14 : 20, B ? 236 : 232); sim.nav.rebuild(); cells.push(cellOf(b.x, b.z));
     for (let i = 0; i < 6; i++) {
       const u = hold(makeUnit(sim, B && i >= 2 ? 'v_truck' : 'v_dozer', PLAYER, // two hidden builders in both runs, so the elimination rule (no Command Center and no builders) reads the same
@@ -249,7 +249,7 @@ function match(fa, fb, lv, ticks, extra) {
 // ---------------------------------------------------------------- H. support powers never land on fogged targets
 {
   const rows = []; let n = 0;
-  for (const [f, lv, nodes, spotter] of [['vanguard', 'medium', ['v_a10'], 'v_drone'], ['vanguard', 'hard', ['v_a10', 'v_para'], 'v_drone'], ['redhammer', 'medium', ['r_barrage'], 'r_scout'],
+  for (const [f, lv, nodes, spotter] of [['vanguard', 'medium', ['v_strike'], 'v_drone'], ['vanguard', 'hard', ['v_strike', 'v_para'], 'v_drone'], ['redhammer', 'medium', ['r_barrage'], 'r_scout'],
                                          ['redhammer', 'hard', ['r_barrage', 'r_fab'], 'r_conscript'], ['sandstorm', 'easy', ['s_ambush'], 's_guerrilla'], ['sandstorm', 'hard', ['s_ambush', 's_toxin'], 's_technical']]) {
     const sim = new Sim({ factions: ['redhammer', f], difficulty: lv }); const a = sim.ais[0], acc = newAcc(); watch(sim, a, acc);
     const T = sim.teams[ENEMY]; for (const k of nodes) { T.promos.add(k); T.powerReady[FACTIONS[f].tree.find(q => q.id === k).power] = 0; } T.points = 0;

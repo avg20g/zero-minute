@@ -10,7 +10,7 @@ import { strikeVisible, fxVisible, SCUD_GAP } from '../sim/powers.js';
 import { fowUniforms } from './gfx.js';
 import { buildTerrain, buildRocks, buildWater, buildBridges, buildTrees } from './terrain.js';
 import { Environment, makeTerrainTextures, terrainMaterial } from './environmentFX.js';
-import { createModel, createPlane, createRocket, createMissile, createChute, buildGhost, buildCrate, buildBomb, bakeStats } from './modelFactory.js';
+import { createModel, createPlane, createMissile, createChute, buildGhost, buildCrate, buildBomb, bakeStats } from './modelFactory.js';
 import { VFX, VET_TRACER } from './vfxManager.js';
 
 const AIR_Y = 13, LASER = [0.4, 0.9, 1], PDL = [0.6, 1, 1], PBEAM = [0.56, 0.85, 1];
@@ -48,10 +48,8 @@ export class View {
     this.fx = new VFX(scene, this.map);
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) this.fx.shakeOn = false;
     this.setLighting(opts.lighting || 'noon');
-    this.rocketDrawn = new Map(); // rocket id -> last point its smoke trail reached
     this.skyBeams = [];           // Particle Cannon buildings firing into the sky right now
     this.views = new Map(); this.props = new Map(); // props: crates, strike aircraft, bombs
-    this.ghosts = new Map();                        // material -> its see-through copy (cloaked units)
     this.rings = []; this.ringGeo = new THREE.RingGeometry(0.86, 1, 28); this.ringGeo.rotateX(-Math.PI / 2);
     this.sqGeo = new THREE.RingGeometry(0.93, 1, 4, 1, Math.PI / 4); this.sqGeo.rotateX(-Math.PI / 2);
     this.thinGeo = new THREE.RingGeometry(0.965, 1, 64); this.thinGeo.rotateX(-Math.PI / 2);
@@ -78,11 +76,12 @@ export class View {
   handleEvents(events) {
     const sim = this.sim, fx = this.fx, fog = sim.fog;
     const see = (e) => this.reveal || fxVisible(sim, PLAYER, e);
+    const altOf = (id) => { const v = this.views.get(id); return v && v.alt ? v.alt : AIR_Y; };   // how high that aircraft is drawn right now
     for (const e of events) {
       switch (e.t) {
         case 'tracer': {
           if (!fog.visAt(PLAYER, e.x, e.z) && !fog.visAt(PLAYER, e.tx, e.tz)) break;
-          const y0 = fx.h(e.x, e.z) + (e.sAir ? AIR_Y - 0.6 : e.y ?? 1.1), y1 = fx.h(e.tx, e.tz) + (e.tAir ? AIR_Y : 0.9), a = Math.atan2(e.tz - e.z, e.tx - e.x);
+          const y0 = fx.h(e.x, e.z) + (e.sAir ? altOf(e.sid) + (e.y ?? -0.6) : e.y ?? 1.1), y1 = fx.h(e.tx, e.tz) + (e.tAir ? altOf(e.tid) : 0.9), a = Math.atan2(e.tz - e.z, e.tx - e.x);
           const sx = e.x + Math.cos(a) * 0.9, sz = e.z + Math.sin(a) * 0.9, col = VET_TRACER[e.vet || 0], glow = 1 + (e.vet || 0) * 0.4;
           const n = WEAPONS[e.w].cd <= 4 ? 1 : e.w === 'sniper' ? 1 : 3;
           for (let i = 0; i < n; i++) {
@@ -95,7 +94,7 @@ export class View {
         }
         case 'laser': {
           if (!fog.visAt(PLAYER, e.x, e.z) && !fog.visAt(PLAYER, e.tx, e.tz)) break;
-          fx.beam(e.x, fx.h(e.x, e.z) + (e.sAir ? AIR_Y : e.y ?? 1.9), e.z, e.tx, fx.h(e.tx, e.tz) + (e.tAir ? AIR_Y : 1.2), e.tz, WEAPONS[e.w].beam || (e.vet ? VET_TRACER[e.vet] : LASER));   // a weapon may have its own beam colour (the bear's eyes are red)
+          fx.beam(e.x, fx.h(e.x, e.z) + (e.sAir ? altOf(e.sid) : e.y ?? 1.9), e.z, e.tx, fx.h(e.tx, e.tz) + (e.tAir ? altOf(e.tid) : 1.2), e.tz, WEAPONS[e.w].beam || (e.vet ? VET_TRACER[e.vet] : LASER));   // a weapon may have its own beam colour (the bear's eyes are red)
           break;
         }
         case 'melee': { // a spear thrust: sparks where it lands, and the figure lunges (recoil forward)
@@ -165,25 +164,7 @@ export class View {
         case 'salvage': if (see(e)) { fx.spark(e.x, fx.h(e.x, e.z) + 1.5, e.z, [1, 0.8, 0.3]); fx.spark(e.x, fx.h(e.x, e.z) + 2, e.z, [1, 0.8, 0.3]); fx.shock(e.x, fx.h(e.x, e.z) + 0.3, e.z, 3.5, 0.4, 0xffcf5a); } break;
         case 'vet': if (see(e)) { const y = fx.h(e.x, e.z); fx.shock(e.x, y + 0.3, e.z, 4.5, 0.6, [0xffcf3a, 0x5ac8ff, 0xff4a3a][e.rank - 1]); fx.spark(e.x, y + 2, e.z, VET_TRACER[e.rank]); } break;
         case 'hazard': if (fog.visAt(PLAYER, e.x, e.z) && e.kind === 'fire') fx.explosion(e.x, fx.h(e.x, e.z), e.z, 0.9); break;
-        case 'rocketfire': if (see(e)) { const y = fx.h(e.x, e.z) + e.y; fx.flash(e.x, y, e.z, 18, 0.08); const g = 0.85; for (let i = 0; i < 4; i++) fx.smoke.spawn(e.x, y, e.z, (fx.rnd() - 0.5) * 3, (fx.rnd() - 0.5) * 2, (fx.rnd() - 0.5) * 3, 0.8, 1.0, 2.4, g, g, g, 0.35, 0, 1); } break;
-        case 'rockethit': {
-          // finish the smoke trail even if the last frames were dropped, then the blast and its scorch decal
-          const from = this.rocketDrawn.get(e.id); this.rocketDrawn.delete(e.id);
-          if (!see(e)) break;
-          const y = fx.h(e.x, e.z), s0 = from || (e.team === PLAYER ? [e.sx, y + e.sy, e.sz] : null); // never trace an enemy rocket back into fog
-          if (s0) fx.streak(s0[0], s0[1], s0[2], e.x, y + 0.3, e.z);
-          fx.explosion(e.x, y, e.z, 1.7); fx.crater(e.x, e.z, 7); fx.shock(e.x, y + 0.4, e.z, 9, 0.4, 0xffd9a0); fx.smokeColumn(e.x, e.z, 3, 1.1);
-          break;
-        }
-        case 'strafe': if (see(e)) { const y = fx.h(e.x, e.z); fx.explosion(e.x, y, e.z, 0.55); fx.dust(e.x, y, e.z, 5, 4, 1.6, 0.4); fx.crater(e.x, e.z, 3.4); } break;
         case 'shellhit': if (see(e)) { fx.explosion(e.x, fx.h(e.x, e.z), e.z, 1.5); fx.crater(e.x, e.z, 7.5); fx.shock(e.x, fx.h(e.x, e.z) + 0.4, e.z, 8, 0.35, 0xffd9a0); } break;
-        case 'gunship': { // AC-130 fire: a line of tracers or one howitzer shell from the aircraft down to the ground
-          if (!see(e)) break;
-          const y = fx.h(e.x, e.z), sy = y + e.sy - 0.5;
-          if (e.k === 'gun') { fx.tracer(e.sx, sy, e.sz, e.x, y + 0.3, e.z, 420, VET_TRACER[1], 1.5); fx.dust(e.x, y, e.z, 2, 1.5, 1.2, 0.35); if (fx.rnd() < 0.25) { fx.explosion(e.x, y, e.z, 0.4); fx.crater(e.x, e.z, 2.6); } }
-          else { fx.tracer(e.sx, sy, e.sz, e.x, y + 0.3, e.z, 520, [1, 0.8, 0.45], 2.4); fx.flash(e.sx, sy, e.sz, 24, 0.1); fx.explosion(e.x, y, e.z, 1.7); fx.crater(e.x, e.z, 7.5); fx.shock(e.x, y + 0.4, e.z, 8, 0.35, 0xffd9a0); fx.shake(e.x, e.z, 0.35); }
-          break;
-        }
         case 'hack': { // Fook Mie's call: a thin beam from her phone to the unit, then a ring in the new owner's colour (recruit) or dust (resign)
           if (!(this.reveal || e.team === PLAYER || e.victim === PLAYER || fog.visAt(PLAYER, e.tx, e.tz))) break;
           const y = fx.h(e.tx, e.tz);
@@ -192,6 +173,12 @@ export class View {
           if (e.k === 'recruit') fx.shock(e.tx, y + 0.3, e.tz, 4.5, 0.6, TEAM_HEX[e.team]); else if (e.k === 'resign') fx.dust(e.tx, y, e.tz, 6, 3, 1.4, 0.4);
           break;
         }
+        case 'launch': if (see(e)) { // a one-way drone leaves its container: booster flash and a cloud of smoke behind the truck
+          const y = fx.h(e.x, e.z) + 2.4; fx.flash(e.x, y, e.z, 26, 0.15); const g = 0.82;
+          for (let i = 0; i < 7; i++) fx.smoke.spawn(e.x, y, e.z, -Math.cos(e.a) * (2 + fx.rnd() * 5) + (fx.rnd() - 0.5) * 3, 0.5 + fx.rnd() * 1.5, -Math.sin(e.a) * (2 + fx.rnd() * 5) + (fx.rnd() - 0.5) * 3, 1.1, 1.0, 3.2, g, g, g, 0.4, 0, 1);
+          fx.dust(e.x, y - 2.4, e.z, 8, 4, 1.8, 0.35);
+        } break;
+        case 'dodge': if (see(e)) { const v = this.views.get(e.id); if (v) v.jinkRoll = 1; const y = fx.h(e.x, e.z) + altOf(e.id); for (let i = 0; i < 3; i++) fx.spark(e.x + (fx.rnd() - 0.5) * 3, y - 0.5, e.z + (fx.rnd() - 0.5) * 3, [1, 0.9, 0.6]); } break;   // flares, and the helicopter rolls out of the way
         case 'vanish': if (see(e)) fx.dust(e.x, fx.h(e.x, e.z), e.z, e.inf ? 6 : 12, 3, e.inf ? 1.3 : 2.2, 0.4); break;
         case 'airliner': if (see(e)) { fx.megaBlast(e.x, e.z, e.r); fx.smokeColumn(e.x, e.z, 8, 2); fx.shake(e.x, e.z, 1.4); } else fx.shake(e.x, e.z, 0.3); break;
         case 'superlaunch': { // what the launching building does; shown only if you can see that building right now
@@ -244,22 +231,6 @@ export class View {
     }
     return v;
   }
-  // A cloaked unit you are allowed to see (your own, or anything in a replay with the fog off) is drawn see-through:
-  // every mesh swaps to a translucent copy of its material, and back when the cloak drops.
-  ghostOf(m) {
-    let g = this.ghosts.get(m);
-    if (!g) { g = m.clone(); g.onBeforeCompile = m.onBeforeCompile; if (m.customProgramCacheKey) g.customProgramCacheKey = m.customProgramCacheKey; g.transparent = true; g.opacity = 0.4; g.depthWrite = false; this.ghosts.set(m, g); }
-    return g;
-  }
-  setGhost(v, on) {
-    if (!!v.ghost === on || !v.g.traverse) return; v.ghost = on;
-    v.g.traverse((o) => {
-      if (!o.isMesh) return;
-      if (on) { o.userData.solid = o.material; o.userData.shadow = o.castShadow; o.material = this.ghostOf(o.material); o.castShadow = false; }
-      else if (o.userData.solid) { o.material = o.userData.solid; o.castShadow = o.userData.shadow; o.userData.solid = null; }
-    });
-  }
-  rocketY(p, u) { return this.fx.h(p.tx, p.tz) + p.sy * (1 - u) * (1 - u * 0.25); }
   // Nuclear Missile and Scud Storm missiles. Each is drawn twice: climbing out of its launcher (if you can see the
   // launcher) and coming down on the target (if you can see the target). In between it is too high to see.
   drawMissile(p, alpha, stamp, dt) {
@@ -329,6 +300,12 @@ export class View {
           if (v.rotorTail) v.rotorTail.rotation.z += dt * 55;
           if (v.rotor2) v.rotor2.rotation.y -= dt * (e.landed ? (e.as === 'spool' ? 3 + e.reloadT * 0.9 : 3) : 30);                  // tandem rotors turn opposite ways
           if (v.prop) v.prop.rotation.x += dt * 60;
+          if (v.props) for (const pr of v.props) pr.rotation.x += dt * (e.landed && e.as !== 'spool' ? 6 : 45);                  // AC-130: four propellers, idling on the ground
+          if (d.jink || v.jinkRoll) { // a gunship that jinks leans into each sidestep; a dodge is a sharp roll
+            const lat = (-(e.x - e.px) * s + (e.z - e.pz) * c) * 20, want = e.landed ? 0 : Math.max(-0.45, Math.min(0.45, lat * 0.05));
+            v.lean = (v.lean || 0) + (want - (v.lean || 0)) * Math.min(1, dt * 6); v.jinkRoll = Math.max(0, (v.jinkRoll || 0) - dt * 2.2);
+            v.body.rotation.x += v.lean + Math.sin(v.jinkRoll * Math.PI) * 0.7;
+          }
           if (e.dive) v.body.rotation.z = -Math.min(1.0, e.dive * 0.2);                                  // FPV drone tips its nose at the target
           if (ak > 0.5 && d.based && fx.rnd() < dt * 40) { const g = 0.85; fx.smoke.spawn(x - c * 3, y, z - s * 3, 0, 0, 0, 0.5, 0.6, 1.4, g, g, g, 0.25, 0, 0.5); }
         } else if (d.ship) { // afloat: level on the water, with a slow roll and pitch; a bow wave and wake when under way
@@ -342,7 +319,6 @@ export class View {
           v.body.rotation.x = -Math.atan2(heightAt(map, x - s * L, z + c * L) - heightAt(map, x + s * L, z - c * L), 2 * L);
         }
         v.g.position.set(x, y, z); v.g.rotation.y = -f;
-        this.setGhost(v, !!e.cloaked && (e.team === PLAYER || !e.detected));
         if (!d.infantry) {
           if (e.hp < e.maxHp * 0.4) fx.damage(x, y, z, dt, e.hp / e.maxHp);   // trailing engine smoke and sparks
           if (!e.air) env.headlight(x, y, z, f, e.radius);                    // no-op except at night
@@ -352,12 +328,27 @@ export class View {
           v.turret.rotation.y = -(tf - f);
           if (v.recoil > 0) { v.recoil = Math.max(0, v.recoil - dt * 5); if (!v.noRecoil) v.turret.position.x = v.turretX - v.recoil * 0.28; }
         }
-        if (v.men) { const n = v.men.length, alive = Math.max(1, Math.ceil(n * e.hp / e.maxHp)); for (let i = 0; i < n; i++) v.men[i].visible = i < alive; if (e.spd > 0.5) { v.spinT += dt * 9; for (let i = 0; i < n; i++) v.men[i].position.y = Math.abs(Math.sin(v.spinT + i * 1.3)) * 0.09; } }
+        if (v.men) {
+          const n = v.men.length, alive = Math.max(1, Math.ceil(n * e.hp / e.maxHp)); for (let i = 0; i < n; i++) v.men[i].visible = i < alive;
+          // walking: legs swing from the hip, alternate legs half a stride apart, each man slightly out of step with the next; the swing dies away when the squad stops
+          const walking = e.spd > 0.5 && !e.inB; if (walking) v.spinT += dt * (5.5 + e.spd * 0.9);
+          v.stride = (v.stride || 0) + ((walking ? 0.6 : 0) - (v.stride || 0)) * Math.min(1, dt * 9);
+          if (v.legs && (v.stride > 0.005 || v.strode)) { const per = v.legs.length / n; for (let i = 0; i < v.legs.length; i++) v.legs[i].rotation.z = Math.sin(v.spinT + ((i / per) | 0) * 1.3 + (i & 1) * Math.PI) * v.stride; v.strode = v.stride > 0.005; }
+          if (walking || v.bobbed) { for (let i = 0; i < n; i++) v.men[i].position.y = walking ? Math.abs(Math.cos(v.spinT + i * 1.3)) * 0.035 : 0; v.bobbed = walking; }
+        }
         if (v.cargo) v.cargo.visible = e.cargo > 0;
         if (v.blade) v.blade.position.y = 0.55 + (e.working ? Math.sin(this.time * 12) * 0.18 : 0);
         if (v.addons) { v.addons.gatling.visible = e.addon === 'gatling'; v.addons.bunker.visible = e.addon === 'bunker'; }
         if (v.tiers) for (let i = 0; i < 3; i++) v.tiers[i].visible = i === e.tier;
         if (v.stores) for (let i = 0; i < v.stores.length; i++) v.stores[i].visible = i < e.ammo;      // missiles and bombs come off the aircraft as they are fired
+        if (v.longbow) v.longbow.visible = !!e.up;                                                     // Apache: the radar dome appears with the Longbow upgrade
+        if (v.doors) { // Shahed Launcher: the container doors swing open while it sets up and fires, and close during the reload; the rack empties drone by drone
+          const W = WEAPONS[d.weapon], cd = e.cds[0], firing = e.bursts[0] > 0 || cd > W.cd - 50, want = e.windup > 0 ? Math.min(1, e.windup / (W.windup * 0.7)) : firing ? 1 : 0;
+          v.open = (v.open || 0) + (want - (v.open || 0)) * Math.min(1, dt * 4);
+          for (let i = 0; i < 2; i++) v.doors[i].rotation.y = (i ? 1 : -1) * v.open * 1.95;
+          const left = cd <= 0 || e.windup > 0 ? W.burst : e.bursts[0] > 0 ? e.bursts[0] : cd < W.cd * 0.45 ? W.burst : 0;
+          for (let i = 0; i < v.rack.length; i++) v.rack[i].visible = i < left;   // rack[0] is the bottom tier: the top drone goes first
+        }
         if (v.arm) { // Scud Launcher: the erector lifts the missile upright before a launch, drops afterwards, and a new missile slides on during the reload
           const W = WEAPONS[d.weapon], cd = e.cds[0], up = Math.max(e.windup / W.windup, cd > W.cd - 30 ? (cd - (W.cd - 30)) / 30 : 0), k = up * up * (3 - 2 * up);
           v.arm.rotation.z = 0.12 + 1.3 * k;
@@ -421,17 +412,6 @@ export class View {
         m.position.set(x, y, z); m.rotation.y = -p.a; rig.body.rotation.z = Math.atan2(p.y - py, 4.4);
         if (rig.props) for (const pr of rig.props) pr.rotation.x += dt * 45;
         if (fx.rnd() < dt * 60) { const g = 0.9; for (const k of [-1, 1]) fx.smoke.spawn(x - p.dx * 5 - p.dz * k, y + 0.9, z - p.dz * 5 + p.dx * k, 0, 0, 0, 0.6, 0.8, 2.0, g, g, g, 0.22, 0, 0.3); }
-        if (p.payload === 'strafe' && p.s > -44 && p.s < 6) { // GAU-8 burst: tracers from the nose gun down onto the line, with gun smoke
-          const nx = x + p.dx * 6, nz = z + p.dz * 6, ny = y - 0.4;
-          if (fx.rnd() < dt * 50) { const k = 18 + fx.rnd() * 10; fx.tracer(nx, ny, nz, x + p.dx * k, fx.h(x + p.dx * k, z + p.dz * k) + 0.5, z + p.dz * k, 340, VET_TRACER[1], 1.6); }
-          if (fx.rnd() < dt * 30) { const g = 0.8; fx.smoke.spawn(nx, ny, nz, p.dx * 20, 0, p.dz * 20, 0.5, 0.9, 2.6, g, g, g, 0.3, 0, 1.5); fx.flash(nx, ny, nz, 14, 0.05); }
-        }
-      } else if (p.kind === 'gunship') { // AC-130: level flight in, port wing low while it circles, level again on the way out
-        const m = this.prop(p.id, () => { const r = createPlane('ac130', sim.teams[p.team].faction, p.team); r.g.userData.rig = r; return r.g; }, stamp), rig = m.userData.rig;
-        const turning = p.s >= 0 && p.n < POWERS.ac130.secs * 20;
-        rig.bank = (rig.bank || 0) + ((turning ? -0.36 : 0) - (rig.bank || 0)) * Math.min(1, dt * 1.8);
-        m.position.set(x, fx.h(p.cx, p.cz) + p.y, z); m.rotation.y = -(p.phdg + angDiff(p.hdg, p.phdg) * alpha); rig.body.rotation.x = rig.bank;
-        if (rig.props) for (const pr of rig.props) pr.rotation.x += dt * 45;
       } else if (p.kind === 'airliner') { // The Phantom's hijacked jet: a shallow dive onto the target, trailing smoke
         const m = this.prop(p.id, () => { const r = createPlane('b737', sim.teams[p.team].faction, p.team); r.g.userData.rig = r; return r.g; }, stamp);
         const y = fx.h(p.tx, p.tz) + p.py + (p.y - p.py) * alpha;
@@ -443,14 +423,6 @@ export class View {
           const a = i * 2.399963, cx = p.x + Math.cos(a) * (2 + i * 1.2), cz = p.z + Math.sin(a) * (2 + i * 1.2), m = this.prop(p.id + ':' + i, () => createChute().g, stamp);
           m.position.set(cx + Math.sin(this.time * 1.3 + i) * 0.5, fx.h(cx, cz) + up * (1 + i * 0.04), cz); m.rotation.z = Math.sin(this.time * 1.7 + i * 2) * 0.12; m.rotation.y = i * 1.3;
         }
-      } else if (p.kind === 'rocket') {
-        // rockets streak from the wing pylon down to the aim point, laying smoke the whole way
-        const m = this.prop(p.id, () => { const r = createRocket(); r.g.userData.rig = r; return r.g; }, stamp);
-        const u = Math.min(1, 1 - (p.t - alpha) / p.T), y = this.rocketY(p, u);
-        m.position.set(x, y, z); m.rotation.y = -p.a; m.userData.rig.body.rotation.z = -Math.atan2(p.sy, Math.hypot(p.tx - p.sx, p.tz - p.sz));
-        const last = this.rocketDrawn.get(p.id) || [p.sx, this.rocketY(p, 0), p.sz];
-        fx.streak(last[0], last[1], last[2], x, y, z); this.rocketDrawn.set(p.id, [x, y, z]);
-        fx.fire.spawn(x - Math.cos(p.a) * 0.9, y, z - Math.sin(p.a) * 0.9, 0, 0, 0, 0.06, 2.2, 0, 1, 0.8, 0.4, 1, 0, 0);
       } else if (p.kind === 'shell') {
         if (p.t > 16) continue;
         const y = fx.h(p.x, p.z) + (p.t - alpha) * 5.5;
@@ -478,7 +450,7 @@ export class View {
       const tot = Math.hypot(p.tx - p.sx, p.tz - p.sz) || 1, u = Math.min(1, Math.hypot(x - p.sx, z - p.sz) / tot);
       const W = WEAPONS[p.w], big = p.w === 'scud_missile';
       const arc = W.arc || (p.kind === 'lob' ? 10 : p.kind === 'shell' ? 0.4 : p.kind === 'rocket' ? 2.2 : 5);
-      const y0 = fx.h(p.sx, p.sz) + (p.sAir ? AIR_Y : big ? 6 : p.sy0 ?? 1.7), y1 = fx.h(p.tx, p.tz) + (p.tAir ? AIR_Y : 1.0), y = y0 * (1 - u) + y1 * u + Math.sin(u * Math.PI) * arc;
+      const y0 = fx.h(p.sx, p.sz) + (p.sAir ? p.sy0 ?? AIR_Y : big ? 6 : p.sy0 ?? 1.7), y1 = fx.h(p.tx, p.tz) + (p.tAir ? (this.views.get(p.tid) || {}).alt || AIR_Y : 1.0), y = y0 * (1 - u) + y1 * u + Math.sin(u * Math.PI) * arc;
       if (big) { // a Scud Launcher's missile is a real missile: it climbs off the erector, arcs over and comes down nose first
         const m = this.prop(p.id, () => { const r = createMissile('scud'); r.g.userData.rig = r; return r.g; }, stamp), pitch = Math.atan2(y1 - y0 + Math.cos(u * Math.PI) * Math.PI * arc, tot);
         m.position.set(x, y, z); m.rotation.y = -p.a; m.userData.rig.body.rotation.z = pitch;

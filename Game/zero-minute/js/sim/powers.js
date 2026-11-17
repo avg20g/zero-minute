@@ -6,7 +6,7 @@
 //   2. A strike grants no vision.
 //   3. Whether the other side sees a strike is decided by strikeVisible().
 import { N, CELL, WORLD } from './defs.js';
-import { FACTIONS, POWERS, UNITS, BLDGS, generalOf, nodePower } from './factionRegistry.js';
+import { FACTIONS, POWERS, UNITS, BLDGS, WEAPONS, generalOf, nodePower } from './factionRegistry.js';
 import { strikeDamage, kill, makeUnit, makeBldg, freeSpot, canPlace, spawnNear } from './entities.js';
 import { addHazard } from './abilities.js';
 import { stepAirliner } from './heroes.js';
@@ -80,71 +80,14 @@ function approach(sim, team, x, z) { // unit vector from the owner's base toward
   if (l < 20) { dx = team === 0 ? 1 : -1; dz = team === 0 ? -1 : 1; }
   const m = Math.hypot(dx, dz); return [dx / m, dz / m];
 }
-// Attack profile: aircraft dive toward the aim point, bottom out just short of it, then climb away.
-export function planeAlt(p) { return p.payload === 'strafe' ? 15 + Math.min(46, Math.abs(p.s + 18) * 0.21) : 34; }
-
-// A-10 rocket salvo. Each rocket has its own aim point on the target line; if the owner can
-// currently SEE an enemy vehicle or structure within `seek` metres of that point, the rocket
-// guides onto it. Anything in fog is never guided on (unguided rockets just hit the line).
-function launchRocket(sim, p, k) {
-  const R = POWERS.a10.rockets, along = -20 + k * 8, lat = (k % 2 ? 2.5 : -2.5);
-  let tx = p.tx + p.dx * along - p.dz * lat, tz = p.tz + p.dz * along + p.dx * lat, guided = 0, bd = R.seek;
-  for (const e of sim.ents) {
-    if (e.dead || e.team === p.team || e.team > 1 || (e.kind === 'unit' && (e.inB || e.air || e.cls !== 1))) continue;
-    const d = Math.hypot(e.x - tx, e.z - tz);
-    if (d < bd && sim.fog.canSee(p.team, e)) { bd = d; guided = e.id; }
-  }
-  if (guided) { const e = sim.byId.get(guided); tx = e.x; tz = e.z; }
-  tx = Math.min(WORLD - 3, Math.max(3, tx)); tz = Math.min(WORLD - 3, Math.max(3, tz));
-  const side = k % 2 ? 4 : -4, sx = p.x - p.dz * side, sz = p.z + p.dx * side;
-  sim.strikes.push({ id: sim.nextId++, kind: 'rocket', team: p.team, sx, sz, sy: p.y - 1.2, tx, tz, x: sx, z: sz, px: sx, pz: sz, a: Math.atan2(tz - sz, tx - sx), t: R.flight, T: R.flight, guided, dead: false });
-  sim.events.push({ t: 'rocketfire', x: sx, z: sz, y: p.y - 1.2, a: p.a, team: p.team });
-}
+// Off-map aircraft (bombers and transports) fly level over the aim point.
+export function planeAlt(p) { return 34; }
 
 function plane(sim, team, model, payload, x, z, lateral = 0, delay = 0) {
   const [dx, dz] = approach(sim, team, x, z), tx = x - dz * lateral, tz = z + dx * lateral, lead = 250 + delay * 4.4;
   const p = { id: sim.nextId++, kind: 'plane', model, payload, team, tx, tz, dx, dz, a: Math.atan2(dz, dx), s: -lead, next: -24, dropped: false,
     x: tx - dx * lead, z: tz - dz * lead, px: 0, pz: 0, y: 0, py: 0, rk: 0, dead: false };
   p.px = p.x; p.pz = p.z; p.y = p.py = planeAlt(p); sim.strikes.push(p);
-}
-
-// AC-130: flies in on a tangent, circles the zone with its port side (where the guns are) toward it, then leaves on a tangent.
-export const GUNSHIP = { speed: 2.4, lead: 150, out: 110 };   // metres per tick; metres flown in before the orbit starts and out after it ends
-function gunship(sim, team, x, z) {
-  const P = POWERS.ac130, [dx, dz] = approach(sim, team, x, z), a = Math.atan2(dx, -dz), s = -Math.round(GUNSHIP.lead / GUNSHIP.speed);
-  const p = { id: sim.nextId++, kind: 'gunship', model: 'ac130', team, cx: x, cz: z, tx: x, tz: z, a, s, n: 0, out: 0, x: 0, z: 0, px: 0, pz: 0, hdg: 0, phdg: 0, y: P.alt, tid: 0, dead: false };
-  gunshipPos(p); p.px = p.x; p.pz = p.z; p.phdg = p.hdg; sim.strikes.push(p);
-}
-function gunshipPos(p) {
-  const R = POWERS.ac130.orbit, ex = p.cx + Math.cos(p.a) * R, ez = p.cz + Math.sin(p.a) * R, tx = Math.sin(p.a), tz = -Math.cos(p.a), k = (p.s < 0 ? p.s : p.out) * GUNSHIP.speed;   // the zone stays off the port wing
-  p.x = ex + tx * k; p.z = ez + tz * k; p.hdg = Math.atan2(tz, tx);
-}
-// One tick of the orbit: the rotary cannon walks over the zone, the howitzer picks off the biggest thing it can see.
-// Only enemies the owner can see right now are aimed at; otherwise rounds fall at random inside the zone.
-function gunshipFire(sim, p) {
-  const P = POWERS.ac130, src = { team: p.team };
-  const pickTarget = (heavy) => {
-    let best = null, bs = -1;
-    for (const e of sim.ents) {
-      if (e.dead || e.team === p.team || e.team > 1 || (e.kind === 'unit' && (e.inB || (e.air && !e.landed)))) continue;
-      if (Math.hypot(e.x - p.cx, e.z - p.cz) - e.radius > P.radius || !sim.fog.canSee(p.team, e)) continue;
-      const soft = e.kind === 'unit' && UNITS[e.type].armor === 'inf', sc = (heavy ? (soft ? 1 : 3) : (soft ? 3 : 1)) + sim.rand();
-      if (sc > bs) { bs = sc; best = e; }
-    }
-    return best;
-  };
-  const spot = (t, spread) => { const a = sim.rand() * 6.2831853, r = Math.sqrt(sim.rand()) * (t ? spread : P.radius); return [Math.min(WORLD - 3, Math.max(3, (t ? t.x : p.cx) + Math.cos(a) * r)), Math.min(WORLD - 3, Math.max(3, (t ? t.z : p.cz) + Math.sin(a) * r))]; };
-  if (p.n % P.gun.every === 0) {
-    if (p.n % 20 === 0 || !p.tid) { const t = pickTarget(false); p.tid = t ? t.id : 0; }
-    const t = p.tid ? sim.byId.get(p.tid) : null, [ix, iz] = spot(t && !t.dead ? t : null, P.gun.spread);
-    strikeDamage(sim, ix, iz, P.gun.r, P.gun.dmg, 'ac130gun', src, p.x, p.z);
-    sim.events.push({ t: 'gunship', k: 'gun', x: ix, z: iz, sx: p.x, sz: p.z, sy: p.y, team: p.team });
-  }
-  if (p.n % P.cannon.every === P.cannon.every - 1) {
-    const t = pickTarget(true), [ix, iz] = spot(t, 1.5);
-    strikeDamage(sim, ix, iz, P.cannon.r, P.cannon.dmg, 'ac130shell', src, p.x, p.z);
-    sim.events.push({ t: 'gunship', k: 'cannon', x: ix, z: iz, sx: p.x, sz: p.z, sy: p.y, team: p.team });
-  }
 }
 
 export const SCUD_GAP = 5;                        // ticks between one Scud Storm rail firing and the next
@@ -182,8 +125,7 @@ export function usePower(sim, team, id, x, z) {
       }
       break;
     case 'particle': { const [dx, dz] = approach(sim, team, x, z); sim.strikes.push({ id: sim.nextId++, kind: 'pbeam', team, x, z, px: x, pz: z, sx: x, sz: z, dx, dz, n: 0, bx: from.x, bz: from.z, dead: false }); break; }
-    case 'ac130': gunship(sim, team, x, z); break;
-    case 'a10': plane(sim, team, 'a10', 'strafe', x, z); if (T.flags.a10x2) plane(sim, team, 'a10', 'strafe', x, z, 9, 14); break;
+    case 'tomahawk': sim.strikes.push({ id: sim.nextId++, kind: 'cruise', team, x, z, px: x, pz: z, t: P.flight, T: P.flight, dead: false }); break;   // one cruise missile: it arrives after its flight time
     case 'fab': plane(sim, team, P.plane || 'h6', 'fab', x, z); break;   // China's Fuel-Air Bomb comes from an H-6 bomber
     case 'toxinbomb': plane(sim, team, 'bomber', 'toxin', x, z); break;
     case 'barrage': {
@@ -218,37 +160,12 @@ export function stepPowers(sim) {
     p.px = p.x; p.pz = p.z;
     if (p.kind === 'plane') {
       p.s += 4.4; p.x = p.tx + p.dx * p.s; p.z = p.tz + p.dz * p.s; p.py = p.y; p.y = planeAlt(p);
-      if (p.payload === 'strafe') {
-        const A = POWERS.a10;
-        // stage 1: 30 mm burst walks down the target line, landing ahead of the aircraft
-        while (p.next <= 24 && p.s + 20 >= p.next) {
-          const j = (sim.rand() - 0.5) * 3.5, ix = p.tx + p.dx * p.next - p.dz * j, iz = p.tz + p.dz * p.next + p.dx * j;
-          if (ix > 2 && iz > 2 && ix < WORLD - 2 && iz < WORLD - 2) { strikeDamage(sim, ix, iz, A.gun.r, A.gun.dmg, 'a10gun', { team: p.team }, p.x, p.z); sim.events.push({ t: 'strafe', x: ix, z: iz, team: p.team }); }
-          p.next += A.gun.step;
-        }
-        // stage 2: six underwing rockets, released in pairs during the dive
-        while (p.rk < A.rockets.n && p.s >= -78 + (p.rk >> 1) * 13) launchRocket(sim, p, p.rk++);
-      } else if (!p.dropped && p.s >= -30) { // bomb release: lands on the aim point 0.6 s later
+      if (!p.dropped && p.s >= -30) { // bomb release: lands on the aim point 0.6 s later
         p.dropped = true;
         sim.strikes.push({ id: sim.nextId++, kind: p.payload === 'paradrop' ? 'para' : p.payload === 'carpet' ? 'carpet' : 'bomb', pid: p.pid, dx: p.dx, dz: p.dz, payload: p.payload, team: p.team, x: p.tx, z: p.tz, px: p.tx, pz: p.tz, t: p.payload === 'paradrop' ? 60 : 12, dead: false });
       }
       if (p.s > 260) p.dead = true;
     } else if (p.kind === 'airliner') { stepAirliner(sim, p);
-    } else if (p.kind === 'gunship') {
-      const P = POWERS.ac130;
-      p.phdg = p.hdg;
-      if (p.s < 0) p.s++;
-      else if (p.n < P.secs * 20) { p.a -= GUNSHIP.speed / P.orbit; gunshipFire(sim, p); p.n++; }
-      else if (++p.out * GUNSHIP.speed > GUNSHIP.out) p.dead = true;
-      gunshipPos(p);
-    } else if (p.kind === 'rocket') {
-      const u = 1 - (--p.t) / p.T; p.x = p.sx + (p.tx - p.sx) * u; p.z = p.sz + (p.tz - p.sz) * u;
-      if (p.t <= 0) {
-        p.dead = true; p.x = p.tx; p.z = p.tz;
-        const R = POWERS.a10.rockets;
-        strikeDamage(sim, p.tx, p.tz, R.r, R.dmg, 'a10rocket', { team: p.team }, p.sx, p.sz);
-        sim.events.push({ t: 'rockethit', x: p.tx, z: p.tz, team: p.team, guided: p.guided, id: p.id, sx: p.sx, sz: p.sz, sy: p.sy });
-      }
     } else if (p.kind === 'pbeam') { // the beam walks along its line, burning whatever it crosses
       const B = (POWERS[p.pid] || POWERS.particle).beam, u = p.n / B.ticks;
       p.x = Math.min(WORLD - 3, Math.max(3, p.sx + p.dx * B.sweep * (u - 0.5))); p.z = Math.min(WORLD - 3, Math.max(3, p.sz + p.dz * B.sweep * (u - 0.5)));
@@ -256,7 +173,8 @@ export function stepPowers(sim) {
       if (++p.n >= B.ticks) p.dead = true;
     } else if (--p.t <= 0) {
       p.dead = true;
-      if (p.kind === 'nuke') {
+      if (p.kind === 'cruise') { const P = POWERS[p.pid] || POWERS.tomahawk; strikeDamage(sim, p.x, p.z, P.radius, P.dmg, 'cruise', { team: p.team }); sim.events.push({ t: 'scudhit', x: p.x, z: p.z, r: P.radius, team: p.team, fire: true, big: true }); }
+      else if (p.kind === 'nuke') {
         const P = POWERS.nuke;
         strikeDamage(sim, p.x, p.z, P.radius, P.dmg, 'nuke', { team: p.team });
         addHazard(sim, 'thermal', p.x, p.z, P.fallout.r, P.fallout.secs, P.fallout.dps, p.team, true);
@@ -278,9 +196,9 @@ export function stepPowers(sim) {
       else if (p.kind === 'shell') { strikeDamage(sim, p.x, p.z, 7, 95, 'artillery', { team: p.team }); sim.events.push({ t: 'shellhit', x: p.x, z: p.z, team: p.team }); }
       else if (p.kind === 'bomb') detonate(sim, p, p.x, p.z);
       else if (p.kind === 'carpet') { // the stick of bombs walks along the bomber's track
-        const B = POWERS[p.pid] || POWERS.b2; for (let i = 0; i < B.n; i++) { const a = (i / (B.n - 1) - 0.5) * B.line, lat = (i % 2 ? 3 : -3); sim.strikes.push({ id: sim.nextId++, kind: 'bomblet', pid: p.pid, team: p.team, x: p.x + p.dx * a - p.dz * lat, z: p.z + p.dz * a + p.dx * lat, px: 0, pz: 0, t: 2 + i * 3, dead: false }); }
+        const B = POWERS[p.pid] && POWERS[p.pid].n ? POWERS[p.pid] : WEAPONS.b2_bombs; for (let i = 0; i < B.n; i++) { const a = (i / (B.n - 1) - 0.5) * B.line, lat = (i % 2 ? 3 : -3); sim.strikes.push({ id: sim.nextId++, kind: 'bomblet', pid: p.pid, team: p.team, x: p.x + p.dx * a - p.dz * lat, z: p.z + p.dz * a + p.dx * lat, px: 0, pz: 0, t: 2 + i * 3, dead: false }); }
       }
-      else if (p.kind === 'bomblet') { const B = POWERS[p.pid] || POWERS.b2; strikeDamage(sim, p.x, p.z, B.r, B.dmg, 'artillery', { team: p.team }); sim.events.push({ t: 'shellhit', x: p.x, z: p.z, team: p.team }); }
+      else if (p.kind === 'bomblet') { const B = POWERS[p.pid] && POWERS[p.pid].n ? POWERS[p.pid] : WEAPONS.b2_bombs; strikeDamage(sim, p.x, p.z, B.r, B.dmg, 'artillery', { team: p.team }); sim.events.push({ t: 'shellhit', x: p.x, z: p.z, team: p.team }); }
       else if (p.kind === 'ambush') {
         const roster = FACTIONS[sim.teams[p.team].faction].ambush || ['s_rpg', 's_rpg', 's_guerrilla'];
         let made = 0;

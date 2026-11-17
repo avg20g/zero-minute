@@ -21,6 +21,7 @@ export function makeUnit(sim, type, team, x, z, facing = 0) {
     // phase 2
     xp: 0, vet: 0, tier: 0, addon: null, addonQ: null, garrison: d.transport ? [] : null,
     stealthMode: d.stealth || null, cloaked: false, detected: false, revealUntil: 0, stillT: 0,
+    up: false, sightPlus: 0, detect: 0,
     deployed: false, cashAcc: 0, horde: false, pdlCd: 0, capT: 0, windup: 0, dive: 0, charging: false,
     mode: d.modes ? d.modes[0] : null, inert: false, expires: 0, temp: false,   // hero ability mode; resigned (takes no part, about to leave); tick it vanishes; called-in unit that leaves no wreck or score
     ammo: d.ammo || 0, as: d.based ? 'parked' : null, home: 0, pad: -1, rw: -1, onApron: false, loiterT: 0, loiterO: null, extend: 0, appr: 0, wps: null, hb: 0, hoverLow: false, landed: false, reloadT: 0,
@@ -40,6 +41,7 @@ function outfit(sim, u, d) {
   if (G && G.cloak && !u.stealthMode && !d.air && !d.noCloak && (d.infantry || d.armor === 'light')) u.stealthMode = 'still'; // Stealth General: hidden when standing still
   if (u.type === 'v_comanche' && T.upgrades.has('v_stealthrotor')) u.stealthMode = 'always';
   if (d.salvage && T.flags.scrap) { u.tier = 1; }
+  if (d.up && T.upgrades.has(d.up.id)) applyUp(u, d);
   if (G) { // generals that change how tough things are, or how experienced they start
     const k = (G.hpMult || 1) * (d.tank && G.tankHp ? G.tankHp : 1);
     if (k !== 1 && !d.hero) { u.maxHp = Math.round(d.hp * k); u.hp = u.maxHp; }
@@ -47,10 +49,13 @@ function outfit(sim, u, d) {
   }
   for (const id of T.promos) {
     const v = promoNode(T.faction, id).vetBuild; if (!v) continue;
-    if ((v === 'tank' && d.tank) || (v === 'infantry' && d.infantry && d.weapon) || v === u.type) { setVet(u, 1); break; }
+    if ((v === 'tank' && d.tank) || (v === 'infantry' && d.infantry && d.weapon) || (v === 'air' && d.air && d.weapon && !d.drone && !d.suicide) || v === u.type) { setVet(u, 1); break; }
   }
 }
 const team_ = (e) => e.team;
+// A team upgrade that changes one unit type (Apache Longbow): more sight, a detector radius, and the model shows it (u.up).
+// The weapon swap is read by slotsOf in combat.js.
+export function applyUp(u, d = UNITS[u.type]) { u.up = true; u.sightPlus = d.up.sight || 0; u.detect = d.up.detector || 0; u.wslots = null; }
 
 export function setVet(u, rank) {
   const base = u.maxHp / (1 + VET.hp * (u.vet || 0)), nm = base * (1 + VET.hp * rank);   // from the unit's own base health (a general may have changed it)
@@ -92,7 +97,7 @@ export function makeBldg(sim, type, team, cx, cz, done = true) {
   if (d.pads) { // airfield: parking spots, runways and helipad come from the building's layout in the registry (metres from the centre)
     const L = d.layout;
     b.pads = L.spots.map(([x, z], i) => ({ x: b.x + x, z: b.z + z, by: 0, ax: b.x + L.aprons[i][0], az: b.z + L.aprons[i][1], f: L.hangars[i][2] === 'e' ? 0 : Math.PI / 2 }));   // ax, az: the apron outside the hangar door; f: the way a parked jet faces (out of the door)
-    b.rws = L.runways.map(oz => ({ x0: b.x - 18, x1: b.x + 18, z: b.z + oz, by: 0 })); b.heli = { x: b.x + L.helipad[0], z: b.z + L.helipad[1] };
+    const rh = L.runwayHalf || 18; b.rws = L.runways.map(oz => ({ x0: b.x - rh, x1: b.x + rh, z: b.z + oz, by: 0 })); b.heli = { x: b.x + L.helipad[0], z: b.z + L.helipad[1] };
   }
   sim.nav.setRect(cx, cz, d.w, d.h, 1);
   sim.ents.push(b); sim.byId.set(b.id, b);

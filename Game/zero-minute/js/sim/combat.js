@@ -3,7 +3,7 @@
 // faction registry; nothing here knows about specific units.
 import { DT, NEUTRAL, GARRISON_RANGE_BONUS, angDiff } from './defs.js';
 import { UNITS, BLDGS, WEAPONS, VET, HORDE, armorOf, generalOf } from './factionRegistry.js';
-import { applyDamage, splashDamage, splashAll, moveTo, stopUnit, isMoving, kill, rectDist } from './entities.js';
+import { applyDamage, splashDamage, splashAll, moveTo, stopUnit, isMoving, kill, rectDist, makeUnit } from './entities.js';
 import { addHazard } from './abilities.js';
 import { heroHack, phantomCall } from './heroes.js';
 
@@ -18,6 +18,7 @@ export function slotsOf(e) {
     if (d.weapon) out.push(d.salvageWeapons ? d.salvageWeapons[e.tier] : d.weapon);
     if (d.weapon2) out.push(d.weapon2);
     if (d.weapon3) out.push(d.weapon3);
+    if (d.up && d.up.weapon && e.team < 2 && _sim.teams[e.team].upgrades.has(d.up.id)) out = out.map(w => d.up.weapon[w] || w);   // an upgrade swaps a weapon for a better one (Apache Longbow)
     if (d.upWeapon && e.team < 2) for (const up in d.upWeapon) if (_sim.teams[e.team].upgrades.has(up)) out.push(d.upWeapon[up]); // weapon unlocked by an upgrade (LAV-25 TOW)
     if (e.addon && d.hardpoints[e.addon].weapon) out.push(d.hardpoints[e.addon].weapon);
   }
@@ -96,11 +97,23 @@ function fire(sim, s, i, wname, ox, oz, t) {
   const w = WEAPONS[wname], M = mountOf(s, i), my = M ? M.y : undefined;   // my: height of the mount, for the effects
   s.cds[i] = Math.max(1, Math.round(w.cd / rateOf(sim, s)));
   s.lastFire = sim.tick;
-  if (s.kind === 'unit') { s.revealUntil = sim.tick + 40; if (UNITS[s.type].ammo) s.ammo--; }
+  if (s.kind === 'unit') { s.revealUntil = sim.tick + 40; if (UNITS[s.type].ammo && !w.free) s.ammo--; }   // a `free` weapon (an aircraft's gun) does not use up the sortie's ammunition
   const dmg = dmgOf(sim, s, w), a = Math.atan2(t.z - oz, t.x - ox), vet = s.vet || 0;
   const ff = s.kind === 'unit' && !!s.order && s.order.t === 'fattack';   // force attack: the shot hurts whatever it lands on, friend or foe
   if (w.kind === 'hack') { const cd = heroHack(sim, s, wname, t); if (cd) s.cds[i] = cd; return; }   // Fook Mie's phone
   if (w.kind === 'call') { phantomCall(sim, s, t); return; }                                          // The Phantom's call
+  if (w.kind === 'carpet') { // a bomber's single pass: the stick of bombs falls along its heading, centred on the target
+    sim.strikes.push({ id: sim.nextId++, kind: 'carpet', team: s.team, x: t.x, z: t.z, px: t.x, pz: t.z, dx: Math.cos(s.facing), dz: Math.sin(s.facing), t: 8, dead: false });
+    sim.events.push({ t: 'bombsaway', x: s.x, z: s.z, team: s.team, sid: s.id });
+    return;
+  }
+  if (w.kind === 'launch') { // a one-way drone leaves the launcher: its own unit, already on its way to this target (or this spot)
+    const D = UNITS[w.unit], back = s.facing + Math.PI, dr = makeUnit(sim, w.unit, s.team, s.x + Math.cos(back) * 3.5, s.z + Math.sin(back) * 3.5, Math.atan2(t.z - s.z, t.x - s.x));
+    dr.temp = true; dr.expires = sim.tick + 1200; dr.altK = dr.paltK = 0.25;
+    dr.order = t.ground ? { t: 'fattack', id: 0, x: t.x, z: t.z, g: groundTarget(t.x, t.z) } : { t: 'fattack', id: t.id, x: t.x, z: t.z, g: null };
+    sim.events.push({ t: 'launch', x: dr.x, z: dr.z, a: dr.facing, team: s.team, sid: s.id, w: wname });
+    return;
+  }
   if (w.kind === 'melee') { // a thrust at arm's length: no projectile, nothing to shoot down
     sim.events.push({ t: 'melee', w: wname, x: ox, z: oz, tx: t.x, tz: t.z, sid: s.id, tid: t.id, onBldg: t.kind === 'bldg' });
     if (t.ground) splashAll(sim, t.x, t.z, GROUND_HIT, dmg, wname, s, ox, oz); else applyDamage(sim, t, dmg, wname, ox, oz, s);
@@ -111,7 +124,7 @@ function fire(sim, s, i, wname, ox, oz, t) {
     if (t.ground) splashAll(sim, t.x, t.z, GROUND_HIT, dmg, wname, s, ox, oz); else applyDamage(sim, t, dmg, wname, ox, oz, s);
   } else {
     sim.projs.push({ id: sim.nextId++, kind: w.kind, w: wname, x: ox, z: oz, px: ox, pz: oz, sx: ox, sz: oz, tid: t.id, tx: t.x, tz: t.z,
-      speed: w.speed, dmg, team: s.team, srcId: s.id, vet, dead: false, a, ff, sy0: my, homing: w.kind !== 'lob', sAir: !!s.air && !s.landed, tAir: !!t.air && !t.landed, thermo: s.kind === 'unit' && !!UNITS[s.type].thermo });
+      speed: w.speed, dmg, team: s.team, srcId: s.id, vet, dead: false, a, ff, sy0: s.air && !s.landed ? UNITS[s.type].alt * (s.altK ?? 1) : my, homing: w.kind !== 'lob', sAir: !!s.air && !s.landed, tAir: !!t.air && !t.landed, thermo: s.kind === 'unit' && !!UNITS[s.type].thermo });
     sim.events.push({ t: 'fire', k: w.kind, w: wname, x: ox, z: oz, y: my, len: M ? M.len : undefined, a, sid: s.id, vet });
   }
 }
@@ -123,7 +136,7 @@ function fireSlots(sim, s, slots, ox, oz, t, dist, lead, bonus) {
     if (excl >= 0 && i !== excl) continue;
     const w = WEAPONS[slots[i]];
     if (!canUse(w, t) || dist > w.range + bonus || (w.minRange && dist < w.minRange)) continue;
-    if (usesAmmo && s.ammo <= 0) continue;
+    if (usesAmmo && s.ammo <= 0 && !w.free) continue;
     const M = mountOf(s, i); let mx = ox, mz = oz;
     if (M) { if (!bears(s, M, Math.atan2(t.z - s.z, t.x - s.x))) { s.bursts[i] = 0; continue; } [mx, mz] = mountPos(s, M); }   // the ship's own structure is in the way: this weapon waits
     if (s.bursts[i] > 0) {
@@ -180,7 +193,8 @@ function unitCombat(sim, u, d, slots) {
     if (holdGround && !d.based && isMoving(u) && dist <= W.range * 0.92) stopUnit(u);
     let aimed;
     const LM = mountOf(u, lead >= 100 ? lead - 100 : lead);
-    if (LM && LM.arc < Math.PI) { // a deck gun with a blind arc: the turret trains as far as it can; a ship that is not under way turns the rest
+    if (d.based && d.mounts) aimed = true;   // a gunship's side-firing guns: each fires only while the target is inside its own arc (see fireSlots)
+    else if (LM && LM.arc < Math.PI) { // a deck gun with a blind arc: the turret trains as far as it can; a ship that is not under way turns the rest
       const off = offAxis(u, LM, a), lim = Math.max(-LM.arc, Math.min(LM.arc, off));
       aimed = turn(u, 'turret', u.facing + (LM.dir || 0) + lim, d.turret) < 0.2;
       if (Math.abs(off) > LM.arc && !u.path && !u.pathReq) turn(u, 'facing', u.facing + Math.sign(off) * (Math.abs(off) - LM.arc * 0.9), d.turn);
@@ -281,6 +295,8 @@ function stepProjectiles(sim) {
     p.x = p.tx; p.z = p.tz; p.dead = true;
     const src = sim.byId.get(p.srcId) || { team: p.team };
     let hit = false;
+    // An agile helicopter may slip a rocket, missile or shell aimed at it (never a bullet or a beam: those are not projectiles).
+    if (t && t.kind === 'unit' && UNITS[t.type].dodge && !t.landed && sim.rand() < UNITS[t.type].dodge) { sim.events.push({ t: 'dodge', x: t.x, z: t.z, id: t.id, team: t.team }); sim.events.push({ t: 'impact', k: p.kind, w: p.w, x: p.x + Math.cos(p.a || 0) * 6, z: p.z + Math.sin(p.a || 0) * 6, hit: false, onBldg: false, air: true, splash: 0 }); continue; }
     if (W.splash) { (p.ff ? splashAll : splashDamage)(sim, p.x, p.z, W.splash, p.dmg, p.w, src, p.sx, p.sz); hit = true; }
     else if (p.ff && !p.tid) { splashAll(sim, p.x, p.z, GROUND_HIT, p.dmg, p.w, src, p.sx, p.sz); hit = true; }
     else if (t && Math.hypot(t.x - p.x, t.z - p.z) <= t.radius + 2) { applyDamage(sim, t, p.dmg, p.w, p.sx, p.sz, src); hit = true; }

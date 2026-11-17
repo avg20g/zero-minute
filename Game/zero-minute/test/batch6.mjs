@@ -83,8 +83,8 @@ const open = () => { const s = new Sim({ empty: true, ai: false }); s.fog.exp[0]
     const s = new Sim({ noEnemy: true, factions: [fac, 'vanguard'], generals: [gen, null] }), T = s.teams[0], tree = FACTIONS[fac].tree;
     ok(T.rank === GENERAL.rankXp.length && tree.every(n => T.promos.has(n.id)), fac + ': sandbox starts at rank ' + T.rank + ' with all ' + tree.length + ' promotions');
     const powers = tree.filter(n => n.power).map(n => n.power);
-    ok(tree.filter(n => n.power).every(n => T.powerReady[n.power] === 0) && powers.some(p => hasPower(s, 0, p) || (gen === 'airforce' && p === 'a10')), fac + ': every power is ready at once');
-    if (gen === 'airforce') ok(hasPower(s, 0, 'b2') && !hasPower(s, 0, 'a10'), 'the Air Force general still gets the B-2 in place of the A-10');
+    ok(tree.filter(n => n.power).every(n => T.powerReady[n.power] === 0) && powers.some(p => hasPower(s, 0, p) || (gen === 'airforce' && p === 'tomahawk')), fac + ': every power is ready at once');
+    if (gen === 'airforce') ok(hasPower(s, 0, 'b2') && !hasPower(s, 0, 'tomahawk'), 'the Air Force general gets the B-2 Fuel-Air Bomb in place of the Tomahawk Strike');
   }
   const n = new Sim({ ai: false }); ok(n.teams[0].rank < GENERAL.rankXp.length && n.teams[0].promos.size === 0, 'a normal match still starts at the bottom');
   console.log('sandbox        : full rank, all promotions and powers for all three factions');

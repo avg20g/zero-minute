@@ -20,7 +20,8 @@ if (!isMainThread) {
   const here = dirname(fileURLToPath(import.meta.url));
   const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
   const outFile = arg('out', join(here, 'runs', stamp + '.jsonl'));
-  const jobs = listJobs({ maps, seeds: Array.from({ length: nSeeds }, (_, i) => i + 1), difficulty });
+  const only = arg('only', '').split(',').filter(Boolean);   // --only stealth,wmd: just the matches those sides play in (a quick look at one side after a change)
+  const jobs = listJobs({ maps, seeds: Array.from({ length: nSeeds }, (_, i) => i + 1), difficulty }).filter(j => !only.length || only.includes(j.a) || only.includes(j.b));
   const results = new Array(jobs.length);
   const threads = Math.max(1, Math.min(+arg('threads', availableParallelism() - 1), jobs.length));
   const t0 = Date.now(); let next = 0, done = 0;

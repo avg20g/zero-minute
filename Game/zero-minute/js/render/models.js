@@ -35,6 +35,7 @@ function init() {
     black: std(0x121214, 0.9, 0), dress: std(0xc21f2b, 0.75, 0.05), blue: std(0x1f5fd0, 0.8, 0.05), camo: std(0x4c5a33, 0.95, 0),   // hero clothing
     fur: std(0x5a3d25, 0.98, 0), furDark: std(0x3a2616, 0.98, 0), bronze: std(0xa9793a, 0.45, 0.65), emr: std(0x55633f, 0.95, 0), fleck: std(0x5f6a4c, 0.95, 0), grey: std(0x80868c, 0.6, 0.5),   // bear fur, hoplite bronze, Russian and European field uniforms
     laser: std(0x24424f, 0.14, 0.7), // coated optic, not a light source
+    multicam: std(0x8c8566, 0.95, 0), coyote: std(0x7c6a48, 0.95, 0), tan: std(0xa58e66, 0.95, 0), pla: std(0x586d46, 0.95, 0), plaDark: std(0x3c4b31, 0.95, 0), fleckDark: std(0x424b36, 0.95, 0),   // US, Chinese and European field kit
     salvage: std(0x6a5c40, 0.85, 0.2),
     jet: std(0x8a9096, 0.5, 0.6),
     civ: null,
@@ -50,6 +51,7 @@ function mats(faction, team) {
   if (M.fm[key]) return M.fm[key];
   const F = FACTIONS[faction], accent = ACCENT[team] ?? ACCENT[2];
   return (M.fm[key] = {
+    faction,
     hull: std(F.hull, 0.88, 0.05), dark: std(F.dark, 0.9, 0.05), accent: std(accent, 0.82, 0.02), // matte service paint
     glow: M.glow[team] || M.glow[2], wall: std(F.hull, 0.85, 0.05), roof: std(F.dark, 0.75, 0.2),
   });
@@ -168,65 +170,188 @@ function landingGear(b, mainX, mainZ, noseX, belly) {
 // Hind: armoured gunship with stepped "double bubble" canopies, troop cabin, drooped stub wings with
 // rocket pods, 5-blade main rotor, 3-blade tail rotor, chin gun, fixed wheels.
 // ---------------- infantry ----------------
-function man(parent, T, x, z, o) {
-  const m = grp(parent, x, 0, z), cloth = o.cloth || M.khaki, legs = o.legs || M.olive;
-  for (const s of [-1, 1]) box(m, legs, 0.16, 0.6, 0.16, 0, 0.3, s * 0.11);
-  box(m, cloth, 0.26, 0.56, 0.42, 0, 0.88, 0); box(m, T.accent, 0.27, 0.12, 0.43, 0, 1.08, 0);
-  add(m, G.sph, M.skin, 0.13, 0.14, 0.13, 0, 1.3, 0); add(m, G.sph, o.hat || M.olive, 0.155, 0.11, 0.155, 0, 1.38, 0);
-  if (o.gun === 'rifle') box(m, M.gun, 0.62, 0.06, 0.06, 0.25, 0.95, 0.24);
-  else if (o.gun === 'long') { box(m, M.gun, 1.1, 0.06, 0.06, 0.4, 0.98, 0.24); cyl(m, M.glass, 0.04, 0.2, 0.3, 1.06, 0.24, 'x'); }
-  else if (o.gun === 'rpg') { cyl(m, M.olive, 0.07, 1.1, 0.1, 1.22, 0.26, 'x'); add(m, G.cone, M.gun, 0.11, 0.3, 0.11, 0.78, 1.22, 0.26).rotation.z = -Math.PI / 2; }
-  else if (o.gun === 'laptop') { box(m, M.dark, 0.3, 0.03, 0.4, 0.35, 0.8, 0); box(m, M.laser, 0.03, 0.26, 0.38, 0.5, 0.94, 0); }
-  else if (o.gun === 'tool') box(m, M.red, 0.3, 0.2, 0.16, 0.2, 0.55, 0.28);
-  else if (o.gun === 'satchel') box(m, M.dark, 0.2, 0.3, 0.3, -0.2, 0.9, 0);
-  else if (o.gun === 'milan') { // MILAN launcher on its tripod in front of the gunner: a fat tube with the sight box beside it
-    for (const a of [0, 2.1, 4.2]) { const l = cyl(m, M.gun, 0.02, 0.6, 0.55 + Math.cos(a) * 0.14, 0.28, Math.sin(a) * 0.14); l.rotation.z = Math.cos(a) * 0.35; l.rotation.x = -Math.sin(a) * 0.35; }
-    cyl(m, M.olive, 0.085, 1.1, 0.6, 0.62, 0, 'x'); box(m, M.dark, 0.2, 0.18, 0.14, 0.45, 0.72, 0.16); cyl(m, M.gun, 0.1, 0.06, 1.16, 0.62, 0, 'x');
+// One soldier, about 1.55 units tall, facing +X. Proper proportions: boots, shins and thighs, hips and belt, a torso
+// with a vest and pouches, shoulders, both arms brought to the weapon, neck, head and headgear, a pack. Each leg is
+// its own node hinged at the hip (`m.userData.legs`), so the view can swing them when the squad walks; everything else
+// is baked into the man. The owner's colour is on both upper arms, round the helmet and on top of the pack.
+//   o.cloth / o.legs  uniform and trousers          o.vest   plate carrier (with three pouches)   o.rig  chest rig only
+//   o.helmet          headgear shape (see headgear) o.hat    its material                         o.gun  what he carries
+//   o.pose            'rifle' | 'shoulder' | 'down' | 'type'                                       o.pack pack material
+const HIP = 0.76;
+function leg(m, s, trousers, boots, o) {
+  const l = grp(m, 0, HIP, s * 0.1);
+  box(l, trousers, 0.16, 0.36, 0.15, 0, -0.18, 0); box(l, trousers, 0.13, 0.32, 0.13, -0.005, -0.5, 0);          // thigh, shin
+  if (o.kneepads) box(l, o.kneepads, 0.05, 0.1, 0.12, 0.075, -0.36, 0);
+  if (o.greaves) box(l, o.greaves, 0.15, 0.28, 0.15, 0.005, -0.5, 0);
+  box(l, boots, 0.14, 0.12, 0.14, 0, -0.68, 0); box(l, boots, 0.25, 0.075, 0.14, 0.05, -0.722, 0);                  // boot: ankle and foot
+  return l;
+}
+// Arms. Shoulders are at y 1.24, z +-0.22; the right hand is the firing hand. Returns nothing: boxes are added to `m`.
+function arms(m, T, sleeve, skin, pose, band = true) {
+  const up = (s, x, y, z, rz, len = 0.27) => { const a = box(m, sleeve, 0.1, len, 0.1, x, y, s * z); a.rotation.z = rz; if (band) { const t = box(m, T.accent, 0.112, 0.075, 0.112, x - Math.sin(rz) * 0.03, y + 0.03, s * z); t.rotation.z = rz; } };
+  const hand = (x, y, z) => box(m, skin, 0.07, 0.07, 0.07, x, y, z);
+  if (pose === 'down') { // at his sides
+    for (const s of [-1, 1]) { up(s, 0, 1.12, 0.235, 0, 0.26); box(m, sleeve, 0.09, 0.24, 0.09, 0.01, 0.88, s * 0.235); hand(0.02, 0.74, s * 0.235); }
+  } else if (pose === 'type') { // forearms level in front, carrying something on them
+    for (const s of [-1, 1]) { up(s, 0.02, 1.12, 0.235, 0.12, 0.26); box(m, sleeve, 0.26, 0.085, 0.085, 0.15, 0.98, s * 0.19); hand(0.3, 0.98, s * 0.17); }
+  } else if (pose === 'shoulder') { // a launcher on the right shoulder: right hand at the grip under it, left hand steadying the tube
+    up(1, 0.07, 1.16, 0.24, 0.75, 0.24); box(m, sleeve, 0.09, 0.2, 0.09, 0.2, 1.17, 0.22); hand(0.2, 1.27, 0.2);
+    up(-1, 0.07, 1.15, 0.22, 0.7, 0.25); const f = box(m, sleeve, 0.42, 0.085, 0.085, 0.3, 1.2, -0.04); f.rotation.y = -0.78; hand(0.46, 1.24, 0.12);
+  } else { // 'rifle': weapon across the body, butt at the right shoulder
+    up(1, 0.05, 1.13, 0.235, 0.42); box(m, sleeve, 0.24, 0.085, 0.085, 0.2, 1.0, 0.2); hand(0.31, 0.985, 0.165);
+    up(-1, 0.07, 1.14, 0.225, 0.62); const f = box(m, sleeve, 0.45, 0.085, 0.085, 0.31, 1.025, -0.07); f.rotation.y = -0.72; hand(0.5, 1.03, 0.09);
   }
-  if (o.kepi) cyl(m, M.white, 0.14, 0.12, 0, 1.47, 0);                          // the Legion's white kepi
-  if (o.pack) box(m, o.pack, 0.2, 0.34, 0.32, -0.22, 0.9, 0);
+}
+function headgear(m, T, o) {
+  const mat = o.hat || M.olive, band = (w, y, d = w * 1.04) => box(m, T.accent, w, 0.034, d, 0, y, 0);
+  switch (o.helmet) {
+    case 'mich': // US high-cut combat helmet with a mount on the brow
+      add(m, G.dome, mat, 0.126, 0.118, 0.132, 0, 1.44, 0); box(m, mat, 0.235, 0.05, 0.25, -0.012, 1.43, 0); box(m, M.dark, 0.04, 0.05, 0.07, 0.118, 1.475, 0); band(0.262, 1.462); break;
+    case 'qgf': // Chinese helmet: rounder, with a short brim all round
+      add(m, G.dome, mat, 0.13, 0.112, 0.13, 0, 1.445, 0); cyl(m, mat, 0.142, 0.022, 0, 1.44, 0); band(0.27, 1.468); break;
+    case 'ssh': // Russian helmet: deep shell that covers the ears
+      add(m, G.dome, mat, 0.128, 0.122, 0.134, 0, 1.44, 0); box(m, mat, 0.13, 0.08, 0.272, -0.02, 1.41, 0); band(0.266, 1.466, 0.284); break;
+    case 'shemagh': // head wrap, a scarf across the face and a tail down the neck
+      add(m, G.sph, mat, 0.116, 0.1, 0.12, -0.008, 1.47, 0); box(m, mat, 0.06, 0.075, 0.17, 0.085, 1.375, 0); box(m, mat, 0.05, 0.17, 0.15, -0.1, 1.31, 0); band(0.24, 1.455, 0.252); break;
+    case 'kepi': // the Legion's white kepi with a dark peak
+      cyl(m, M.white, 0.104, 0.09, 0, 1.535, 0); box(m, M.dark, 0.1, 0.016, 0.17, 0.125, 1.497, 0); cyl(m, T.accent, 0.108, 0.03, 0, 1.502, 0); break;
+    case 'cap': // knitted wool cap
+      add(m, G.sph, mat, 0.108, 0.085, 0.11, -0.005, 1.475, 0); cyl(m, T.accent, 0.107, 0.03, -0.004, 1.455, 0); break;
+    case 'boonie': // soft hat with a brim all round
+      cyl(m, mat, 0.17, 0.016, 0, 1.47, 0); add(m, G.dome, mat, 0.106, 0.075, 0.106, 0, 1.475, 0); cyl(m, T.accent, 0.109, 0.026, 0, 1.49, 0); break;
+    case 'hard': // hard hat
+      add(m, G.dome, mat, 0.12, 0.1, 0.122, 0, 1.455, 0); cyl(m, mat, 0.135, 0.016, 0.02, 1.455, 0); box(m, T.accent, 0.06, 0.02, 0.2, 0, 1.556, 0); break;
+    case 'hood': // hood up
+      add(m, G.sph, mat, 0.122, 0.125, 0.122, -0.022, 1.435, 0); box(m, mat, 0.07, 0.12, 0.2, -0.1, 1.3, 0); break;
+    default: // bare head: short hair
+      add(m, G.sph, o.hair || M.black, 0.105, 0.085, 0.108, -0.012, 1.465, 0);
+  }
+}
+function weapon(m, kind) {
+  const g = grp(m, 0.3, 1.0, 0.15), P = (mat, sx, sy, sz, x, y, z = 0, rz = 0) => { const b = box(g, mat, sx, sy, sz, x, y, z); if (rz) b.rotation.z = rz; return b; }, tube = (mat, r, len, x, y, z = 0) => cyl(g, mat, r, len, x, y, z, 'x', G.cyl8);
+  switch (kind) {
+    case 'm4': // M4 carbine: flat-top receiver with an optic, round handguard, collapsible stock on a tube, straight-ish magazine
+      P(M.gun, 0.26, 0.07, 0.045, 0, 0); P(M.gun, 0.2, 0.052, 0.052, 0.22, 0.005); tube(M.gun, 0.012, 0.2, 0.42, 0.005); P(M.gun, 0.02, 0.06, 0.02, 0.36, 0.05);
+      P(M.dark, 0.1, 0.04, 0.035, 0.02, 0.055); P(M.gun, 0.05, 0.15, 0.03, 0.05, -0.105, 0, 0.15); P(M.gun, 0.04, 0.09, 0.03, -0.07, -0.075, 0, -0.2); tube(M.gun, 0.014, 0.16, -0.2, 0.005); P(M.gun, 0.05, 0.11, 0.035, -0.28, -0.015); break;
+    case 'm4s': // the same carbine with a suppressor
+      weapon(m, 'm4'); tube(M.dark, 0.022, 0.2, 0.6, 0.005); break;
+    case 'm203': // carbine with a grenade launcher under the barrel
+      weapon(m, 'm4'); tube(M.gun, 0.028, 0.24, 0.26, -0.045); break;
+    case 'qbz': // QBZ-95: a bullpup. Magazine behind the grip, long carrying handle over the top, short barrel
+      P(M.gun, 0.44, 0.078, 0.046, -0.06, 0); P(M.gun, 0.26, 0.02, 0.022, -0.02, 0.085); for (const x of [-0.14, 0.1]) P(M.gun, 0.022, 0.05, 0.022, x, 0.058);
+      P(M.gun, 0.05, 0.15, 0.03, -0.17, -0.1, 0, 0.3); P(M.gun, 0.04, 0.09, 0.03, 0.0, -0.075, 0, -0.15); P(M.gun, 0.1, 0.014, 0.022, 0.03, -0.115); tube(M.gun, 0.012, 0.16, 0.24, 0.0); tube(M.gun, 0.018, 0.04, 0.33, 0.0); break;
+    case 'ak': // Kalashnikov: wooden stock and handguard, gas tube over the barrel, long curved magazine
+      P(M.gun, 0.26, 0.064, 0.04, 0, 0); P(M.wood, 0.17, 0.05, 0.046, 0.2, -0.004); tube(M.gun, 0.011, 0.26, 0.4, 0.0); tube(M.gun, 0.009, 0.16, 0.25, 0.032); P(M.gun, 0.02, 0.06, 0.016, 0.5, 0.03);
+      P(M.gun, 0.05, 0.1, 0.03, 0.05, -0.08, 0, 0.3); P(M.gun, 0.046, 0.1, 0.03, 0.09, -0.16, 0, 0.62); P(M.wood, 0.04, 0.09, 0.03, -0.08, -0.07, 0, -0.2); P(M.wood, 0.24, 0.07, 0.04, -0.25, -0.022, 0, 0.12); break;
+    case 'famas': // FAMAS: a bullpup with the big carrying handle that gives it its nickname, the bugle
+      P(M.gun, 0.5, 0.082, 0.05, -0.05, 0); P(M.gun, 0.34, 0.02, 0.022, 0.0, 0.1); for (const x of [-0.16, 0.16]) P(M.gun, 0.022, 0.07, 0.022, x, 0.065);
+      P(M.gun, 0.045, 0.13, 0.03, -0.15, -0.1); P(M.gun, 0.04, 0.09, 0.03, 0.02, -0.075, 0, -0.15); tube(M.gun, 0.012, 0.18, 0.28, 0.0); for (const z of [-0.03, 0.03]) tube(M.gun, 0.006, 0.2, 0.1, 0.05, z); break;
+    case 'long': // bolt-action sniper rifle: long barrel, telescopic sight, bipod, a cheek-piece stock
+      P(M.gun, 0.3, 0.06, 0.045, 0, 0); P(M.olive, 0.3, 0.075, 0.045, -0.28, -0.02, 0, 0.08); P(M.olive, 0.24, 0.05, 0.05, 0.24, -0.008); tube(M.gun, 0.012, 0.5, 0.58, 0.004); tube(M.gun, 0.02, 0.1, 0.86, 0.004);
+      tube(M.dark, 0.026, 0.26, 0.02, 0.075); tube(M.dark, 0.034, 0.05, 0.16, 0.075); for (const z of [-1, 1]) { const b = cyl(g, M.gun, 0.008, 0.2, 0.38, -0.1, z * 0.035, 'y', G.cyl8); b.rotation.x = z * 0.3; } break;
+    case 'm60': // the Vet's machine gun: heavy receiver with a feed cover, long barrel, bipod, carrying handle, a belt hanging from it
+      P(M.gun, 0.46, 0.1, 0.07, 0, 0); P(M.gun, 0.2, 0.03, 0.075, 0.02, 0.065); P(M.dark, 0.3, 0.07, 0.065, 0.34, -0.005); tube(M.gun, 0.018, 0.5, 0.72, 0.01); tube(M.gun, 0.026, 0.08, 0.99, 0.01);
+      P(M.gun, 0.12, 0.02, 0.02, 0.3, 0.075); P(M.dark, 0.26, 0.1, 0.05, -0.34, -0.02); P(M.gun, 0.04, 0.1, 0.03, -0.1, -0.09, 0, -0.2); P(M.yellow, 0.05, 0.26, 0.04, 0.03, -0.16, 0.05);
+      for (const z of [-1, 1]) { const b = cyl(g, M.gun, 0.009, 0.26, 0.86, -0.1, z * 0.05, 'y', G.cyl8); b.rotation.x = z * 0.3; } break;
+  }
+  return g;
+}
+function man(parent, T, x, z, o) {
+  const m = grp(parent, x, 0, z), cloth = o.cloth || M.khaki, trousers = o.legs || cloth, boots = o.boots || M.black, skin = o.skin || M.skin, pose = o.pose || (o.gun === 'rpg' ? 'shoulder' : o.gun === 'laptop' || o.gun === 'milan' ? 'type' : o.gun === 'tool' || o.gun === 'satchel' || o.gun === 'none' ? 'down' : 'rifle');
+  m.userData.legs = [-1, 1].map(s => leg(m, s, trousers, boots, o));
+  box(m, trousers, 0.2, 0.14, 0.3, 0, 0.78, 0); box(m, o.belt || M.dark, 0.215, 0.05, 0.31, 0, 0.865, 0);          // hips, belt
+  box(m, cloth, 0.2, 0.4, 0.33, 0, 1.07, 0); box(m, cloth, 0.18, 0.1, 0.44, 0, 1.24, 0);                            // torso, shoulders
+  if (o.vest) { box(m, o.vest, 0.25, 0.3, 0.3, 0.004, 1.06, 0); for (const pz of [-0.09, 0, 0.09]) box(m, o.vest, 0.06, 0.11, 0.075, 0.15, 0.97, pz); box(m, o.vest, 0.05, 0.12, 0.12, -0.14, 0.95, 0.06); }   // plate carrier, magazine pouches, a pouch on the back
+  if (o.rig) { for (const pz of [-0.1, 0, 0.1]) box(m, o.rig, 0.06, 0.15, 0.085, 0.125, 1.0, pz); for (const s of [-1, 1]) box(m, o.rig, 0.215, 0.36, 0.04, 0, 1.1, s * 0.1); }   // chest rig: three magazine pouches on shoulder straps
+  cyl(m, skin, 0.05, 0.08, 0, 1.32, 0); add(m, G.sph, skin, 0.1, 0.115, 0.1, 0.008, 1.42, 0);                         // neck, head
+  headgear(m, T, o); arms(m, T, o.sleeve || cloth, skin, pose);
+  if (o.pack) { box(m, o.pack, 0.15, 0.32, 0.27, -0.19, 1.08, 0); box(m, o.pack, 0.07, 0.14, 0.2, -0.28, 1.02, 0); box(m, T.accent, 0.12, 0.02, 0.21, -0.19, 1.25, 0); }   // pack, its outer pocket, a recognition panel on top
+  else box(m, T.accent, 0.02, 0.13, 0.2, -0.108, 1.14, 0);                                                           // no pack: the panel is on his back
+  switch (o.gun) {
+    case 'rifle': weapon(m, o.arm || 'm4'); break;
+    case 'long': weapon(m, 'long'); break;
+    case 'rpg': { // RPG-7 on the right shoulder: tube with a flared rear, the pointed warhead out in front, an optical sight
+      cyl(m, M.olive, 0.042, 0.95, 0.12, 1.33, 0.2, 'x', G.cyl8); cyl(m, M.wood, 0.05, 0.3, -0.05, 1.33, 0.2, 'x', G.cyl8); add(m, G.cone, M.olive, 0.075, 0.2, 0.075, -0.45, 1.33, 0.2).rotation.z = -Math.PI / 2;
+      add(m, G.cone, M.gun, 0.085, 0.3, 0.085, 0.87, 1.33, 0.2).rotation.z = -Math.PI / 2; cyl(m, M.gun, 0.085, 0.1, 0.67, 1.33, 0.2, 'x', G.cyl8); cyl(m, M.gun, 0.035, 0.12, 0.56, 1.33, 0.2, 'x', G.cyl8);
+      box(m, M.dark, 0.1, 0.07, 0.04, 0.25, 1.4, 0.16); box(m, M.gun, 0.03, 0.09, 0.03, 0.2, 1.26, 0.2);
+      for (const dz of [-0.07, 0.07]) add(m, G.cone, M.gun, 0.05, 0.22, 0.05, -0.2, 1.33, dz - 0.05);                 // two spare rounds standing in the pack
+      break; }
+    case 'laptop': box(m, M.dark, 0.3, 0.025, 0.36, 0.36, 1.03, 0); box(m, M.laser, 0.025, 0.24, 0.34, 0.5, 1.15, 0).rotation.z = -0.25; cyl(m, M.gun, 0.008, 0.5, -0.2, 1.45, 0.1); break;   // open laptop on his forearms, aerial on the pack
+    case 'tool': box(m, M.red, 0.3, 0.17, 0.14, 0.04, 0.62, 0.235); box(m, M.gun, 0.16, 0.025, 0.03, 0.04, 0.72, 0.235); cyl(m, M.wood, 0.018, 0.9, -0.14, 1.1, 0, 'y', G.cyl8).rotation.x = 0.5; box(m, M.steel, 0.02, 0.2, 0.16, -0.14, 1.52, -0.22).rotation.x = 0.5; break;   // toolbox in hand, shovel across his back
+    case 'satchel': box(m, M.olive, 0.16, 0.24, 0.26, 0.03, 0.6, 0.235); box(m, M.olive, 0.03, 0.14, 0.03, 0.03, 0.76, 0.235); box(m, M.olive, 0.16, 0.26, 0.28, -0.19, 1.05, 0); cyl(m, M.gun, 0.012, 0.1, -0.19, 1.22, 0.08); break;   // a satchel charge in hand and another on his back
+    case 'milan': { // MILAN on its tripod in front of the gunner: launch tube, the sight unit on its left, three splayed legs
+      for (const a of [0, 2.1, 4.2]) { const l = cyl(m, M.gun, 0.02, 0.92, 0.62 + Math.cos(a) * 0.17, 0.44, Math.sin(a) * 0.17, 'y', G.cyl8); l.rotation.z = Math.cos(a) * 0.36; l.rotation.x = -Math.sin(a) * 0.36; }
+      cyl(m, M.olive, 0.085, 1.1, 0.66, 0.96, 0, 'x'); cyl(m, M.gun, 0.1, 0.06, 1.22, 0.96, 0, 'x'); box(m, M.dark, 0.22, 0.2, 0.15, 0.48, 1.04, 0.17); cyl(m, M.gun, 0.03, 0.08, 0.6, 1.04, 0.17, 'x', G.cyl8);
+      break; }
+  }
   return m;
 }
+const legsOf = (men) => men.flatMap(m => m.userData.legs);
 function squad(T, spots, o) {
-  const g = new THREE.Group(), b = grp(g), men = spots.map(([x, z]) => man(b, T, x, z, o));
-  return { g, body: b, men, muzzle: 0.9, muzzleY: 1.0 };
+  const g = new THREE.Group(), b = grp(g), men = spots.map(([x, z], i) => man(b, T, x, z, typeof o === 'function' ? o(i) : o));
+  return { g, body: b, men, legs: legsOf(men), muzzle: 0.9, muzzleY: 1.0 };
+}
+// What each faction's soldiers wear and carry.
+function kit(f) {
+  switch (f) {
+    case 'vanguard': return { cloth: M.multicam, vest: M.coyote, helmet: 'mich', hat: M.multicam, arm: 'm4', boots: M.tan, pack: M.coyote, kneepads: M.coyote };   // US: MultiCam, high-cut helmet, M4
+    case 'redhammer': return { cloth: M.pla, vest: M.plaDark, helmet: 'qgf', hat: M.pla, arm: 'qbz', boots: M.black, pack: M.plaDark };                             // China: green digital camouflage, QBZ-95
+    case 'ursa': return { cloth: M.emr, vest: M.olive, helmet: 'ssh', hat: M.olive, arm: 'ak', boots: M.black, pack: M.olive };                                     // Russia: EMR, deep helmet, AK
+    case 'aegis': return { cloth: M.fleck, vest: M.fleckDark, helmet: 'kepi', arm: 'famas', boots: M.black, pack: M.fleckDark };                                    // Europe: flecked camouflage, white kepi, FAMAS
+    default: return { cloth: M.cloth, legs: M.khaki, rig: M.olive, helmet: 'shemagh', hat: M.dark, arm: 'ak', boots: M.dark };                                      // ISIS: loose shirt, chest rig, head wrap, AK
+  }
 }
 // ---------------- heroes ----------------
-// One figure each, drawn 1.4 times the size of a soldier so it can be picked out in a crowd. Forward is +X.
-function heroRig(build) { const g = new THREE.Group(), b = grp(g), m = grp(b); m.scale.setScalar(1.4); build(m); return { g, body: b, men: [m], muzzle: 1.3, muzzleY: 1.45 }; }
+// One figure each, drawn 1.4 times the size of a soldier so it can be picked out in a crowd. Forward is +X. `build`
+// returns the leg nodes that swing when the hero walks (in stride order: alternate legs are half a step apart).
+function heroRig(build) { const g = new THREE.Group(), b = grp(g), m = grp(b); m.scale.setScalar(1.4); const legs = build(m) || []; return { g, body: b, men: [m], legs, muzzle: 1.3, muzzleY: 1.45 }; }
 // Disabled Vet: long black hair and a red headband, bare chest, camouflage trousers, an M60 in the right hand and an RPG in the left.
 function vet(T) {
   return heroRig((m) => {
-    for (const s of [-1, 1]) { box(m, M.camo, 0.18, 0.62, 0.18, 0, 0.31, s * 0.12); box(m, M.olive, 0.1, 0.16, 0.185, 0.02, 0.4, s * 0.12); box(m, M.black, 0.24, 0.1, 0.19, 0.03, 0.05, s * 0.12); }
-    box(m, M.skin, 0.28, 0.58, 0.46, 0, 0.91, 0); box(m, M.black, 0.3, 0.07, 0.48, 0, 0.64, 0);                       // bare torso, belt
-    box(m, M.yellow, 0.3, 0.06, 0.07, 0, 0.95, 0).rotation.x = 0.75;                                                  // ammunition belt across the chest
-    for (const s of [-1, 1]) box(m, M.skin, 0.36, 0.13, 0.13, 0.14, 1.02, s * 0.3);                                   // both arms held forward
-    add(m, G.sph, M.skin, 0.14, 0.15, 0.14, 0, 1.34, 0); add(m, G.sph, M.black, 0.16, 0.13, 0.165, -0.02, 1.4, 0);    // head, hair
-    box(m, M.black, 0.1, 0.5, 0.3, -0.13, 1.12, 0); box(m, M.red, 0.3, 0.045, 0.31, 0, 1.38, 0);                      // hair down the back, headband
-    box(m, M.gun, 1.0, 0.1, 0.09, 0.5, 0.98, 0.31); cyl(m, M.gun, 0.03, 0.5, 1.2, 0.99, 0.31, 'x'); box(m, M.yellow, 0.06, 0.22, 0.05, 0.45, 0.85, 0.36);   // M60 with its belt
-    cyl(m, M.olive, 0.07, 1.2, 0.35, 1.08, -0.31, 'x'); add(m, G.cone, M.gun, 0.12, 0.34, 0.12, 1.1, 1.08, -0.31).rotation.z = -Math.PI / 2;               // RPG
-    box(m, T.accent, 0.12, 0.08, 0.14, 0.02, 1.02, 0.3);                                                              // armband in the owner's colour
+    const legs = [-1, 1].map(s => { const l = leg(m, s, M.camo, M.black, {}); box(l, M.olive, 0.165, 0.1, 0.155, 0, -0.3, 0); box(l, M.dark, 0.06, 0.16, 0.05, 0.03, -0.2, s * 0.09); return l; });   // trousers with a darker band at the knee, a thigh pocket
+    box(m, M.camo, 0.21, 0.14, 0.31, 0, 0.78, 0); box(m, M.black, 0.225, 0.06, 0.32, 0, 0.865, 0); box(m, M.steel, 0.02, 0.05, 0.07, 0.115, 0.865, 0);                      // hips, belt and buckle
+    box(m, M.skin, 0.2, 0.2, 0.3, 0, 0.98, 0); box(m, M.skin, 0.23, 0.22, 0.38, 0.005, 1.17, 0); box(m, M.skin, 0.2, 0.09, 0.48, 0, 1.26, 0);                                // bare torso: waist, chest, shoulders
+    for (const s of [-1, 1]) box(m, M.skin, 0.03, 0.1, 0.15, 0.115, 1.19, s * 0.085);                                                                                           // chest muscles
+    for (const s of [-1, 1]) box(m, M.yellow, 0.245, 0.05, 0.06, 0.004, 1.1, 0).rotation.x = s * 0.8;                                                                           // two ammunition belts crossed over the chest
+    cyl(m, M.skin, 0.055, 0.08, 0, 1.33, 0); add(m, G.sph, M.skin, 0.105, 0.12, 0.105, 0.008, 1.43, 0);
+    add(m, G.sph, M.black, 0.118, 0.1, 0.122, -0.015, 1.48, 0); box(m, M.black, 0.09, 0.42, 0.26, -0.115, 1.25, 0); for (const s of [-1, 1]) box(m, M.black, 0.1, 0.24, 0.05, -0.03, 1.36, s * 0.115);   // long black hair, down the back and past the ears
+    box(m, M.red, 0.232, 0.04, 0.24, 0, 1.47, 0); for (const k of [0, 1]) box(m, M.red, 0.16, 0.03, 0.035, -0.19, 1.43 - k * 0.05, -0.03 + k * 0.07).rotation.z = 0.5 + k * 0.3;   // red headband with its tails
+    // right arm down to the machine gun at the hip; left arm bent up, holding the RPG on the shoulder
+    box(m, M.skin, 0.115, 0.28, 0.115, 0.04, 1.11, 0.27).rotation.z = 0.3; box(m, M.skin, 0.26, 0.1, 0.1, 0.2, 0.96, 0.27); box(m, M.skin, 0.08, 0.08, 0.08, 0.33, 0.95, 0.27);
+    box(m, M.skin, 0.115, 0.26, 0.115, 0.06, 1.14, -0.27).rotation.z = 0.7; box(m, M.skin, 0.1, 0.22, 0.1, 0.19, 1.2, -0.26); box(m, M.skin, 0.08, 0.08, 0.08, 0.19, 1.32, -0.25);
+    box(m, T.accent, 0.125, 0.08, 0.125, 0.03, 1.14, 0.27).rotation.z = 0.3; box(m, T.accent, 0.125, 0.08, 0.125, 0.045, 1.16, -0.27).rotation.z = 0.7;                       // armbands in the owner's colour
+    const g = weapon(m, 'm60'); g.position.set(0.42, 0.93, 0.27);
+    cyl(m, M.olive, 0.045, 1.0, 0.16, 1.38, -0.25, 'x', G.cyl8); cyl(m, M.wood, 0.053, 0.3, 0.0, 1.38, -0.25, 'x', G.cyl8); add(m, G.cone, M.olive, 0.08, 0.2, 0.08, -0.44, 1.38, -0.25).rotation.z = -Math.PI / 2;   // RPG-7 on the left shoulder
+    add(m, G.cone, M.gun, 0.09, 0.32, 0.09, 0.95, 1.38, -0.25).rotation.z = -Math.PI / 2; cyl(m, M.gun, 0.09, 0.1, 0.74, 1.38, -0.25, 'x', G.cyl8);
+    return legs;
   });
 }
 // Fook Mie: a woman in a red dress, a phone held up in one hand.
 function fookmie(T) {
   return heroRig((m) => {
-    for (const s of [-1, 1]) { box(m, M.skin, 0.09, 0.36, 0.09, 0, 0.2, s * 0.08); box(m, M.dress, 0.2, 0.06, 0.09, 0.03, 0.03, s * 0.08); }   // legs, red shoes
-    add(m, G.cone, M.dress, 0.3, 0.62, 0.3, 0, 0.62, 0); box(m, M.dress, 0.18, 0.42, 0.3, 0, 1.0, 0);                 // skirt flaring from the waist, bodice
-    box(m, M.skin, 0.1, 0.32, 0.08, 0, 0.98, -0.19); box(m, M.skin, 0.1, 0.08, 0.22, 0.02, 1.16, 0.2); box(m, M.skin, 0.09, 0.26, 0.08, 0.06, 1.24, 0.27); // one arm down, one raised to the ear
-    add(m, G.sph, M.skin, 0.125, 0.14, 0.125, 0, 1.36, 0); add(m, G.sph, M.black, 0.15, 0.14, 0.155, -0.035, 1.39, 0); box(m, M.black, 0.08, 0.3, 0.26, -0.11, 1.22, 0); // head, long black hair
-    box(m, M.dark, 0.03, 0.15, 0.08, 0.1, 1.36, 0.2); box(m, T.glow, 0.012, 0.11, 0.06, 0.118, 1.36, 0.2);            // the phone, screen lit in the owner's colour
-    box(m, T.accent, 0.19, 0.05, 0.31, 0, 0.82, 0);                                                                   // sash in the owner's colour
+    const legs = [-1, 1].map(s => { const l = grp(m, 0, 0.7, s * 0.075); box(l, M.skin, 0.085, 0.3, 0.085, 0, -0.2, 0); box(l, M.skin, 0.075, 0.3, 0.075, 0, -0.48, 0); box(l, M.dress, 0.2, 0.05, 0.085, 0.04, -0.675, 0); box(l, M.dress, 0.03, 0.09, 0.03, -0.05, -0.65, 0); return l; });   // legs, red shoes with heels
+    add(m, G.cone, M.dress, 0.26, 0.5, 0.26, 0, 0.72, 0); cyl(m, M.dress, 0.26, 0.03, 0, 0.475, 0);                                                                       // skirt flaring from the waist to the knee
+    box(m, M.dress, 0.17, 0.2, 0.25, 0, 0.98, 0); box(m, M.dress, 0.19, 0.2, 0.3, 0.008, 1.16, 0); box(m, T.accent, 0.18, 0.045, 0.262, 0, 0.9, 0);                       // fitted bodice; the sash at the waist is in the owner's colour
+    box(m, M.skin, 0.15, 0.06, 0.38, 0, 1.275, 0); cyl(m, M.skin, 0.042, 0.08, 0, 1.33, 0); add(m, G.sph, M.skin, 0.098, 0.112, 0.098, 0.008, 1.425, 0);                    // bare shoulders, neck, head
+    add(m, G.sph, M.black, 0.115, 0.105, 0.118, -0.02, 1.455, 0); box(m, M.black, 0.07, 0.4, 0.22, -0.105, 1.23, 0); for (const s of [-1, 1]) box(m, M.black, 0.08, 0.26, 0.04, -0.02, 1.33, s * 0.105);   // long black hair
+    box(m, M.skin, 0.075, 0.26, 0.075, 0, 1.13, -0.2); box(m, M.skin, 0.07, 0.24, 0.07, 0.01, 0.9, -0.2); box(m, M.dress, 0.05, 0.16, 0.16, 0.02, 0.72, -0.24);            // left arm down, a red handbag in the hand
+    box(m, M.skin, 0.075, 0.24, 0.075, 0.03, 1.15, 0.2).rotation.z = 0.25; box(m, M.skin, 0.07, 0.25, 0.07, 0.075, 1.19, 0.185).rotation.z = -2.6; box(m, M.skin, 0.06, 0.06, 0.06, 0.07, 1.36, 0.16);   // right arm bent up to the ear
+    box(m, M.dark, 0.03, 0.15, 0.075, 0.09, 1.4, 0.13); box(m, T.glow, 0.012, 0.115, 0.058, 0.108, 1.4, 0.13);                                                               // the phone, its screen lit in the owner's colour
+    return legs;
   });
 }
 // The Phantom: black tracksuit with blue stripes, hood up, nothing in his hands.
 function phantom(T) {
   return heroRig((m) => {
-    for (const s of [-1, 1]) { box(m, M.black, 0.17, 0.62, 0.17, 0, 0.31, s * 0.12); box(m, M.blue, 0.05, 0.6, 0.03, 0, 0.31, s * 0.21); box(m, M.white, 0.24, 0.08, 0.18, 0.03, 0.04, s * 0.12); } // trousers with a side stripe, white trainers
-    box(m, M.black, 0.27, 0.58, 0.44, 0, 0.91, 0); box(m, M.blue, 0.28, 0.09, 0.45, 0, 1.06, 0); box(m, M.blue, 0.03, 0.56, 0.05, 0.14, 0.91, 0);          // jacket, chest band, zip line
-    for (const s of [-1, 1]) { box(m, M.black, 0.13, 0.5, 0.12, 0, 0.88, s * 0.29); box(m, M.blue, 0.04, 0.48, 0.03, 0, 0.88, s * 0.355); add(m, G.sph, M.skin, 0.06, 0.06, 0.06, 0, 0.6, s * 0.29); } // arms at his sides, empty hands
-    add(m, G.sph, M.skin, 0.13, 0.145, 0.13, 0.01, 1.33, 0); add(m, G.sph, M.black, 0.17, 0.16, 0.17, -0.04, 1.37, 0);                                 // face in a raised hood
-    box(m, T.accent, 0.12, 0.07, 0.13, 0, 1.0, 0.29);                                                                 // armband in the owner's colour
+    const legs = [-1, 1].map(s => { const l = leg(m, s, M.black, M.white, {}); box(l, M.blue, 0.05, 0.66, 0.02, 0, -0.33, s * 0.078); box(l, M.dark, 0.25, 0.02, 0.145, 0.05, -0.755, 0); return l; });   // trousers with a side stripe, white trainers
+    box(m, M.black, 0.21, 0.14, 0.31, 0, 0.78, 0); box(m, M.black, 0.22, 0.42, 0.35, 0, 1.07, 0); box(m, M.black, 0.19, 0.1, 0.46, 0, 1.24, 0); box(m, M.black, 0.235, 0.06, 0.36, 0, 0.88, 0);             // jacket with a ribbed hem
+    box(m, M.blue, 0.225, 0.07, 0.355, 0, 1.17, 0); box(m, M.blue, 0.012, 0.36, 0.03, 0.112, 1.05, 0); for (const s of [-1, 1]) box(m, M.black, 0.03, 0.09, 0.1, 0.105, 0.96, s * 0.1);                    // chest band, zip, pockets
+    for (const s of [-1, 1]) { box(m, M.black, 0.11, 0.28, 0.11, 0, 1.11, s * 0.245); box(m, M.black, 0.1, 0.26, 0.1, 0.01, 0.86, s * 0.245); box(m, M.blue, 0.03, 0.52, 0.02, 0, 0.99, s * 0.302); box(m, M.skin, 0.07, 0.08, 0.07, 0.02, 0.7, s * 0.245); }   // arms at his sides with a stripe down each, empty hands
+    box(m, T.accent, 0.12, 0.075, 0.12, 0, 1.14, 0.245); box(m, T.accent, 0.12, 0.075, 0.12, 0, 1.14, -0.245);                                                               // armbands in the owner's colour
+    cyl(m, M.skin, 0.05, 0.08, 0, 1.32, 0); add(m, G.sph, M.skin, 0.098, 0.115, 0.098, 0.014, 1.42, 0);
+    add(m, G.sph, M.black, 0.128, 0.132, 0.128, -0.022, 1.44, 0); box(m, M.black, 0.03, 0.035, 0.2, 0.105, 1.51, 0); box(m, M.black, 0.08, 0.14, 0.24, -0.1, 1.3, 0);          // hood up, its rim shading the face
+    for (const s of [-1, 1]) box(m, M.white, 0.012, 0.14, 0.012, 0.115, 1.25, s * 0.03);                                                                                       // drawstrings
+    return legs;
   });
 }
 // A plain civilian saloon car (The Phantom's car bomb).
@@ -297,21 +422,22 @@ function factory(T) {
 // Airfield (40 m x 28 m). Must match the layout in sim/entities.js: runway centrelines at z = -10 and z = +10,
 // four parking pads at x = -14 + 7 i on the centre line, helipad at (15.5, 0).
 function airfield(T, d) {
-  const g = new THREE.Group(), L = d.layout; slab(g, 39.6, 27.6, M.tarmac, 0.4);
+  const g = new THREE.Group(), L = d.layout, SW = d.w * CELL - 0.4, SD = d.h * CELL - 0.4, RH = L.runwayHalf || 18, HG = L.hangar || HANGAR;   // the Strategic Airfield is the same building at a larger size
+  slab(g, SW, SD, M.tarmac, 0.4);
   for (const rz of L.runways) {
-    for (const z of [rz - 3.0, rz + 3.0]) box(g, M.white, 36, 0.05, 0.16, 0, 0.38, z);                              // runway edge lines
-    for (let i = -6; i <= 6; i++) box(g, M.white, 1.5, 0.05, 0.22, i * 2.6, 0.38, rz);                              // centreline dashes
-    for (const x of [-17.2, 17.2]) for (let k = -3; k <= 3; k++) box(g, M.white, 1.5, 0.05, 0.3, x, 0.38, rz + k * 0.78); // threshold bars
+    for (const z of [rz - 3.0, rz + 3.0]) box(g, M.white, RH * 2, 0.05, 0.16, 0, 0.38, z);                          // runway edge lines
+    for (let x = -RH + 2.4; x <= RH - 2.4 + 1e-6; x += 2.6) box(g, M.white, 1.5, 0.05, 0.22, x, 0.38, rz);          // centreline dashes
+    for (const x of [-RH + 0.8, RH - 0.8]) for (let k = -3; k <= 3; k++) box(g, M.white, 1.5, 0.05, 0.3, x, 0.38, rz + k * 0.78); // threshold bars
   }
-  // One hangar per jet, big enough for the largest fighter. The door faces south ('s') or east ('e') and stands open:
-  // the jet parks inside with its nose at the door.
-  const W = HANGAR.w, D = HANGAR.d, H = HANGAR.h;
+  // One hangar per aircraft, big enough for the largest that parks there. The door faces south ('s') or east ('e') and
+  // stands open: the aircraft parks inside with its nose at the door.
+  const W = HG.w, D = HG.d, H = HG.h, rise = W > 12 ? 1.5 : 1.0;
   for (const [x, z, face] of L.hangars) {
     const h = grp(g, x, 0.35, z); if (face === 'e') h.rotation.y = Math.PI / 2;                                     // built facing south (+z), turned for an east door
     box(h, T.wall, W, H, 0.3, 0, H / 2, -D / 2 + 0.15); for (const s of [-1, 1]) box(h, T.wall, 0.3, H, D, s * (W / 2 - 0.15), H / 2, 0);   // back and side walls
-    const roof = cyl(h, T.roof, 1, D, 0, H, 0, 'z', G.cyl8); roof.scale.set(W / 2 + 0.15, D, 1.0);                       // shallow arched roof
+    const roof = cyl(h, T.roof, 1, D, 0, H, 0, 'z', G.cyl8); roof.scale.set(W / 2 + 0.15, D, rise);                      // shallow arched roof
     box(h, T.accent, W + 0.1, 0.3, 0.14, 0, H + 0.1, D / 2); box(h, M.dark, W - 0.7, H - 0.3, 0.1, 0, H / 2 - 0.1, -D / 2 + 0.36);   // door lintel in team colour, dark back wall
-    box(h, M.slab, W - 0.6, 0.04, D - 0.4, 0, 0.03, 0); for (const s of [-1, 1]) box(h, M.yellow, 0.12, 0.05, D - 1, s * 2.6, 0.06, 0.2);   // hangar floor and wingtip lines
+    box(h, M.slab, W - 0.6, 0.04, D - 0.4, 0, 0.03, 0); for (const s of [-1, 1]) box(h, M.yellow, 0.12, 0.05, D - 1, s * (W / 2 - 1.0), 0.06, 0.2);   // hangar floor and wingtip lines
   }
   for (let i = 0; i < L.aprons.length; i++) { // taxi line: out of the door to the apron, then down to the runway
     const [ax, az] = L.aprons[i], [sx, sz] = L.spots[i], len = Math.hypot(ax - sx, az - sz);
@@ -325,8 +451,8 @@ function airfield(T, d) {
   box(g, T.wall, 2.0, 2.4, 2.4, tx, 1.5, tz); cyl(g, T.wall, 0.75, 5, tx, 4.4, tz); cyl(g, M.glass, 1.25, 1.1, tx, 7.2, tz); cyl(g, T.roof, 1.45, 0.25, tx, 7.9, tz); // control tower
   box(g, T.accent, 2.05, 0.3, 2.45, tx, 2.5, tz);
   const spin = grp(g, tx, 8.1, tz); box(spin, M.steel, 2.2, 0.5, 0.12, 0, 0.5, 0); cyl(spin, M.steel, 0.07, 0.5, 0, 0.2, 0);
-  cyl(g, M.steel, 0.06, 2.4, 18.4, 1.5, -1.2); box(g, M.red, 1.0, 0.45, 0.05, 19.0, 2.5, -1.2);                     // windsock
-  return { g, spin, top: 9 };
+  cyl(g, M.steel, 0.06, 2.4, SW / 2 - 1.4, 1.5, -1.2); box(g, M.red, 1.0, 0.45, 0.05, SW / 2 - 0.8, 2.5, -1.2);     // windsock
+  return { g, spin, top: Math.max(9, H + rise + 2) };
 }
 function patriot(T) {
   const g = new THREE.Group();
@@ -437,19 +563,29 @@ function dock() {
 function bearrider(T) {
   const r = heroRig((m) => {
     const bear = grp(m, 0, 0, 0);
-    box(bear, M.fur, 1.5, 0.72, 0.72, 0, 0.82, 0); box(bear, M.fur, 0.7, 0.8, 0.8, 0.45, 0.9, 0);                  // body, heavier at the shoulders
-    for (const [x, z] of [[0.5, 0.25], [0.5, -0.25], [-0.55, 0.25], [-0.55, -0.25]]) { box(bear, M.fur, 0.26, 0.56, 0.26, x, 0.28, z); box(bear, M.furDark, 0.3, 0.1, 0.3, x + 0.03, 0.05, z); }   // legs and paws
-    box(bear, M.fur, 0.5, 0.5, 0.56, 1.0, 1.05, 0); box(bear, M.furDark, 0.3, 0.22, 0.26, 1.34, 0.96, 0); box(bear, M.black, 0.08, 0.1, 0.14, 1.5, 1.0, 0);   // head, muzzle, nose
-    for (const s of [-1, 1]) { add(bear, G.sph, M.fur, 0.1, 0.1, 0.06, 0.9, 1.36, s * 0.22); box(bear, M.red, 0.04, 0.07, 0.08, 1.26, 1.14, s * 0.15); }       // ears, red eyes
-    add(bear, G.sph, M.fur, 0.14, 0.14, 0.14, -0.8, 0.95, 0);                                                                                                   // tail
-    const man = grp(m, -0.1, 1.18, 0);                                                                                                                         // the rider, astride
-    for (const s of [-1, 1]) { box(man, M.camo, 0.2, 0.2, 0.5, 0.05, 0.05, s * 0.3).rotation.x = s * 0.5; box(man, M.black, 0.24, 0.1, 0.16, 0.12, -0.3, s * 0.46); }   // thighs down the bear's sides, boots
-    box(man, M.skin, 0.28, 0.56, 0.44, 0, 0.42, 0); box(man, M.black, 0.3, 0.07, 0.46, 0, 0.16, 0);                                                            // bare torso, belt
-    for (const s of [-1, 1]) box(man, M.skin, 0.4, 0.13, 0.13, 0.2, 0.5, s * 0.3);
-    add(man, G.sph, M.skin, 0.14, 0.15, 0.14, 0, 0.86, 0);
-    box(man, M.grey, 0.34, 0.16, 0.34, 0, 0.98, 0); for (const s of [-1, 1]) box(man, M.grey, 0.2, 0.2, 0.05, -0.02, 0.86, s * 0.17); box(man, M.red, 0.04, 0.07, 0.07, 0.175, 0.99, 0);   // ushanka: crown, ear flaps, red star
-    const gun = grp(man, 0.45, 0.36, 0.22); box(gun, M.gun, 0.5, 0.2, 0.2, 0, 0, 0); for (const [dy, dz] of [[0.05, 0.05], [0.05, -0.05], [-0.05, 0.05], [-0.05, -0.05]]) cyl(gun, M.gun, 0.025, 0.9, 0.65, dy, dz, 'x');
-    cyl(gun, M.gun, 0.09, 0.06, 1.08, 0, 0, 'x'); box(gun, M.yellow, 0.06, 0.3, 0.06, -0.1, -0.2, 0.1);                                                        // minigun: motor, six barrels' worth, muzzle ring, belt
+    box(bear, M.fur, 1.1, 0.66, 0.7, -0.1, 0.84, 0); box(bear, M.fur, 0.6, 0.78, 0.78, 0.5, 0.92, 0); box(bear, M.fur, 0.5, 0.66, 0.74, -0.62, 0.8, 0);         // barrel, the hump over the shoulders, haunches
+    box(bear, M.furDark, 0.9, 0.1, 0.5, -0.05, 0.5, 0);                                                                                                          // darker belly
+    box(bear, M.fur, 0.4, 0.5, 0.5, 0.86, 1.0, 0).rotation.z = -0.35; box(bear, M.fur, 0.46, 0.46, 0.52, 1.12, 1.06, 0);                                         // thick neck, head
+    box(bear, M.furDark, 0.3, 0.2, 0.26, 1.44, 0.98, 0); box(bear, M.fur, 0.2, 0.1, 0.3, 1.3, 1.25, 0).rotation.z = -0.5; box(bear, M.black, 0.07, 0.09, 0.13, 1.6, 1.02, 0);   // muzzle, brow, nose
+    box(bear, M.black, 0.2, 0.03, 0.2, 1.46, 0.875, 0); for (const s of [-1, 1]) box(bear, M.white, 0.03, 0.06, 0.03, 1.54, 0.855, s * 0.08);                      // open jaw line and two teeth
+    for (const s of [-1, 1]) { add(bear, G.sph, M.fur, 0.1, 0.1, 0.06, 1.0, 1.36, s * 0.22); add(bear, G.sph, M.furDark, 0.06, 0.06, 0.03, 1.02, 1.36, s * 0.24); box(bear, M.red, 0.04, 0.07, 0.08, 1.36, 1.15, s * 0.15); }   // ears, red eyes
+    add(bear, G.sph, M.fur, 0.13, 0.13, 0.13, -0.9, 0.98, 0);                                                                                                    // tail
+    box(bear, T.accent, 0.62, 0.03, 0.74, -0.1, 1.185, 0); for (const s of [-1, 1]) box(bear, T.accent, 0.62, 0.26, 0.03, -0.1, 1.06, s * 0.365);                   // saddle blanket in the owner's colour
+    // four legs, each hinged at the shoulder or hip: upper leg, lower leg, paw, claws. Stride order: front-left, front-right, rear-right, rear-left.
+    const legs = [[0.52, 1], [0.52, -1], [-0.6, -1], [-0.6, 1]].map(([x, s]) => { const l = grp(bear, x, 0.62, s * 0.26); box(l, M.fur, 0.3, 0.36, 0.28, 0, -0.14, 0); box(l, M.fur, 0.24, 0.3, 0.24, 0.01, -0.42, 0); box(l, M.furDark, 0.32, 0.1, 0.28, 0.04, -0.57, 0); for (const c of [-0.08, 0, 0.08]) box(l, M.black, 0.06, 0.04, 0.03, 0.22, -0.595, c); return l; });
+    const man = grp(m, -0.1, 1.2, 0);                                                                                                                            // the rider, astride
+    for (const s of [-1, 1]) { box(man, M.camo, 0.2, 0.2, 0.42, 0.05, 0.05, s * 0.27).rotation.x = s * 0.55; box(man, M.camo, 0.16, 0.3, 0.14, 0.1, -0.17, s * 0.42); box(man, M.black, 0.24, 0.1, 0.16, 0.14, -0.34, s * 0.43); }   // thighs down the bear's sides, shins, boots
+    box(man, M.camo, 0.22, 0.12, 0.3, 0, 0.12, 0); box(man, M.black, 0.235, 0.06, 0.32, 0, 0.2, 0);                                                              // hips, belt
+    box(man, M.skin, 0.2, 0.2, 0.3, 0, 0.32, 0); box(man, M.skin, 0.23, 0.22, 0.38, 0.005, 0.51, 0); box(man, M.skin, 0.2, 0.09, 0.48, 0, 0.6, 0); for (const s of [-1, 1]) box(man, M.skin, 0.03, 0.1, 0.15, 0.115, 0.53, s * 0.085);   // bare torso
+    cyl(man, M.skin, 0.055, 0.08, 0, 0.67, 0); add(man, G.sph, M.skin, 0.105, 0.12, 0.105, 0.008, 0.77, 0);
+    box(man, M.grey, 0.25, 0.13, 0.26, 0, 0.87, 0); box(man, M.grey, 0.04, 0.1, 0.22, 0.125, 0.86, 0); for (const s of [-1, 1]) box(man, M.grey, 0.16, 0.2, 0.045, -0.02, 0.76, s * 0.125); box(man, M.red, 0.02, 0.06, 0.06, 0.148, 0.87, 0);   // ushanka: crown, turned-up front, ear flaps, red star
+    box(man, M.skin, 0.115, 0.28, 0.115, 0.04, 0.45, 0.27).rotation.z = 0.3; box(man, M.skin, 0.26, 0.1, 0.1, 0.2, 0.3, 0.27);                                   // right arm down to the gun
+    box(man, M.skin, 0.115, 0.26, 0.115, 0.08, 0.46, -0.27).rotation.z = 0.6; const f = box(man, M.skin, 0.44, 0.1, 0.1, 0.32, 0.36, -0.08); f.rotation.y = -0.75;   // left arm across to the fore grip
+    box(man, T.accent, 0.125, 0.08, 0.125, 0.03, 0.48, 0.27).rotation.z = 0.3; box(man, T.accent, 0.125, 0.08, 0.125, 0.06, 0.49, -0.27).rotation.z = 0.6;       // armbands
+    const gun = grp(man, 0.5, 0.3, 0.2); box(gun, M.gun, 0.4, 0.2, 0.2, -0.05, 0, 0); cyl(gun, M.gun, 0.11, 0.2, 0.2, 0, 0, 'x'); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; cyl(gun, M.gun, 0.022, 0.8, 0.68, Math.cos(a) * 0.065, Math.sin(a) * 0.065, 'x', G.cyl8); }
+    for (const x of [0.6, 1.02]) cyl(gun, M.gun, 0.095, 0.04, x, 0, 0, 'x'); box(gun, M.gun, 0.05, 0.14, 0.04, 0.3, 0.14, 0); box(gun, M.gun, 0.3, 0.03, 0.03, 0.2, 0.2, 0);   // minigun: motor, six barrels, clamps, a top handle
+    box(gun, M.yellow, 0.07, 0.34, 0.07, -0.12, -0.22, 0.1); box(man, M.olive, 0.22, 0.36, 0.3, -0.22, 0.42, 0);                                                 // belt down to the ammunition pack on his back
+    return legs;
   });
   r.muzzle = 2.0; r.muzzleY = 1.7; return r;
 }
@@ -457,14 +593,22 @@ function bearrider(T) {
 // helmet with a red horsehair crest, a round bronze shield on the left arm and a spear levelled in the right hand.
 function leonidas(T) {
   const r = heroRig((m) => {
-    for (const s of [-1, 1]) { box(m, M.skin, 0.18, 0.62, 0.18, 0, 0.31, s * 0.12); box(m, M.bronze, 0.2, 0.3, 0.2, 0.01, 0.2, s * 0.12); box(m, M.wood, 0.24, 0.05, 0.2, 0.03, 0.025, s * 0.12); }   // legs, greaves, sandals
-    box(m, M.bronze, 0.3, 0.2, 0.46, 0, 0.66, 0); box(m, M.skin, 0.28, 0.5, 0.46, 0, 0.98, 0);                                                                // bronze trunks, bare torso
-    const cape = box(m, M.dress, 0.06, 1.0, 0.56, -0.2, 0.74, 0); cape.rotation.z = 0.16; box(m, M.dress, 0.2, 0.08, 0.5, -0.06, 1.24, 0);                      // red cape from the shoulders
-    add(m, G.sph, M.skin, 0.13, 0.14, 0.13, 0, 1.36, 0); add(m, G.sph, M.bronze, 0.165, 0.17, 0.165, -0.01, 1.4, 0);                                            // head inside the helmet
-    box(m, M.bronze, 0.06, 0.2, 0.05, 0.15, 1.32, 0); for (const s of [-1, 1]) box(m, M.bronze, 0.1, 0.16, 0.04, 0.1, 1.27, s * 0.12);                          // nose guard and cheek plates
-    for (let i = 0; i < 5; i++) { const a = -0.9 + i * 0.5; box(m, M.red, 0.14, 0.16, 0.05, -0.02 + Math.sin(a) * 0.16, 1.5 + Math.cos(a) * 0.14, 0).rotation.z = -a; }   // the crest, front to back
-    box(m, M.skin, 0.4, 0.13, 0.13, 0.16, 1.1, 0.3); cyl(m, M.wood, 0.028, 2.5, 0.75, 1.12, 0.36, 'x'); add(m, G.cone, M.bronze, 0.06, 0.34, 0.06, 2.15, 1.12, 0.36).rotation.z = -Math.PI / 2; cyl(m, M.bronze, 0.035, 0.12, -0.52, 1.12, 0.36, 'x');   // spear arm, shaft, point, butt spike
-    box(m, M.skin, 0.3, 0.13, 0.13, 0.12, 1.02, -0.3); cyl(m, M.bronze, 0.46, 0.06, 0.26, 0.98, -0.42, 'z'); cyl(m, M.red, 0.3, 0.07, 0.26, 0.98, -0.43, 'z'); cyl(m, M.bronze, 0.1, 0.09, 0.26, 0.98, -0.44, 'z');   // shield arm and the round shield
+    const legs = [-1, 1].map(s => { const l = grp(m, 0, HIP, s * 0.11); box(l, M.skin, 0.17, 0.36, 0.16, 0, -0.18, 0); box(l, M.skin, 0.14, 0.32, 0.14, -0.005, -0.5, 0); box(l, M.bronze, 0.155, 0.3, 0.155, 0.012, -0.5, 0); box(l, M.bronze, 0.05, 0.08, 0.12, 0.08, -0.35, 0); box(l, M.wood, 0.25, 0.04, 0.14, 0.05, -0.74, 0); box(l, M.wood, 0.03, 0.1, 0.15, 0.02, -0.67, 0); return l; });   // bare legs, bronze greaves with knee caps, sandals
+    box(m, M.bronze, 0.22, 0.17, 0.32, 0, 0.8, 0); for (let i = -2; i <= 2; i++) box(m, M.wood, 0.03, 0.16, 0.055, 0.115, 0.7, i * 0.065); box(m, M.wood, 0.235, 0.05, 0.33, 0, 0.885, 0);   // bronze trunks, a skirt of leather strips, belt
+    box(m, M.skin, 0.2, 0.2, 0.3, 0, 1.0, 0); box(m, M.skin, 0.235, 0.22, 0.39, 0.005, 1.18, 0); box(m, M.skin, 0.2, 0.09, 0.5, 0, 1.27, 0); for (const s of [-1, 1]) box(m, M.skin, 0.03, 0.1, 0.16, 0.118, 1.2, s * 0.088);   // bare torso
+    const cape = box(m, M.dress, 0.05, 1.05, 0.58, -0.22, 0.76, 0); cape.rotation.z = 0.17; box(m, M.dress, 0.16, 0.07, 0.5, -0.07, 1.3, 0); for (const s of [-1, 1]) cyl(m, M.bronze, 0.035, 0.02, 0.03, 1.31, s * 0.2, 'x', G.cyl8);   // red cape from the shoulders, pinned with two bronze discs
+    cyl(m, M.skin, 0.055, 0.08, 0, 1.34, 0); add(m, G.sph, M.skin, 0.1, 0.115, 0.1, 0.008, 1.43, 0);
+    add(m, G.sph, M.bronze, 0.13, 0.14, 0.132, -0.006, 1.46, 0); box(m, M.bronze, 0.03, 0.17, 0.035, 0.125, 1.39, 0); for (const s of [-1, 1]) { box(m, M.bronze, 0.1, 0.17, 0.03, 0.085, 1.36, s * 0.1); box(m, M.black, 0.02, 0.035, 0.06, 0.128, 1.44, s * 0.05); }   // Corinthian helmet: nose guard, long cheek plates, eye slits
+    box(m, M.bronze, 0.05, 0.16, 0.2, -0.11, 1.34, 0);                                                                                                                 // neck guard
+    for (let i = 0; i < 7; i++) { const a = -1.0 + i * 0.36; box(m, M.red, 0.1, 0.17, 0.04, -0.012 + Math.sin(a) * 0.17, 1.47 + Math.cos(a) * 0.16, 0).rotation.z = -a; }   // the crest, front to back
+    box(m, M.red, 0.04, 0.3, 0.04, -0.2, 1.36, 0);                                                                                                                      // its tail down the back
+    box(m, T.accent, 0.24, 0.03, 0.06, -0.012, 1.595, 0); box(m, T.accent, 0.125, 0.07, 0.125, 0.03, 1.17, 0.28).rotation.z = 0.5;                                      // the crest holder and an arm ring in the owner's colour
+    box(m, M.skin, 0.115, 0.26, 0.115, 0.04, 1.14, 0.28).rotation.z = 0.5; box(m, M.skin, 0.25, 0.1, 0.1, 0.2, 1.06, 0.3); box(m, M.bronze, 0.1, 0.11, 0.11, 0.26, 1.06, 0.3);   // spear arm with a bronze bracer
+    cyl(m, M.wood, 0.026, 2.5, 0.75, 1.1, 0.37, 'x', G.cyl8); add(m, G.cone, M.bronze, 0.055, 0.36, 0.055, 2.17, 1.1, 0.37).rotation.z = -Math.PI / 2; cyl(m, M.bronze, 0.035, 0.14, -0.55, 1.1, 0.37, 'x', G.cyl8);   // spear: shaft, leaf point, butt spike
+    box(m, M.skin, 0.115, 0.24, 0.115, 0.05, 1.14, -0.28).rotation.z = 0.5; box(m, M.skin, 0.22, 0.1, 0.1, 0.18, 1.02, -0.32);                                         // shield arm
+    cyl(m, M.bronze, 0.47, 0.05, 0.26, 0.98, -0.43, 'z'); cyl(m, M.bronze, 0.49, 0.025, 0.26, 0.98, -0.415, 'z'); cyl(m, T.accent, 0.38, 0.055, 0.26, 0.98, -0.435, 'z');   // the round shield: bronze rim, its face in the owner's colour
+    for (const k of [-1, 1]) box(m, M.bronze, 0.05, 0.5, 0.02, 0.26 + k * 0.1, 0.98, -0.468).rotation.z = k * 0.4;                                                       // the lambda of Sparta
+    return legs;
   });
   r.muzzle = 2.4; r.muzzleY = 1.55; return r;
 }
@@ -472,25 +616,26 @@ const UNIT = {
   avenger, inferno, scorpion, buggy, tractor, dozer, truck, // tanks, technical, helicopter and scouts are built in modelFactory.js
   mig: (T) => jet(T, false), // the Raptor and the Z-10 are built in modelFactory.js
   vet, fookmie, phantom, car, bearrider, leonidas,
-  rifle: (T) => squad(T, FOUR, { gun: 'rifle' }),
-  // Russia: motor rifle infantry in green EMR camouflage with helmets and packs; a two-man RPG-7 team; convicts in mismatched dark kit and wool caps
-  motorrifle: (T) => squad(T, FOUR, { gun: 'rifle', cloth: M.emr, legs: M.emr, hat: M.olive, pack: M.olive }),
-  rpg7: (T) => squad(T, TWO, { gun: 'rpg', cloth: M.emr, legs: M.emr, hat: M.olive }),
-  convict: (T) => squad(T, FOUR, { gun: 'rifle', cloth: M.dark, legs: M.khaki, hat: M.black }),
-  // Europe: Legion infantry in flecked camouflage and white kepis; a two-man MILAN missile team behind its tripod
-  legion: (T) => squad(T, FOUR, { gun: 'rifle', cloth: M.fleck, legs: M.fleck, hat: M.fleck, kepi: true }),
-  milanteam: (T) => { const g = new THREE.Group(), b = grp(g), o = { cloth: M.fleck, legs: M.fleck, hat: M.fleck, kepi: true }; const men = [man(b, T, 0.1, 0.35, { ...o, gun: 'milan' }), man(b, T, -0.1, -0.35, { ...o, gun: 'rifle', pack: M.olive })]; return { g, body: b, men, muzzle: 1.2, muzzleY: 0.7 }; },
-  seal: (T) => { // four operators in black: two carbines, a marksman with a long rifle, a grenadier
-    const g = new THREE.Group(), b = grp(g), o = { cloth: M.black, legs: M.dark, hat: M.dark };
-    const men = FOUR.map(([x, z], i) => { const m = man(b, T, x, z, { ...o, gun: i === 2 ? 'long' : 'rifle' }); box(m, M.dark, 0.2, 0.3, 0.3, -0.2, 0.92, 0); if (i === 3) cyl(m, M.gun, 0.07, 0.4, 0.42, 0.86, 0.24, 'x'); return m; });
-    return { g, body: b, men, muzzle: 0.9, muzzleY: 1.0 };
-  },
-  bomber: (T) => { const r = squad(T, ONE, { gun: 'rifle', cloth: M.cloth, hat: M.dark }); box(r.body, M.crateC, 0.46, 0.34, 0.5, 0, 1.12, 0); for (const z of [-0.2, 0, 0.2]) cyl(r.body, M.gun, 0.05, 0.3, 0.26, 1.12, z); return r; }, // explosive vest over plain clothes
-  rpg: (T) => squad(T, TWO, { gun: 'rpg', cloth: M.cloth, hat: M.red }),
-  sniper: (T) => squad(T, ONE, { gun: 'long', cloth: M.ghillie, legs: M.ghillie, hat: M.ghillie }),
-  hacker: (T) => squad(T, TWO, { gun: 'laptop', cloth: M.dark, hat: M.dark }),
-  worker: (T) => squad(T, ONE, { gun: 'tool', cloth: M.cloth, hat: M.yellow }),
-  saboteur: (T) => squad(T, ONE, { gun: 'satchel', cloth: M.dark, legs: M.dark, hat: M.dark }),
+  rifle: (T) => squad(T, FOUR, { ...kit(T.faction), gun: 'rifle' }),
+  // Russia: motor rifle infantry in green EMR camouflage with deep helmets and packs; a two-man RPG-7 team; convicts in mismatched dark kit and wool caps
+  motorrifle: (T) => squad(T, FOUR, { ...kit('ursa'), gun: 'rifle' }),
+  rpg7: (T) => squad(T, TWO, { ...kit('ursa'), gun: 'rpg' }),
+  convict: (T) => squad(T, FOUR, (i) => ({ cloth: i % 2 ? M.dark : M.grey, legs: i % 2 ? M.khaki : M.dark, rig: M.olive, helmet: 'cap', hat: M.black, gun: 'rifle', arm: 'ak', boots: M.black })),
+  // Europe: Legion infantry in flecked camouflage and white kepis with FAMAS rifles; a two-man MILAN missile team behind its tripod
+  legion: (T) => squad(T, FOUR, { ...kit('aegis'), gun: 'rifle' }),
+  milanteam: (T) => { const r = squad(T, TWO, (i) => ({ ...kit('aegis'), gun: i ? 'rifle' : 'milan' })); r.muzzle = 1.2; r.muzzleY = 0.96; return r; },
+  // SEAL Team: four operators in black with suppressed carbines; one is a marksman with a long rifle, one a grenadier
+  seal: (T) => squad(T, FOUR, (i) => ({ cloth: M.black, vest: M.dark, helmet: 'mich', hat: M.dark, skin: M.black, boots: M.black, pack: M.dark, kneepads: M.dark, gun: i === 2 ? 'long' : 'rifle', arm: i === 3 ? 'm203' : 'm4s' })),
+  // Suicide Bomber: plain clothes, an explosive vest with a row of charges and a detonator in his hand; no rifle
+  bomber: (T) => { const r = squad(T, ONE, { cloth: M.cloth, legs: M.khaki, helmet: 'shemagh', hat: M.dark, gun: 'none', boots: M.dark }), m = r.men[0];
+    box(m, M.crateC, 0.27, 0.26, 0.36, 0.004, 1.06, 0); for (const z of [-0.12, -0.04, 0.04, 0.12]) cyl(m, M.yellow, 0.03, 0.2, 0.14, 1.06, z, 'y', G.cyl8); box(m, M.red, 0.012, 0.02, 0.3, 0.165, 1.17, 0); box(m, M.dark, 0.04, 0.1, 0.04, 0.03, 0.72, 0.235); return r; },
+  rpg: (T) => squad(T, TWO, { ...kit('sandstorm'), hat: M.red, gun: 'rpg' }),
+  // Pathfinder Sniper: ghillie suit and a soft hat, a long scoped rifle
+  sniper: (T) => { const r = squad(T, ONE, { cloth: M.ghillie, helmet: 'boonie', hat: M.ghillie, gun: 'long', boots: M.tan }), m = r.men[0];
+    for (const [x, y, z] of [[-0.13, 1.24, 0.12], [-0.13, 1.1, -0.1], [-0.12, 0.96, 0.08], [0.0, 1.31, -0.2], [0.0, 1.31, 0.2], [-0.06, 1.5, 0.1], [-0.08, 1.49, -0.08]]) box(m, M.camo, 0.08, 0.12, 0.1, x, y, z).rotation.z = 0.4; return r; },   // ragged strips of the suit
+  hacker: (T) => squad(T, TWO, { cloth: M.dark, legs: M.grey, helmet: 'hood', hat: M.dark, gun: 'laptop', pack: M.black, boots: M.white }),
+  worker: (T) => squad(T, ONE, { cloth: M.cloth, legs: M.khaki, helmet: 'hard', hat: M.yellow, gun: 'tool', boots: M.dark, belt: M.wood }),
+  saboteur: (T) => squad(T, ONE, { cloth: M.dark, legs: M.black, helmet: 'hood', hat: M.black, gun: 'satchel', boots: M.black }),
 };
 // Particle Cannon: ring of capacitor banks around a tall emitter mast that tracks the sky.
 function particle(T) {

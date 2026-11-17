@@ -43,6 +43,9 @@ function shared() {
     typhoon: std(0xa9afb4, 0.78, 0.1), typhoonDark: std(0x80888e, 0.8, 0.1),                              // Eurofighter: air-superiority grey
     tigerGreen: std(0x4a5440, 0.9, 0.05), tigerDark: std(0x2f3628, 0.92, 0.05),                           // Tiger: dark green and black
     ka52: std(0x565c50, 0.88, 0.06), ka52Dark: std(0x33382f, 0.9, 0.06),                                  // Ka-52: grey-green
+    apache: std(0x434a3c, 0.9, 0.05), apacheDark: std(0x2c3128, 0.92, 0.05),                              // AH-64: Army aircraft green
+    viper: std(0x848c92, 0.84, 0.08), viperDark: std(0x5a6268, 0.86, 0.08),                               // AH-1Z: Marine Corps grey
+    shahed: std(0xcbc5ad, 0.86, 0.04),                                                                    // Shahed-136: pale sand
   };
   return S;
 }
@@ -79,7 +82,7 @@ function prism(p, mat, pts, depth, mode, x, y, z, name) {
     q.setAttribute('position', new THREE.BufferAttribute(prismPositions(pts, depth, mode), 3));
     q.computeVertexNormals(); return q;
   });
-  const m = mesh(p, g, mat, name); m.position.set(x, y, z); m.userData.profile = pts; return m;
+  const m = mesh(p, g, mat, name); m.position.set(x, y, z); m.userData.profile = pts; m.userData.depth = depth; m.userData.mode = mode; return m;
 }
 function grp(parent, x = 0, y = 0, z = 0, name) { const g = new THREE.Group(); g.position.set(x, y, z); if (name) g.name = name; parent.add(g); return g; }
 function wheel(p, r, w, x, y, z, name = 'wheel') { const s = shared(); cyl(p, s.rubber, r, w, x, y, z, 'z', name); cyl(p, s.steel, r * 0.55, w * 1.08, x, y, z, 'z', 'hub', s.cyl8); }
@@ -271,10 +274,17 @@ function a10(P) {
     box(b, s.grey, 0.9, 0.36, 0.12, -2.3, 0.5, k * 0.62, 'enginepylon').rotation.x = k * 0.5;
     box(b, s.grey, 1.3, 1.36, 0.07, -4.62, 0.82, k * 1.82, 'fin');                        // twin fins = H-tail
     box(b, P.id, 0.5, 0.26, 0.09, -4.7, 1.2, k * 1.82, 'idpanel');
-    for (const z of [2.5, 3.3, 4.1]) { box(b, s.greyDark, 0.5, 0.14, 0.06, 0.5, -0.24, k * z, 'pylon'); cyl(b, s.ordnance, 0.07, 1.1, 0.55, -0.36, k * z, 'x', 'rocket'); }
+    for (const z of [2.5, 3.3, 4.1]) box(b, s.greyDark, 0.5, 0.14, 0.06, 0.5, -0.24, k * z, 'pylon');
+    cyl(b, s.ordnance, 0.13, 1.0, 0.55, -0.42, k * 4.1, 'x', 'rocketpod'); cyl(b, s.gunmetal, 0.1, 0.04, 1.06, -0.42, k * 4.1, 'x', 'podface');   // outer pylon: a rocket pod
   }
   box(b, s.grey, 1.3, 0.08, 3.7, -4.6, 0.14, 0, 'tailplane');
-  return { g, body: b, gun: [5.95, -0.2, 0.06], pylons: [2.5, 3.3, 4.1], muzzle: 5.95, muzzleY: -0.2 };
+  // Four AGM-65 Mavericks on the inner pylons, one node each so the view can take them off as they are fired (outer pair first).
+  const stores = [];
+  for (const z of [2.5, 3.3]) for (const k of [1, -1]) { const st = grp(b, 0.55, -0.4, k * z, 'store'); cyl(st, s.white, 0.085, 1.1, 0, 0, 0, 'x', 'maverick'); ball(st, s.glass, 0.085, 0.085, 0.085, 0.55, 0, 0, 'seeker'); for (const r of [0, Math.PI / 2]) box(st, s.greyDark, 0.4, 0.34, 0.015, -0.3, 0, 0, 'maverickfin').rotation.x = r; stores.push(st); }
+  const gear = grp(b, 0, 0, 0, 'gear');                                                                     // nose leg offset to the right of the gun, main legs under the wing pods
+  cyl(gear, s.steel, 0.045, 0.6, 3.3, -0.72, 0.16, 'y', 'strut'); cyl(gear, s.rubber, 0.17, 0.12, 3.3, -1.04, 0.16, 'z', 'wheel');
+  for (const k of [-1, 1]) { cyl(gear, s.steel, 0.05, 0.5, 0.9, -0.76, k * 1.9, 'y', 'strut'); cyl(gear, s.rubber, 0.22, 0.15, 0.9, -1.0, k * 1.9, 'z', 'wheel'); }
+  return { g, body: b, gear, stores, ground: 1.22, gun: [5.95, -0.2, 0.06], pylons: [2.5, 3.3, 4.1], muzzle: 5.95, muzzleY: -0.2 };
 }
 // ---------------------------------------------------------------- twin-engine fighters from real dimensions
 // One builder, three aircraft. Every number in a spec is in metres on the real aircraft (`m` = metres aft
@@ -378,7 +388,10 @@ function b2(P) {
   }
   prism(b, dark, [[L * 0.5, -0.05], [L * 0.3, 0.55], [-L * 0.1, 0.6], [-L * 0.42, 0.1], [-L * 0.42, -0.2], [L * 0.3, -0.25]], 1.9, 'side', 0, 0, 0, 'centrebody');
   ball(b, s.glass, 0.9, 0.22, 0.75, L * 0.3, 0.42, 0, 'canopy');
-  return { g, body: b, muzzle: L * 0.5, muzzleY: -0.3 };
+  const gear = grp(b, 0, 0, 0, 'gear'); gear.visible = false;                                                // down only on the ground (the buildable B-2); the off-map bomber never shows it
+  cyl(gear, s.steel, 0.06, 0.7, L * 0.3, -0.6, 0, 'y', 'strut'); cyl(gear, s.rubber, 0.2, 0.26, L * 0.3, -0.98, 0, 'z', 'wheel');
+  for (const k of [-1, 1]) { cyl(gear, s.steel, 0.07, 0.7, -L * 0.1, -0.56, k * 2.1, 'y', 'strut'); cyl(gear, s.rubber, 0.24, 0.5, -L * 0.1, -0.94, k * 2.1, 'z', 'wheel'); }
+  return { g, body: b, gear, ground: 1.2, muzzle: L * 0.5, muzzleY: -0.3 };
 }
 
 // LAV-25: 8x8 amphibious fighting vehicle, 6.39 m long, 2.5 m wide, 2.69 m high. Boat-shaped nose, trim vane,
@@ -890,10 +903,209 @@ function fremm(P) {
   cyl(t, s.greyDark, 0.8, 0.18, 0, 0.09, 0, 'y', 'ring'); ball(t, s.typhoon, 0.85, 1.0, 0.85, 0, 0.18, 0, 'gunhouse', s.dome); cyl(t, s.gunmetal, 0.08, 2.4, 1.6, 0.7, 0, 'x', 'barrel');
   return { g, body: b, turret: t, turretX: 10.4, muzzle: 13.2, muzzleY: 2.4, ship: true };
 }
+// ---------------------------------------------------------------- batch 13: US gunships
+// AH-64 Apache: 14.68 m fuselage, 14.63 m four-blade main rotor, four-blade tail rotor set like scissors on the left
+// of a swept fin. Flat-paned tandem cockpit (gunner in front, pilot stepped up behind), the TADS/PNVS sensor turret
+// on the nose, engine pods high on the fuselage sides, avionics bays along the lower sides, stub wings with a
+// Hellfire rack and a rocket pod each, the 30 mm chain gun under the belly between two fixed main wheels, and a
+// tailwheel. `longbow` is the mast-mounted radar dome: its own node, shown once the Longbow upgrade is bought.
+export const APACHE = { scale: 0.5, fuselage: 14.68, rotor: 14.63, blades: 4, tailBlades: 4 };
+function apache(P) {
+  const s = shared(), g = new THREE.Group(), b = grp(g), R = APACHE.rotor / 2 * APACHE.scale;
+  P = { ...P, hull: s.apache, dark: s.apacheDark };   // Army aircraft green whoever flies it; the team marks keep their colour
+  prism(b, P.hull, [[3.0, -0.3], [2.95, 0.05], [2.3, 0.42], [1.4, 0.86], [0.0, 1.0], [-1.6, 0.7], [-1.9, -0.1], [-1.2, -0.62], [2.3, -0.62]], 0.84, 'side', 0, 0, 0, 'fuselage');
+  box(b, s.glass, 0.85, 0.32, 0.62, 2.0, 0.54, 0, 'canopy').rotation.z = -0.42; box(b, s.glass, 0.9, 0.34, 0.64, 1.05, 0.94, 0, 'canopy').rotation.z = -0.3;   // gunner in front, pilot stepped up behind
+  box(b, P.dark, 0.1, 0.4, 0.66, 1.53, 0.74, 0, 'canopyframe').rotation.z = -0.36;
+  cyl(b, s.gunmetal, 0.2, 0.46, 3.1, -0.12, 0, 'z', 'tads'); box(b, s.gunmetal, 0.2, 0.18, 0.22, 3.02, 0.18, 0, 'pnvs');   // target sight drum on the nose, night-vision turret above it
+  for (const k of [-1, 1]) {
+    cyl(b, P.dark, 0.3, 1.7, -0.6, 0.74, k * 0.7, 'x', 'engine'); box(b, s.gunmetal, 0.08, 0.4, 0.44, 0.27, 0.74, k * 0.7, 'intake');
+    box(b, s.gunmetal, 0.46, 0.24, 0.34, -1.5, 0.8, k * 0.82, 'exhaust').rotation.y = k * 0.5;
+    box(b, P.hull, 2.7, 0.38, 0.2, 1.15, -0.3, k * 0.5, 'avionicsbay');
+    box(b, P.dark, 0.85, 0.08, 1.5, 0.1, 0.0, k * 1.15, 'stubwing');
+    box(b, s.gunmetal, 0.3, 0.26, 0.34, 0.2, -0.26, k * 0.98, 'missilerack'); for (const dz of [-0.1, 0.1]) for (const dy of [-0.08, 0.08]) cyl(b, s.ordnance, 0.045, 0.82, 0.3, -0.26 + dy, k * 0.98 + dz, 'x', 'missile');   // four Hellfires a side
+    cyl(b, s.gunmetal, 0.17, 1.0, 0.2, -0.26, k * 1.68, 'x', 'rocketpod'); cyl(b, s.gunmetal, 0.12, 0.04, 0.72, -0.26, k * 1.68, 'x', 'podface');
+    cyl(b, s.steel, 0.045, 0.72, 1.55, -0.9, k * 0.62, 'y', 'gearstrut').rotation.x = k * 0.32; cyl(b, s.rubber, 0.22, 0.16, 1.5, -1.23, k * 0.76, 'z', 'wheel');
+  }
+  prism(b, P.hull, [[-1.6, 0.7], [-5.9, 0.62], [-5.9, 0.36], [-1.9, -0.1]], 0.3, 'side', 0, 0, 0, 'tailboom');
+  prism(b, P.hull, [[-5.3, 0.5], [-6.5, 2.0], [-6.95, 2.0], [-6.3, 0.3]], 0.1, 'side', 0, 0, 0, 'fin'); box(b, P.hull, 0.6, 0.04, 1.7, -6.25, 0.32, 0, 'stabilator');
+  box(b, P.id, 0.34, 0.26, 0.12, -6.2, 1.2, 0, 'idpanel');
+  cyl(b, s.steel, 0.04, 0.5, -5.8, 0.1, 0, 'y', 'tailstrut'); cyl(b, s.rubber, 0.13, 0.1, -5.8, -0.18, 0, 'z', 'tailwheel');
+  cyl(b, s.gunmetal, 0.08, 0.42, -0.3, 1.2, 0, 'y', 'mast');
+  const rotor = grp(b, -0.3, 1.44, 0, 'rotor'); cyl(rotor, s.gunmetal, 0.2, 0.1, 0, 0, 0, 'y', 'hub');
+  for (let i = 0; i < APACHE.blades; i++) { const arm = grp(rotor); arm.rotation.y = i * Math.PI * 2 / APACHE.blades; box(arm, s.gunmetal, R - 0.15, 0.03, 0.22, (R + 0.15) / 2, 0, 0, 'blade'); }
+  const longbow = grp(b, -0.3, 1.5, 0, 'longbow'); cyl(longbow, s.gunmetal, 0.07, 0.3, 0, 0.14, 0, 'y', 'radarpost'); ball(longbow, s.greyDark, 0.46, 0.2, 0.46, 0, 0.42, 0, 'radome'); cyl(longbow, s.gunmetal, 0.3, 0.06, 0, 0.3, 0, 'y', 'radarbase');
+  longbow.visible = false;   // the Longbow fire-control radar: a flattened dome above the rotor
+  const rotorTail = grp(b, -6.72, 1.6, 0.13, 'tailrotor');
+  for (let i = 0; i < 2; i++) { const arm = grp(rotorTail); arm.rotation.z = i * 0.96; box(arm, s.steel, 1.3, 0.07, 0.03, 0, 0, 0, 'tailblade'); }   // two crossed pairs at 55 degrees = four blades
+  const t = grp(b, 1.0, -0.7, 0, 'turret'); cyl(t, s.gunmetal, 0.16, 0.18, 0, 0, 0, 'y', 'gunmount'); box(t, s.gunmetal, 0.4, 0.14, 0.12, 0.1, -0.08, 0, 'receiver'); cyl(t, s.gunmetal, 0.04, 1.05, 0.75, -0.08, 0, 'x', 'cannon');
+  return { g, body: b, turret: t, turretX: 1.0, rotor, rotorTail, longbow, ground: 1.46, muzzle: 2.3, muzzleY: -0.8 };
+}
+// AH-1Z Viper: 13.87 m fuselage that is under a metre wide, 14.63 m four-blade rotor, four-blade tail rotor. One
+// long tandem canopy, two engines side by side behind the mast, stub wings with missile rails at the tips, skids
+// instead of wheels, a three-barrel 20 mm gun in a chin turret and a sensor ball on the nose.
+export const VIPER = { scale: 0.5, fuselage: 13.87, rotor: 14.63, blades: 4, tailBlades: 4, width: 0.99 };
+function viper(P) {
+  const s = shared(), g = new THREE.Group(), b = grp(g), R = VIPER.rotor / 2 * VIPER.scale, wide = +(VIPER.width * VIPER.scale + 0.06).toFixed(3);
+  P = { ...P, hull: s.viper, dark: s.viperDark };   // Marine Corps grey
+  prism(b, P.hull, [[3.1, -0.1], [2.9, 0.14], [2.1, 0.42], [1.2, 0.74], [-0.1, 0.84], [-1.5, 0.56], [-1.7, -0.1], [-1.0, -0.5], [2.3, -0.5]], wide, 'side', 0, 0, 0, 'fuselage');
+  box(b, s.glass, 0.85, 0.28, 0.46, 2.0, 0.5, 0, 'canopy').rotation.z = -0.36; box(b, s.glass, 0.9, 0.3, 0.48, 1.1, 0.8, 0, 'canopy').rotation.z = -0.3;
+  ball(b, s.gunmetal, 0.19, 0.19, 0.19, 3.14, 0.0, 0, 'sensor');
+  for (const k of [-1, 1]) {
+    cyl(b, P.dark, 0.22, 1.5, -0.7, 0.8, k * 0.3, 'x', 'engine'); box(b, s.gunmetal, 0.4, 0.2, 0.26, -1.5, 0.84, k * 0.42, 'exhaust').rotation.y = k * 0.6;
+    box(b, P.dark, 0.8, 0.07, 1.75, 0.15, 0.02, k * 1.15, 'stubwing');
+    cyl(b, s.gunmetal, 0.16, 0.95, 0.25, -0.24, k * 0.85, 'x', 'rocketpod'); cyl(b, s.gunmetal, 0.11, 0.04, 0.74, -0.24, k * 0.85, 'x', 'podface');
+    box(b, s.gunmetal, 0.3, 0.24, 0.3, 0.25, -0.24, k * 1.45, 'missilerack'); for (const dz of [-0.09, 0.09]) for (const dy of [-0.07, 0.07]) cyl(b, s.ordnance, 0.04, 0.8, 0.34, -0.24 + dy, k * 1.45 + dz, 'x', 'missile');
+    cyl(b, s.gunmetal, 0.03, 1.1, 0.2, 0.06, k * 2.04, 'x', 'wingtiprail'); cyl(b, s.white, 0.045, 1.25, 0.25, 0.14, k * 2.04, 'x', 'sidewinder');
+    cyl(b, s.steel, 0.045, 3.3, 0.7, -1.08, k * 0.72, 'x', 'skid');
+    for (const x of [1.5, -0.2]) cyl(b, s.steel, 0.035, 0.66, x, -0.78, k * 0.56, 'y', 'skidstrut').rotation.x = k * 0.5;
+    box(b, P.hull, 0.45, 0.42, 0.04, -4.3, 0.44, k * 0.85, 'endplate');
+  }
+  prism(b, P.hull, [[-1.5, 0.56], [-5.4, 0.5], [-5.4, 0.26], [-1.7, -0.1]], 0.26, 'side', 0, 0, 0, 'tailboom');
+  prism(b, P.hull, [[-4.9, 0.4], [-6.0, 1.75], [-6.42, 1.75], [-5.8, 0.26]], 0.09, 'side', 0, 0, 0, 'fin'); box(b, P.hull, 0.5, 0.04, 1.7, -4.3, 0.42, 0, 'tailplane');
+  box(b, P.id, 0.32, 0.24, 0.11, -5.7, 1.05, 0, 'idpanel');
+  cyl(b, s.gunmetal, 0.07, 0.42, -0.2, 1.02, 0, 'y', 'mast');
+  const rotor = grp(b, -0.2, 1.26, 0, 'rotor'); cyl(rotor, s.gunmetal, 0.18, 0.1, 0, 0, 0, 'y', 'hub');
+  for (let i = 0; i < VIPER.blades; i++) { const arm = grp(rotor); arm.rotation.y = i * Math.PI * 2 / VIPER.blades; box(arm, s.gunmetal, R - 0.15, 0.03, 0.26, (R + 0.15) / 2, 0, 0, 'blade'); }
+  const rotorTail = grp(b, -6.2, 1.4, -0.12, 'tailrotor');
+  for (let i = 0; i < 2; i++) { const arm = grp(rotorTail); arm.rotation.z = i * Math.PI / 2; box(arm, s.steel, 1.2, 0.07, 0.03, 0, 0, 0, 'tailblade'); }
+  const t = grp(b, 2.4, -0.58, 0, 'turret'); cyl(t, s.gunmetal, 0.14, 0.16, 0, 0, 0, 'y', 'gunmount');
+  for (const z of [-0.035, 0, 0.035]) cyl(t, s.gunmetal, 0.02, 0.9, 0.55, -0.07 + (z ? 0 : 0.035), z, 'x', 'barrel');
+  return { g, body: b, turret: t, turretX: 2.4, rotor, rotorTail, ground: 1.14, muzzle: 3.3, muzzleY: -0.65 };
+}
+
+// ---------------------------------------------------------------- batch 13: ISIS trucks and the Shahed
+// Quad Cannon: the four-barrel 23 mm turret of a ZSU-23-4 on the bed of a pickup. The turret is a wide flat box
+// with the guns in a square cluster between two cheeks and the folded "Gun Dish" radar on the roof at the back.
+function zu23(P) {
+  const s = shared(), g = new THREE.Group(), b = grp(g);
+  for (const x of [1.08, -1.08]) for (const k of [-1, 1]) wheel(b, 0.31, 0.24, x, 0.31, k * 0.66);
+  box(b, s.gunmetal, 3.2, 0.1, 0.9, 0, 0.42, 0, 'chassis');
+  prism(b, P.hull, [[0.72, 0.5], [1.68, 0.5], [1.68, 0.82], [0.72, 0.9]], 1.34, 'side', 0, 0, 0, 'bonnet');
+  prism(b, P.hull, [[-0.28, 0.5], [0.74, 0.5], [0.74, 0.9], [0.4, 1.34], [-0.28, 1.34]], 1.34, 'side', 0, 0, 0, 'cab');
+  box(b, s.glass, 0.03, 0.5, 1.2, 0.585, 1.12, 0, 'windshield').rotation.z = 0.658; box(b, s.glass, 0.5, 0.3, 1.36, 0.02, 1.14, 0, 'window');
+  box(b, s.gunmetal, 0.04, 0.2, 1.0, 1.7, 0.66, 0, 'grille'); box(b, s.gunmetal, 0.08, 0.12, 1.4, 1.76, 0.46, 0, 'bumper');
+  box(b, P.hull, 1.5, 0.06, 1.34, -1.03, 0.6, 0, 'flatbed'); for (const k of [-1, 1]) box(b, P.hull, 1.5, 0.22, 0.05, -1.03, 0.74, k * 0.67, 'bedside');
+  box(b, P.id, 0.7, 0.02, 0.8, 1.2, 0.875, 0, 'idpanel').rotation.z = -0.083;
+  const t = grp(b, -1.0, 0.63, 0, 'turret');
+  cyl(t, s.gunmetal, 0.34, 0.5, 0, 0.25, 0, 'y', 'pedestal');
+  prism(t, P.dark, [[0.62, -0.42], [0.62, 0.42], [0.3, 0.66], [-0.66, 0.66], [-0.66, -0.66], [0.3, -0.66]], 0.5, 'plan', 0, 0.76, 0, 'turretshell');   // wide and flat, like the Shilka's
+  for (const k of [-1, 1]) box(t, P.dark, 0.5, 0.36, 0.2, 0.55, 0.9, k * 0.34, 'cheek');
+  for (const dy of [-0.075, 0.075]) for (const dz of [-0.09, 0.09]) { cyl(t, s.gunmetal, 0.035, 1.5, 1.3, 0.92 + dy, dz, 'x', 'barrel'); cyl(t, s.gunmetal, 0.05, 0.14, 2.06, 0.92 + dy, dz, 'x', 'flashhider'); }
+  box(t, s.gunmetal, 0.3, 0.3, 0.34, 0.5, 0.92, 0, 'breech');
+  cyl(t, s.gunmetal, 0.04, 0.3, -0.45, 1.16, 0, 'y', 'radarpost'); const dish = ball(t, s.steel, 0.3, 0.1, 0.3, -0.45, 1.34, 0, 'radar', s.dome); dish.rotation.z = -0.5;
+  box(t, P.id, 0.5, 0.02, 0.7, -0.05, 1.02, 0, 'idpanel');
+  return { g, body: b, turret: t, turretX: -1.0, muzzle: 2.2, muzzleY: 1.55 };
+}
+// Shahed-136: 3.5 m long, 2.5 m span. A cropped delta wing blended into a round body, a fin above and below each
+// wingtip, a small piston engine and a two-blade pusher propeller at the back. Built once and used twice: flying
+// (the drone unit) and sitting on the launch rack in the truck.
+export const SHAHED = { length: 3.5, span: 2.5, scale: 0.9 };
+function shahedShape(b, P, K, withProp) {
+  const s = shared(), L = +(SHAHED.length * K).toFixed(3), h = +(SHAHED.span / 2 * K).toFixed(3), r = +(0.2 * K).toFixed(3);
+  prism(b, s.shahed, [[L * 0.22, 0], [-L * 0.42, h], [-L * 0.5, h], [-L * 0.5, -h], [-L * 0.42, -h]], +(0.08 * K).toFixed(3), 'plan', 0, 0, 0, 'wing');
+  cyl(b, s.shahed, r, +(L * 0.6).toFixed(3), -L * 0.02, 0.02 * K, 0, 'x', 'fuselage'); taper(b, s.shahed, +(0.04 * K).toFixed(3), r, +(L * 0.22).toFixed(3), +(L * 0.39).toFixed(3), 0.02 * K, 0, 'nose');
+  for (const k of [-1, 1]) box(b, s.shahed, L * 0.17, 0.56 * K, 0.04 * K, -L * 0.41, 0, k * h, 'tipfin');
+  box(b, s.gunmetal, 0.3 * K, 0.26 * K, 0.3 * K, -L * 0.36, 0.05 * K, 0, 'engine');
+  box(b, P.id, 0.5 * K, 0.02 * K, 0.6 * K, -L * 0.3, 0.05 * K, h * 0.55, 'idpanel'); box(b, P.id, 0.5 * K, 0.02 * K, 0.6 * K, -L * 0.3, 0.05 * K, -h * 0.55, 'idpanel');
+  if (!withProp) return null;
+  const prop = grp(b, -L * 0.5 - 0.06, 0.05 * K, 0, 'prop'); box(prop, s.wood, 0.03, 0.9 * K, 0.09, 0, 0, 0, 'propblade');
+  return prop;
+}
+function shahed(P) {
+  const g = new THREE.Group(), b = grp(g), prop = shahedShape(b, P, SHAHED.scale, true);
+  return { g, body: b, prop, muzzle: 0, muzzleY: 0 };
+}
+// Shahed Launcher: a three-axle truck carrying a shipping container. The two rear doors swing open (`doors`, turned by
+// the view) to show the launch rack, tilted up toward the back, with three drones on it (`rack`: one node each, taken
+// off as they fly).
+function shahedtruck(P) {
+  const s = shared(), g = new THREE.Group(), b = grp(g);
+  for (const x of [2.3, -1.0, -2.1]) for (const k of [-1, 1]) wheel(b, 0.46, 0.34, x, 0.46, k * 0.86);
+  box(b, s.gunmetal, 6.5, 0.2, 1.3, 0, 0.78, 0, 'chassis');
+  prism(b, P.hull, [[1.55, 0.86], [3.2, 0.86], [3.2, 1.6], [2.9, 2.3], [1.55, 2.3]], 2.0, 'side', 0, 0, 0, 'cab');
+  box(b, s.glass, 0.04, 0.62, 1.8, 3.07, 1.95, 0, 'windshield').rotation.z = 0.4; for (const k of [-1, 1]) box(b, s.glass, 0.7, 0.5, 0.03, 2.3, 1.9, k * 1.0, 'window');
+  box(b, s.gunmetal, 0.1, 0.3, 2.0, 3.24, 0.8, 0, 'bumper'); box(b, s.gunmetal, 0.05, 0.5, 1.3, 3.22, 1.25, 0, 'grille');
+  const C = { x0: -3.25, x1: 1.35, y0: 0.9, h: 2.1, w: 2.04 }, cx = (C.x0 + C.x1) / 2, len = C.x1 - C.x0;
+  box(b, P.dark, len, 0.1, C.w, cx, C.y0, 0, 'containerfloor'); box(b, P.hull, len, 0.08, C.w, cx, C.y0 + C.h, 0, 'containerroof'); box(b, P.hull, 0.08, C.h, C.w, C.x1 - 0.04, C.y0 + C.h / 2, 0, 'containerfront');
+  for (const k of [-1, 1]) { box(b, P.hull, len, C.h, 0.08, cx, C.y0 + C.h / 2, k * (C.w / 2 - 0.04), 'containerside'); for (let i = 0; i < 7; i++) box(b, P.dark, 0.08, C.h - 0.2, 0.04, C.x0 + 0.4 + i * 0.63, C.y0 + C.h / 2, k * (C.w / 2 + 0.01), 'rib'); }
+  box(b, P.id, 1.3, 0.03, 0.8, cx, C.y0 + C.h + 0.05, 0, 'idpanel');
+  const doors = [-1, 1].map(k => { const d = grp(b, C.x0, C.y0 + 0.05, k * (C.w / 2 - 0.04), 'door'); box(d, P.hull, 0.07, C.h - 0.06, C.w / 2 - 0.05, 0, C.h / 2, -k * (C.w / 4), 'doorleaf'); for (const y of [0.5, 1.5]) box(d, s.gunmetal, 0.09, 0.05, C.w / 2 - 0.2, -0.01, y, -k * (C.w / 4), 'lockbar'); return d; });
+  const frame = grp(b, cx - 0.1, C.y0 + 0.16, 0, 'launchframe'); frame.rotation.z = -0.2;   // a three-tier rack, tilted so the drones leave upward out of the back
+  for (const k of [-1, 1]) for (const x of [-1.5, 1.5]) box(frame, s.steel, 0.07, 1.75, 0.07, x, 0.86, k * 0.9, 'post');
+  const rack = [0, 1, 2].map((i) => { const y = 0.22 + i * 0.56; for (const k of [-1, 1]) box(frame, s.steel, 3.3, 0.06, 0.06, 0, y - 0.1, k * 0.9, 'rail'); const d = grp(frame, 0.15, y, 0, 'rackdrone'); d.rotation.y = Math.PI; shahedShape(d, P, 0.62, false); return d; });   // the top one leaves first
+  return { g, body: b, doors, rack, muzzle: -3.4, muzzleY: 2.0 };
+}
+
+// ---------------------------------------------------------------- team marks
+// Every unit carries one more element in its owner's colour, sized to stay modest: ground vehicles fly a pennant
+// from a whip aerial (and their roof panels are a little larger), fixed-wing aircraft have a band at each wingtip,
+// helicopters a band round the tail boom, ships a funnel band and a masthead pennant. The marks are placed from the
+// model's own measurements, so nothing has to be kept in step by hand. Mesh name: 'teammark'.
+function partBox(o) { // half-sizes of one mesh in its parent's frame (rotations other than a cylinder's axis are ignored: close enough to place a mark)
+  const g = o.geometry, sc = o.scale, S = shared();
+  if (o.userData.profile) { const p = o.userData.profile, xs = p.map(q => q[0]), ys = p.map(q => q[1]), cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2, hx = (Math.max(...xs) - Math.min(...xs)) / 2, hy = (Math.max(...ys) - Math.min(...ys)) / 2, hd = o.userData.depth / 2;
+    return o.userData.mode === 'side' ? { ox: cx, oy: cy, oz: 0, hx, hy, hz: hd } : { ox: cx, oy: 0, oz: cy, hx, hy: hd, hz: hy }; }
+  if (g === S.box) return { ox: 0, oy: 0, oz: 0, hx: sc.x / 2, hy: sc.y / 2, hz: sc.z / 2 };
+  if (g === S.cyl || g === S.cyl8) { const r = sc.x, l = sc.y / 2; return Math.abs(o.rotation.z) > 1 ? { ox: 0, oy: 0, oz: 0, hx: l, hy: r, hz: r } : Math.abs(o.rotation.x) > 1 ? { ox: 0, oy: 0, oz: 0, hx: r, hy: r, hz: l } : { ox: 0, oy: 0, oz: 0, hx: r, hy: l, hz: r }; }
+  if (g === S.sph || g === S.dome) return { ox: 0, oy: g === S.dome ? sc.y / 2 : 0, oz: 0, hx: sc.x, hy: g === S.dome ? sc.y / 2 : sc.y, hz: sc.z };
+  const q = g.parameters ? [g.parameters.radiusTop, g.parameters.radiusBottom, g.parameters.height] : g.params;   // a taper, lying along X
+  if (q && q.length >= 3) { const r = Math.max(q[0], q[1]); return { ox: 0, oy: 0, oz: 0, hx: q[2] / 2, hy: r, hz: r }; }
+  return { ox: 0, oy: 0, oz: 0, hx: 0, hy: 0, hz: 0 };
+}
+function measure(root, skip) { // every mesh under `root`, as a box in root's frame
+  const out = [];
+  const walk = (o, x, y, z, k) => {
+    for (const c of o.children) {
+      if (skip.has(c) || !c.visible) continue;
+      const px = x + c.position.x * k, py = y + c.position.y * k, pz = z + c.position.z * k;
+      if (c.isMesh) { const e = partBox(c); out.push({ o: c, name: c.name, x: px + e.ox * k, y: py + e.oy * k, z: pz + e.oz * k, hx: e.hx * k, hy: e.hy * k, hz: e.hz * k, px, py, pz }); }
+      else walk(c, px, py, pz, k * c.scale.x);
+    }
+  };
+  walk(root, 0, 0, 0, 1); return out;
+}
+function sliceAt(pts, v, axis) { // extent of a convex outline along the other axis where it crosses `v` on `axis`
+  let lo = Infinity, hi = -Infinity; const o = 1 - axis;
+  for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; if ((a[axis] - v) * (b[axis] - v) > 0 || a[axis] === b[axis]) continue; const t = (v - a[axis]) / (b[axis] - a[axis]), w = a[o] + (b[o] - a[o]) * t; lo = Math.min(lo, w); hi = Math.max(hi, w); }
+  return hi >= lo ? [lo, hi] : null;
+}
+function pennant(p, P, x, y, z, k = 1) { prism(p, P.id, [[0, 0.17 * k], [0, -0.17 * k], [-0.74 * k, 0]], 0.04, 'side', x, y, z, 'teammark'); }
+export function teamMarks(rig, P, d) {
+  if (!rig.body || d.infantry || d.radius < 1.2) return rig;
+  const s = shared(), b = rig.body, skip = new Set();
+  for (const k of ['rotor', 'rotor2', 'rotorTail', 'prop', 'props', 'gear', 'stores', 'tiers', 'addons', 'doors', 'rack', 'longbow', 'arm', 'round']) eachRef(rig[k], (o) => skip.add(o));
+  const parts = measure(b, skip); if (!parts.length) return rig;
+  const top = Math.max(...parts.map(p => p.y + p.hy)), x0 = Math.min(...parts.map(p => p.x - p.hx)), x1 = Math.max(...parts.map(p => p.x + p.hx));
+  if (d.ship) {
+    const mast = parts.reduce((a, p) => (p.y + p.hy > a.y + a.hy ? p : a));                              // the highest point: fly the pennant from it
+    cyl(b, s.gunmetal, 0.03, 1.0, mast.x, top + 0.5, mast.z, 'y', 'pennantstaff'); pennant(b, P, mast.x, top + 0.8, mast.z, 1.7);
+    const f = parts.find(p => p.name === 'funnel');
+    if (f) { const pr = f.o.userData.profile, y = f.y + f.hy * 0.45, sl = pr && sliceAt(pr, y - f.py, 1), fx0 = sl ? f.px + sl[0] : f.x - f.hx, fx1 = sl ? f.px + sl[1] : f.x + f.hx; box(b, P.id, fx1 - fx0 + 0.08, 0.34, f.hz * 2 + 0.08, (fx0 + fx1) / 2, y, f.z, 'teammark'); }
+  } else if (rig.rotor) {
+    const tb = parts.find(p => p.name === 'tailboom' && p.o.userData.profile);
+    if (tb) { const xm = tb.px + (tb.x - tb.px) - tb.hx * 0.1, sl = sliceAt(tb.o.userData.profile, xm - tb.px, 0); if (sl) box(b, P.id, 0.36, sl[1] - sl[0] + 0.05, tb.hz * 2 + 0.05, xm, tb.py + (sl[0] + sl[1]) / 2, tb.pz, 'teammark'); }
+  } else if (d.air) {
+    for (const k of [-1, 1]) { // a band over each wingtip
+      const tip = parts.reduce((a, p) => (k * p.z + p.hz > k * a.z + a.hz ? p : a)), zt = k * tip.z + tip.hz, pr = tip.o.userData.profile;
+      let xa = tip.x - tip.hx, xb = tip.x + tip.hx;
+      if (pr && tip.o.userData.mode === 'plan') { const at = pr.filter(q => k * (tip.pz + q[1]) >= zt - 0.03), xs = at.map(q => q[0] + tip.px); if (xs.length) { xa = Math.min(...xs); xb = Math.max(...xs); } }
+      const len = Math.max(0.6, xb - xa) + 0.08, w = Math.min(0.5, zt * 0.12);
+      box(b, P.id, len, tip.hy * 2 + 0.05, w, (xa + xb) / 2, tip.y, k * (zt - w / 2 - 0.04), 'teammark');
+    }
+  } else {
+    const host = rig.turret || b, an = (rig.turret ? measure(rig.turret, skip) : parts).find(p => p.name === 'antenna');   // a tank's aerial is on its turret
+    if (an) pennant(host, P, an.x, an.y + an.hy - 0.2, an.z);
+    else { const zs = Math.max(...parts.map(p => Math.abs(p.z) + p.hz)), ax = x0 + (x1 - x0) * 0.2, az = zs * 0.5; cyl(b, s.gunmetal, 0.015, top * 0.6 + 0.85, ax, top * 0.7 + 0.425, az, 'y', 'antenna'); pennant(b, P, ax, top + 0.65, az); }
+    b.traverse((o) => { if (o.isMesh && o.name === 'idpanel' && o.geometry === s.box && o.scale.y < o.scale.x && o.scale.y < o.scale.z) { o.scale.x *= 1.3; o.scale.z *= 1.3; } });   // roof panels a little larger
+  }
+  return rig;
+}
+
 export const ASSEMBLY = { abrams, battlemaster, overlord: (P) => sovietTank(P, true), technical, scoutcar: scoutCar, comanche, drone, raptor, f15e, j11, lav25, scudtel, fpv, chinook, z10,
   rhib, mkv, frigate, corvette, lcraft, mboat, dboat,
   t90, t14, bmp3, tunguska, tos1, su27, su57, ka52, stereg,
-  leopard2, kf51, laserleo, puma, gepard, pzh2000, typhoon, tiger, fremm };
+  leopard2, kf51, laserleo, puma, gepard, pzh2000, typhoon, tiger, fremm,
+  a10: (P) => a10(P), ac130: (P) => ac130(P), b2: (P) => b2(P), apache, viper, zu23, shahedtruck, shahed };   // the US strike aircraft are units now (their builders are further down: hence the arrows)
 // ---------------------------------------------------------------- C-130 Hercules / AC-130 gunship
 // Real aircraft (metres): 29.8 long, 40.4 span, 11.7 to the top of the fin; fuselage 4.3 across; four turboprops at
 // 4.95 m and 10.1 m from the centreline, each with a 4.1 m four-blade propeller; tailplane span 16.0. Every number in
@@ -941,7 +1153,10 @@ function herc(P, gunship) {
     ball(b, s.gunmetal, 0.24, 0.24, 0.24, X(4.6), -R - 0.05, -0.3, 'sensorball');
     guns.push([X(7.2), -0.3, -(R + 0.75)], [X(18.4), -0.25, -(R + 1.1)]);
   }
-  return { g, body: b, props, guns };
+  const gear = grp(b, 0, 0, 0, 'gear'); gear.visible = false;                                                // down only on the ground (the buildable AC-130)
+  cyl(gear, s.steel, 0.06, 0.5, X(4.6), -R - 0.2, 0, 'y', 'strut'); for (const k of [-1, 1]) cyl(gear, s.rubber, 0.24, 0.14, X(4.6), -R - 0.34, k * 0.16, 'z', 'wheel');
+  for (const k of [-1, 1]) for (const m of [12.6, 15.0]) cyl(gear, s.rubber, 0.32, 0.3, X(m), -R - 0.26, k * (R - 0.05), 'z', 'wheel');
+  return { g, body: b, props, guns, gear, ground: +(R + 0.6).toFixed(3) };
 }
 const ac130 = (P) => herc(P, true), c130 = (P) => herc(P, false);
 // ---------------------------------------------------------------- hijacked airliner (The Phantom)
@@ -1223,9 +1438,10 @@ export function createModel(e) {
   if (e.kind === 'unit') {
     const d = UNITS[e.type], ext = GLB.get(d.model), make = ASSEMBLY[d.model];
     if (ext) { rig = fromGLB(ext, null); rig.source = 'glb'; }
-    else if (make) { rig = fromTemplate('a:' + e.type + ':' + e.team, () => make(paint(d.faction, e.team))); rig.source = 'assembly'; }
+    else if (make) { rig = fromTemplate('a:' + e.type + ':' + e.team, () => { const P = paint(d.faction, e.team); return teamMarks(make(P), P, d); }); rig.source = 'assembly'; }
   }
   if (!rig) { rig = fromTemplate('l:' + e.kind + ':' + e.type + ':' + e.team + ':' + (e.variant || 0), () => legacyModel(e)); rig.source = 'library'; }
+  if (rig.legs) for (const l of rig.legs) l.traverse((o) => { if (o.isMesh) o.castShadow = false; });   // a leg's own shadow is not worth a second draw
   rig.kind = e.kind; rig.type = e.type;
   return rig;
 }

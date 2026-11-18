@@ -76,12 +76,12 @@ for (const [fac, type] of Object.entries(HEROES)) {
 // ---------------------------------------------------------------- Fook Mie
 {
   const W = WEAPONS.phone, mk = () => { const s = bare({ factions: ['redhammer', 'vanguard'] }); const f = makeUnit(s, 'r_hero', PLAYER, 200, 200, 0); return [s, f]; };
-  ok([['s_guerrilla', 40], ['v_ranger', 40], ['r_tank', 100], ['v_tank', 120], ['v_comanche', 200], ['r_overlord', 267]].every(([t, n]) => hackTicks(W, { type: t }) === n) && W.minSec === 2 && W.maxSec === 14,
-    'recharge follows the price of the unit taken: 2 s for a $225-300 squad, 6 s for a $900 tank, 10 s for a $1,500 gunship, 13.3 s for a $2,000 Overlord');
+  ok([['s_guerrilla', 40], ['r_conscript', 40], ['v_ranger', 43], ['r_tank', 93], ['v_tank', 120], ['v_comanche', 200], ['r_overlord', 267]].every(([t, n]) => hackTicks(W, { type: t }) === n) && W.minSec === 2 && W.maxSec === 14,
+    'recharge follows the price of the unit taken: 2 s for a $240-250 squad, 6 s for a $900 tank, 10 s for a $1,500 gunship, 13.3 s for a $2,000 Overlord');
   { // recruit: cheap ones fast, an expensive one slow
     const [s, f] = mk(), squads = [0, 1, 2].map(i => mute(makeUnit(s, 'v_ranger', ENEMY, 226, 192 + i * 8, Math.PI))); const taken = [], t0 = s.tick;
     runMuted(s, 200, (ev) => { for (const e of ev) if (e.t === 'hack') taken.push(s.tick - t0); });
-    ok(taken.length === 3 && squads.every(u => u.team === PLAYER && !u.dead) && taken[2] - taken[0] <= 2 * 40 + 4, `three cheap squads recruited ${(taken[1] - taken[0]) / 20} s apart; they now belong to her side`);
+    ok(taken.length === 3 && squads.every(u => u.team === PLAYER && !u.dead) && taken[2] - taken[0] <= 2 * 43 + 4, `three cheap squads recruited ${(taken[1] - taken[0]) / 20} s apart; they now belong to her side`);
     ok(s.teams[ENEMY].unitsLost === 3 && s.teams[PLAYER].unitsKilled === 3 && f.mode === 'recruit', 'each one counts as a loss for its old owner');
     const big = mute(makeUnit(s, 'v_tank', ENEMY, 228, 200, Math.PI)), next = mute(makeUnit(s, 'v_ranger', ENEMY, 226, 214, Math.PI)); let tBig = -1, tNext = -1; const t1 = s.tick;
     for (const u of squads) u.__mute = true;

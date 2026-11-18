@@ -344,7 +344,7 @@ export class Hud {
     } else {
       const d = BLDGS[e.type];
       if (e.type === 'dock') return e.supplies > 0 ? `$${fmt(e.supplies)} of supplies left` : 'Depleted';
-      if (d.capturable) return (e.team === PLAYER ? 'Yours: +$' + d.income.amt + ' every 2 s' : e.team === NEUTRAL || !sim.fog.canSee(PLAYER, e) ? 'Send infantry to capture it' : 'Enemy-held: send infantry to retake it');
+      if (d.capturable) return (e.team === PLAYER ? 'Yours: ' + (d.site ? d.desc : '+$' + Math.round(d.income.amt * (e.type === 'derrick' && FACTIONS[sim.teams[PLAYER].faction].oil || 1)) + ' every 2 s') : (e.team === NEUTRAL || !sim.fog.canSee(PLAYER, e) ? 'Send infantry to capture it' : 'Enemy-held: send infantry to retake it') + (d.site ? '. ' + d.desc : ''));
       if (e.type === 'civ') out.push(e.ruined ? 'Destroyed' : `Garrison ${e.team === PLAYER || sim.fog.canSee(PLAYER, e) ? e.garrison.length : '?'}/${capacityOf(e)}` + (e.team === PLAYER && e.garrison.length ? ' · press U, or right-click the ground, to take them out' : ''));
       else if (!e.done) out.push(`Building ${Math.floor(e.progress * 100)}%`);
       else if (mine) {

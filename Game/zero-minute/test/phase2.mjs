@@ -45,7 +45,7 @@ const X = 300, Z = 300;
 // --- veterancy
 {
   const s = empty(); const t = makeUnit(s, 'v_tank', PLAYER, X, Z, 0); hold(t); const hp0 = t.maxHp, ranks = [];
-  for (let k = 0; k < 6; k++) { const v = makeUnit(s, 'r_tank', ENEMY, X + 24, Z + (k % 3) * 6 - 6, Math.PI); hold(v); v.cds = [1e9, 1e9, 1e9]; v.hp = 20;
+  for (let k = 0; k < 8; k++) { const v = makeUnit(s, 'r_tank', ENEMY, X + 24, Z + (k % 3) * 6 - 6, Math.PI); hold(v); v.cds = [1e9, 1e9, 1e9]; v.hp = 20;   // eight kills: the Type 99 is $700 since batch 14, so six no longer reach Heroic
     s.issue({ t: 'attack', ids: [t.id], target: v.id }); run(s, 120, kk => { for (const e of kk.events) if (e.t === 'vet' && e.id === t.id) ranks.push(e.rank); }); }
   ok(ranks.join() === '1,2,3', 'tank ranked up Veteran, Elite, Heroic by kills: ' + ranks.join()); ok(Math.abs(t.maxHp - hp0 * 1.45) < 0.01, 'max HP +15% per rank (' + hp0 + ' to ' + t.maxHp.toFixed(0) + ')');
   const v = makeUnit(s, 'r_overlord', ENEMY, X + 26, Z, Math.PI); hold(v); v.cds = [1e9, 1e9, 1e9]; let tracerVet = -1, cdSeen = 0;

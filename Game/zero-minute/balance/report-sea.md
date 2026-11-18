@@ -4,34 +4,24 @@
 
 ## Outliers
 
-- **United States (no general)** wins 68% of decided games (target 40-60%).
-- **Russia (no general)** wins 20% of decided games (target 40-60%).
-- **Europe (no general)** wins 33% of decided games (target 40-60%).
-- **United States: Air Force General** wins 67% of decided games (target 40-60%).
-- **United States: Marine Corps General** wins 70% of decided games (target 40-60%).
-- **China: Cyber General** wins 75% of decided games (target 40-60%).
-- **China: Mass Assault General** wins 67% of decided games (target 40-60%).
-- **Russia: Wagner Group** wins 14% of decided games (target 40-60%).
-- **Russia: Vacation Command Group** wins 10% of decided games (target 40-60%).
-- I base beats R base 4-0 (target no worse than about 70/30).
-- airforce beats E base 4-0 (target no worse than about 70/30).
-- marine beats E base 4-0 (target no worse than about 70/30).
-- airforce beats panzer 4-0 (target no worse than about 70/30).
-- marine beats panzer 4-0 (target no worse than about 70/30).
-- cyber beats I base 4-0 (target no worse than about 70/30).
-- cyber beats R base 4-0 (target no worse than about 70/30).
-- cyber beats wmd 4-0 (target no worse than about 70/30).
+- **China (no general)** wins 62% of decided games (target 40-60%).
+- **ISIS (no general)** wins 21% of decided games (target 40-60%).
+- **Russia (no general)** wins 68% of decided games (target 40-60%).
+- **ISIS: Stealth General** wins 26% of decided games (target 40-60%).
+- **ISIS: WMD General** wins 31% of decided games (target 40-60%).
+- **Europe: Panzer General** wins 63% of decided games (target 40-60%).
+- US base beats wmd 4-0 (target no worse than about 70/30).
+- E base beats marine 4-0 (target no worse than about 70/30).
+- cyber beats airforce 4-0 (target no worse than about 70/30).
 - cyber beats vacation 4-0 (target no worse than about 70/30).
-- cyber beats panzer 4-0 (target no worse than about 70/30).
-- mass beats vacation 4-0 (target no worse than about 70/30).
-- wmd beats wagner 4-0 (target no worse than about 70/30).
-- marine beats lasergen 4-0 (target no worse than about 70/30).
-- Map **strait** favours start 2: 65% of decided games (target within 5 points of even).
+- C base beats lasergen 4-0 (target no worse than about 70/30).
+- panzer beats I base 4-0 (target no worse than about 70/30).
 - 30% of matches end in a draw at 25 minutes.
 - US base: the AI never built AC-130 Gunship, B-2 Spirit, AH-64 Apache.
 - C base: the AI never built Landing Craft.
 - I base: the AI never built Saboteur.
 - I base: never used Toxin Bomb.
+- R base: never used Iskander Strike.
 - marine: the AI never built AC-130 Gunship, B-2 Spirit, AH-64 Apache, Mk V Combat Boat.
 - cyber: the AI never built Landing Craft.
 - mass: the AI never built Landing Craft.
@@ -39,27 +29,29 @@
 - stealth: never used Toxin Bomb.
 - wmd: the AI never built Saboteur.
 - wmd: never used Toxin Bomb.
+- wagner: never used Iskander Strike.
+- vacation: never used Iskander Strike.
 
 
 ## Loadouts
 
 | Loadout | Games | Win rate | W | L | Draws | Avg win (min) | Value killed / lost | Earned | Idle money |
 |---|---|---|---|---|---|---|---|---|---|
-| China: Cyber General | 56 | 75% | 39 | 13 | 4 | 23.5 | 1.10 | 58100 | 5553 |
-| United States: Marine Corps General | 56 | 70% | 26 | 11 | 19 | 21.1 | 1.02 | 103503 | 8043 |
-| United States (no general) | 56 | 68% | 23 | 11 | 22 | 25.4 | 1.06 | 110910 | 11653 |
-| United States: Air Force General | 56 | 67% | 29 | 14 | 13 | 23.3 | 1.06 | 102757 | 4322 |
-| China: Mass Assault General | 56 | 67% | 24 | 12 | 20 | 26.2 | 1.02 | 78447 | 8562 |
-| ISIS: WMD General | 56 | 57% | 25 | 19 | 12 | 27.1 | 0.81 | 79887 | 7902 |
-| China (no general) | 56 | 50% | 21 | 21 | 14 | 26.8 | 1.01 | 71840 | 7523 |
-| ISIS (no general) | 56 | 50% | 21 | 21 | 14 | 22.9 | 0.77 | 75593 | 7490 |
-| ISIS: Stealth General | 56 | 50% | 20 | 20 | 16 | 21.2 | 0.70 | 77370 | 5682 |
-| Europe: Laser General | 56 | 49% | 19 | 20 | 17 | 30.0 | 1.32 | 81507 | 2872 |
-| Europe: Panzer General | 56 | 43% | 21 | 28 | 7 | 30.2 | 1.19 | 78630 | 3380 |
-| Europe (no general) | 56 | 33% | 14 | 29 | 13 | 33.5 | 1.16 | 78403 | 2706 |
-| Russia (no general) | 56 | 20% | 6 | 24 | 26 | 31.9 | 1.16 | 86587 | 3880 |
-| Russia: Wagner Group | 56 | 14% | 4 | 24 | 28 | 30.4 | 0.95 | 87257 | 4859 |
-| Russia: Vacation Command Group | 56 | 10% | 3 | 28 | 25 | 25.6 | 1.10 | 84673 | 3303 |
+| Russia (no general) | 56 | 68% | 21 | 10 | 25 | 28.8 | 1.21 | 93193 | 11348 |
+| Europe: Panzer General | 56 | 63% | 27 | 16 | 13 | 26.6 | 1.19 | 86710 | 4815 |
+| China (no general) | 56 | 62% | 23 | 14 | 19 | 29.0 | 1.05 | 88983 | 8070 |
+| Russia: Vacation Command Group | 56 | 58% | 18 | 13 | 25 | 27.9 | 1.05 | 89473 | 10790 |
+| China: Cyber General | 56 | 58% | 29 | 21 | 6 | 28.5 | 0.96 | 81350 | 5409 |
+| Europe (no general) | 56 | 57% | 28 | 21 | 7 | 28.0 | 1.32 | 81653 | 3968 |
+| Europe: Laser General | 56 | 57% | 26 | 20 | 10 | 28.8 | 1.26 | 86997 | 5316 |
+| Russia: Wagner Group | 56 | 56% | 19 | 15 | 22 | 28.8 | 0.99 | 87357 | 10049 |
+| United States (no general) | 56 | 54% | 20 | 17 | 19 | 31.1 | 1.09 | 112050 | 8556 |
+| China: Mass Assault General | 56 | 54% | 15 | 13 | 28 | 28.4 | 1.05 | 93377 | 12141 |
+| United States: Marine Corps General | 56 | 48% | 20 | 22 | 14 | 28.2 | 1.11 | 104920 | 6375 |
+| United States: Air Force General | 56 | 44% | 18 | 23 | 15 | 28.4 | 1.03 | 111767 | 3038 |
+| ISIS: WMD General | 56 | 31% | 13 | 29 | 14 | 27.7 | 0.71 | 82973 | 7097 |
+| ISIS: Stealth General | 56 | 26% | 10 | 28 | 18 | 27.3 | 0.67 | 85647 | 6839 |
+| ISIS (no general) | 56 | 21% | 9 | 34 | 13 | 22.0 | 0.71 | 77190 | 8666 |
 
 ## Pairings
 
@@ -67,32 +59,32 @@ Row loadout's win rate against the column loadout (both start positions combined
 
 |  | US base | C base | I base | R base | E base | airforce | marine | cyber | mass | stealth | wmd | wagner | vacation | lasergen | panzer |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| US base | · | 33% /1d | 50% | 100% /3d | 100% /1d | 50% /2d | 100% /2d | 33% /1d | 33% /1d | 67% /1d | 100% /2d | 100% /3d | 100% /1d | 100% /3d | 67% /1d |
-| C base | 67% /1d | · | 50% /2d | 100% /2d | 67% /1d | 33% /1d | 0% /1d | 50% | 25% | 0% /2d | 33% /1d | 67% /1d | 100% /2d | 75% | 50% |
-| I base | 50% | 50% /2d | · | 100% | 75% | 33% /1d | 67% /1d | 0% | 50% /2d | 0% /3d | 25% | 100% /3d | 100% /2d | 25% | 50% |
-| R base | 0% /3d | 0% /2d | 0% | · | 67% /1d | 33% /1d | 0% /3d | 0% | 33% /1d | 0% /2d | 0% /2d | - /4d | 0% /3d | 50% /2d | 50% /2d |
-| E base | 0% /1d | 33% /1d | 25% | 33% /1d | · | 0% | 0% | 33% /1d | 0% /2d | 75% | 33% /1d | 100% /1d | 100% /2d | 0% /3d | 25% |
-| airforce | 50% /2d | 67% /1d | 67% /1d | 67% /1d | 100% | · | 100% /3d | 25% | 67% /1d | 50% | 50% | 100% /1d | 100% /3d | 50% | 100% |
-| marine | 0% /2d | 100% /1d | 33% /1d | 100% /3d | 100% | 0% /3d | · | 75% | 67% /1d | 67% /1d | 33% /1d | - /4d | 50% /2d | 100% | 100% |
-| cyber | 67% /1d | 50% | 100% | 100% | 67% /1d | 75% | 25% | · | 67% /1d | 75% | 100% | 50% | 100% | 67% /1d | 100% |
-| mass | 67% /1d | 75% | 50% /2d | 67% /1d | 100% /2d | 33% /1d | 33% /1d | 33% /1d | · | 0% /3d | 100% /2d | 100% /3d | 100% | 100% /2d | 67% /1d |
-| stealth | 33% /1d | 100% /2d | 100% /3d | 100% /2d | 25% | 50% | 33% /1d | 25% | 100% /3d | · | 33% /1d | 100% /2d | 75% | 33% /1d | 25% |
-| wmd | 0% /2d | 67% /1d | 75% | 100% /2d | 67% /1d | 50% | 67% /1d | 0% | 0% /2d | 67% /1d | · | 100% | 100% /1d | 25% | 67% /1d |
-| wagner | 0% /3d | 33% /1d | 0% /3d | - /4d | 0% /1d | 0% /1d | - /4d | 50% | 0% /3d | 0% /2d | 0% | · | - /4d | 0% /2d | 25% |
-| vacation | 0% /1d | 0% /2d | 0% /2d | 100% /3d | 0% /2d | 0% /3d | 50% /2d | 0% | 0% | 25% | 0% /1d | - /4d | · | 0% /3d | 0% /2d |
-| lasergen | 0% /3d | 25% | 75% | 50% /2d | 100% /3d | 50% | 0% | 33% /1d | 0% /2d | 67% /1d | 75% | 100% /2d | 100% /3d | · | 50% |
-| panzer | 33% /1d | 50% | 50% | 50% /2d | 75% | 0% | 0% | 0% | 33% /1d | 75% | 33% /1d | 75% | 100% /2d | 50% | · |
+| US base | · | 50% /2d | 67% /1d | 100% /3d | 25% | 33% /1d | 50% | 50% | 0% /3d | 100% /1d | 100% | 0% /3d | 100% /3d | 0% /1d | 67% /1d |
+| C base | 50% /2d | · | 75% | 0% /2d | 67% /1d | 33% /1d | 75% | 67% /1d | 0% /3d | 50% | 100% /3d | 100% /2d | 50% /2d | 100% | 50% /2d |
+| I base | 33% /1d | 25% | · | 0% /2d | 25% | 25% | 0% /2d | 50% | 0% /2d | 100% /3d | 25% | 0% /1d | 0% /2d | 25% | 0% |
+| R base | 0% /3d | 100% /2d | 100% /2d | · | 67% /1d | 33% /1d | - /4d | 25% | 100% /2d | 67% /1d | 100% /1d | 100% /2d | 67% /1d | 100% /2d | 0% /3d |
+| E base | 75% | 33% /1d | 75% | 33% /1d | · | 67% /1d | 100% | 33% /1d | 33% /1d | 75% | 75% | 50% | 50% /2d | 25% | 50% |
+| airforce | 67% /1d | 67% /1d | 75% | 67% /1d | 33% /1d | · | 50% | 0% | 0% /3d | 100% /3d | 0% /3d | 50% | 50% /2d | 25% | 25% |
+| marine | 50% | 25% | 100% /2d | - /4d | 0% | 50% | · | 33% /1d | 50% | 0% /3d | 75% | 67% /1d | 100% /3d | 50% | 50% |
+| cyber | 50% | 33% /1d | 50% | 75% | 67% /1d | 100% | 67% /1d | · | 50% /2d | 75% | 25% | 33% /1d | 100% | 50% | 25% |
+| mass | 100% /3d | 100% /3d | 100% /2d | 0% /2d | 67% /1d | 100% /3d | 50% | 50% /2d | · | 33% /1d | - /4d | 100% /3d | 33% /1d | 67% /1d | 0% /2d |
+| stealth | 0% /1d | 50% | 0% /3d | 33% /1d | 25% | 0% /3d | 100% /3d | 25% | 67% /1d | · | 33% /1d | 0% /2d | 0% /2d | 25% | 0% /1d |
+| wmd | 0% | 0% /3d | 75% | 0% /1d | 25% | 100% /3d | 25% | 75% | - /4d | 67% /1d | · | 25% | 0% /1d | 0% /1d | 25% |
+| wagner | 100% /3d | 0% /2d | 100% /1d | 0% /2d | 50% | 50% | 33% /1d | 67% /1d | 0% /3d | 100% /2d | 75% | · | 0% /3d | 50% /2d | 100% /2d |
+| vacation | 0% /3d | 50% /2d | 100% /2d | 33% /1d | 50% /2d | 50% /2d | 0% /3d | 0% | 67% /1d | 100% /2d | 100% /1d | 100% /3d | · | 100% /2d | 67% /1d |
+| lasergen | 100% /1d | 0% | 75% | 0% /2d | 75% | 75% | 50% | 50% | 33% /1d | 75% | 100% /1d | 50% /2d | 0% /2d | · | 67% /1d |
+| panzer | 33% /1d | 50% /2d | 100% | 100% /3d | 50% | 75% | 50% | 75% | 100% /2d | 100% /1d | 75% | 0% /2d | 33% /1d | 33% /1d | · |
 
 ## Maps and start positions
 
 | Map | Games | Start 1 wins | Start 2 wins | Draws | Mirror matches: start 1 / start 2 |
 |---|---|---|---|---|---|
-| strait | 225 | 35% | 65% | 61 | 2 / 8 of 15 |
-| isles | 225 | 51% | 49% | 73 | 9 / 2 of 15 |
+| strait | 225 | 54% | 46% | 53 | 6 / 5 of 15 |
+| isles | 225 | 54% | 46% | 81 | 5 / 4 of 15 |
 
 ## Match length
 
-Decided matches: shortest 8.9 min, quarter 18.6, median 26.1, three-quarter 33.6, longest 39.9. Draws: 134 of 450 (30%).
+Decided matches: shortest 9.7 min, quarter 23.2, median 29.7, three-quarter 34.4, longest 40.0. Draws: 134 of 450 (30%).
 
 ## Units
 
@@ -102,318 +94,357 @@ Per loadout: how many of each unit the AI built per game, the share that died, a
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Flashbang Ranger | 300 | 62.7 | 100% | 50.2 / 60.8 |
-| Pathfinder Sniper | 650 | 24.4 | 89% | 21.2 / 20.7 |
-| A-10 Thunderbolt | 1500 | 20.4 | 91% | 14.8 / 11.1 |
-| Avenger Laser Tank | 1200 | 20.3 | 66% | 15.7 / 11.3 |
-| Sentinel Battle Tank | 900 | 20.3 | 70% | 16.9 / 16.6 |
-| Comanche Gunship | 1500 | 20.3 | 87% | 14.6 / 6.7 |
-| Chinook | 800 | 10.6 | 65% | 8.6 / 12.6 |
-| Frigate | 2200 | 7.6 | 40% | 7.9 / 6.5 |
-| RHIB | 500 | 4.2 | 92% | 4.4 / 3.8 |
-| Disabled Vet | 2500 | 3.1 | 72% | 2.4 / 2.5 |
-| F-22 Raptor | 1400 | 3.0 | 88% | 1.9 / 0.8 |
-| Dozer | 1000 | 3.0 | 100% | 1.0 / 6.5 |
-| Recon Drone | 400 | 1.6 | 70% | 1.3 / 1.7 |
+| Flashbang Ranger | 320 | 58.7 | 100% | 49.9 / 48.9 |
+| A-10 Thunderbolt | 1600 | 23.2 | 92% | 20.6 / 12.0 |
+| Pathfinder Sniper | 650 | 17.0 | 89% | 15.9 / 15.1 |
+| M2A3 Bradley | 1000 | 16.9 | 75% | 19.4 / 10.4 |
+| Avenger Laser Tank | 1200 | 14.4 | 71% | 12.3 / 7.6 |
+| Sentinel Battle Tank | 900 | 11.1 | 73% | 11.3 / 7.7 |
+| M142 HIMARS | 1300 | 10.7 | 81% | 13.0 / 3.7 |
+| Chinook | 800 | 9.6 | 69% | 7.7 / 7.4 |
+| Comanche Gunship | 1500 | 9.2 | 92% | 10.0 / 4.0 |
+| Frigate | 2200 | 7.8 | 46% | 7.0 / 5.2 |
+| RHIB | 500 | 4.3 | 95% | 3.9 / 3.2 |
+| Dozer | 1000 | 3.5 | 99% | 2.5 / 4.3 |
+| Disabled Vet | 2500 | 3.4 | 78% | 3.0 / 3.3 |
+| F-22 Raptor | 1400 | 2.3 | 89% | 2.1 / 1.2 |
+| Recon Drone | 400 | 2.1 | 80% | 2.2 / 2.3 |
 | AC-130 Gunship | 2800 | 0.0 | - | 0.0 / 0.0 |
 | B-2 Spirit | 3000 | 0.0 | - | 0.0 / 0.0 |
 | AH-64 Apache | 1600 | 0.0 | - | 0.0 / 0.0 |
 
-Powers used per game: Particle Cannon 2.7, Tomahawk Strike 9.3, Paratrooper Drop 6.0. Superweapon launches per game: 2.68.
+Powers used per game: Particle Cannon 2.0, Tomahawk Strike 9.2, Paratrooper Drop 5.8. Superweapon launches per game: 2.00.
 
 ### China (no general)
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Conscript Squad | 250 | 78.7 | 95% | 64.6 / 69.7 |
-| Z-10 Gunship | 1500 | 21.4 | 93% | 21.2 / 13.3 |
-| Inferno Cannon | 850 | 18.7 | 87% | 17.0 / 13.5 |
-| Battlemaster Tank | 750 | 16.7 | 82% | 14.2 / 13.0 |
-| Supply Truck | 600 | 10.9 | 83% | 6.9 / 11.4 |
-| Corvette | 1900 | 8.9 | 52% | 11.5 / 6.6 |
-| Overlord Heavy Tank | 2000 | 7.6 | 66% | 8.6 / 4.2 |
-| J-11 Fighter | 1200 | 6.0 | 82% | 6.0 / 3.6 |
-| Hacker Squad | 600 | 3.4 | 60% | 3.4 / 3.8 |
-| Fook Mie | 2500 | 3.2 | 76% | 3.6 / 2.5 |
-| Dozer | 1000 | 3.0 | 100% | 0.9 / 5.7 |
-| Scout Car | 450 | 2.4 | 85% | 2.5 / 2.4 |
+| Conscript Squad | 240 | 61.8 | 96% | 41.9 / 69.4 |
+| PGZ-09 | 900 | 22.8 | 85% | 17.0 / 19.7 |
+| ZBD-04A | 850 | 18.9 | 87% | 17.7 / 13.9 |
+| Z-10 Gunship | 1500 | 18.0 | 93% | 13.7 / 14.0 |
+| Battlemaster Tank | 700 | 15.6 | 84% | 12.3 / 15.1 |
+| Supply Truck | 600 | 11.8 | 83% | 5.2 / 11.0 |
+| Corvette | 1900 | 11.7 | 64% | 11.6 / 9.4 |
+| Inferno Cannon | 850 | 8.6 | 89% | 9.0 / 6.9 |
+| Overlord Heavy Tank | 2000 | 7.1 | 72% | 6.0 / 3.9 |
+| Hacker Squad | 600 | 5.3 | 77% | 4.7 / 4.4 |
+| J-11 Fighter | 1200 | 5.0 | 80% | 4.7 / 3.3 |
+| Dozer | 1000 | 3.2 | 100% | 1.4 / 5.3 |
+| Fook Mie | 2500 | 3.2 | 77% | 3.5 / 2.1 |
+| Scout Car | 450 | 2.2 | 81% | 1.8 / 2.4 |
 | Landing Craft | 700 | 0.0 | - | 0.0 / 0.0 |
 
-Powers used per game: Nuclear Missile 2.7, Artillery Barrage 7.8, Cash Hack 1.7, Fuel-Air Bomb 1.7. Superweapon launches per game: 2.72.
+Powers used per game: Nuclear Missile 2.6, Artillery Barrage 8.0, Cash Hack 1.6, Fuel-Air Bomb 1.6. Superweapon launches per game: 2.62.
 
 ### ISIS (no general)
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| RPG Trooper | 300 | 75.8 | 100% | 51.5 / 74.6 |
-| Guerrilla Squad | 225 | 58.8 | 100% | 41.6 / 57.9 |
-| Toxin Tractor | 600 | 33.5 | 93% | 22.7 / 34.9 |
-| Quad Cannon | 500 | 33.0 | 93% | 19.4 / 33.3 |
-| Scorpion Light Tank | 700 | 22.2 | 87% | 19.1 / 19.8 |
-| Drone Boat | 400 | 21.4 | 94% | 18.7 / 18.0 |
-| Supply Pickup | 600 | 15.2 | 84% | 6.1 / 16.1 |
-| Rocket Buggy | 900 | 15.1 | 91% | 13.4 / 12.3 |
-| Shahed Launcher | 1200 | 14.1 | 89% | 10.4 / 12.9 |
-| Technical Pickup | 450 | 13.2 | 93% | 9.7 / 13.9 |
-| Missile Boat | 1500 | 10.9 | 88% | 9.6 / 9.1 |
-| Worker | 250 | 6.5 | 100% | 1.7 / 9.9 |
-| The Phantom | 2500 | 5.5 | 88% | 3.6 / 7.1 |
+| RPG Trooper | 320 | 52.4 | 100% | 32.7 / 48.8 |
+| Guerrilla Squad | 250 | 38.9 | 100% | 23.1 / 36.5 |
+| Quad Cannon | 575 | 32.7 | 93% | 20.5 / 29.2 |
+| Mortar Team | 450 | 22.6 | 91% | 19.1 / 18.9 |
+| Scorpion Light Tank | 775 | 22.3 | 85% | 21.8 / 18.1 |
+| Toxin Tractor | 600 | 21.4 | 92% | 14.9 / 20.1 |
+| Drone Boat | 400 | 16.7 | 96% | 13.6 / 13.9 |
+| Technical Pickup | 450 | 15.2 | 95% | 7.3 / 15.7 |
+| Shahed Launcher | 1200 | 10.3 | 89% | 7.5 / 9.3 |
+| Supply Pickup | 600 | 9.7 | 84% | 4.6 / 9.1 |
+| Missile Boat | 1500 | 8.6 | 89% | 7.2 / 7.1 |
+| Captured T-55 | 650 | 7.4 | 89% | 3.8 / 6.9 |
+| Worker | 250 | 7.2 | 100% | 2.5 / 9.4 |
+| Rocket Buggy | 900 | 5.9 | 92% | 4.9 / 5.2 |
+| The Phantom | 2500 | 4.3 | 88% | 3.5 / 4.4 |
 | Saboteur | 700 | 0.0 | - | 0.0 / 0.0 |
 
-Powers used per game: Scud Storm 3.0, Ambush Squad 6.5, Toxin Bomb 0.0, Sneak Attack 9.3. Superweapon launches per game: 3.03.
+Powers used per game: Scud Storm 2.6, Ambush Squad 6.0, Toxin Bomb 0.0, Sneak Attack 8.3. Superweapon launches per game: 2.57.
 
 ### Russia (no general)
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| RPG Team | 320 | 63.8 | 90% | 44.6 / 56.7 |
-| Motor Rifle Squad | 280 | 50.2 | 100% | 42.6 / 44.9 |
-| BMP-3 | 900 | 35.3 | 86% | 36.3 / 29.4 |
-| Supply Truck | 600 | 16.1 | 93% | 8.0 / 11.9 |
-| T-90 | 800 | 12.8 | 83% | 9.9 / 11.6 |
-| Ka-52 | 1500 | 11.8 | 93% | 16.6 / 5.8 |
-| Steregushchiy Corvette | 1900 | 9.8 | 67% | 10.7 / 6.5 |
-| 2K22 Tunguska | 1000 | 8.1 | 80% | 6.9 / 5.1 |
-| TOS-1A | 1100 | 4.9 | 77% | 9.3 / 3.0 |
-| Dozer | 1000 | 4.3 | 100% | 0.6 / 5.4 |
-| IT’S HIM! | 2500 | 3.1 | 78% | 2.0 / 2.8 |
-| Su-27 | 1300 | 1.3 | 66% | 2.6 / 0.7 |
+| RPG Team | 290 | 52.1 | 89% | 30.1 / 55.0 |
+| Motor Rifle Squad | 250 | 27.7 | 100% | 21.7 / 25.8 |
+| BMP-3 | 750 | 22.1 | 85% | 22.0 / 17.9 |
+| BTR-82A | 600 | 21.3 | 88% | 20.9 / 24.9 |
+| Su-25 Frogfoot | 1250 | 19.4 | 93% | 22.1 / 16.5 |
+| 2K22 Tunguska | 900 | 16.0 | 83% | 10.5 / 15.8 |
+| T-90 | 700 | 16.0 | 76% | 9.0 / 18.0 |
+| Supply Truck | 600 | 12.0 | 78% | 9.5 / 12.5 |
+| Steregushchiy Corvette | 1900 | 11.9 | 63% | 8.7 / 12.5 |
+| Ka-52 | 1500 | 10.8 | 90% | 10.9 / 8.0 |
+| Spetsnaz Team | 650 | 10.1 | 89% | 8.1 / 6.8 |
+| 2S19 Msta-S | 1000 | 4.7 | 83% | 4.0 / 4.6 |
+| Dozer | 1000 | 3.9 | 100% | 1.4 / 7.1 |
+| TOS-1A | 1000 | 3.5 | 80% | 2.5 / 2.9 |
+| IT’S HIM! | 2500 | 2.6 | 69% | 2.0 / 3.5 |
+| Mi-8 | 900 | 2.6 | 92% | 1.8 / 3.6 |
+| Su-27 | 1300 | 2.3 | 82% | 1.9 / 2.3 |
 
-Powers used per game: Iskander Strike 2.6, Artillery Barrage 8.8, VDV Airdrop 5.6, ODAB Fuel-Air Bomb 5.3. Superweapon launches per game: 2.63.
+Powers used per game: Kinzhal Strike 3.4, Artillery Barrage 9.9, VDV Airdrop 6.0, ODAB Fuel-Air Bomb 5.8, Iskander Strike 0.0. Superweapon launches per game: 3.37.
 
 ### Europe (no general)
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Legion Squad | 340 | 56.2 | 100% | 57.9 / 49.2 |
-| MILAN Team | 430 | 44.5 | 89% | 44.6 / 40.2 |
-| Puma | 950 | 23.1 | 80% | 28.3 / 16.4 |
-| Flakpanzer Gepard | 950 | 12.1 | 79% | 15.4 / 8.2 |
-| Supply Truck | 600 | 11.9 | 90% | 7.9 / 10.2 |
-| FREMM Frigate | 2100 | 8.5 | 64% | 10.1 / 6.3 |
-| Leonidas | 2500 | 6.5 | 92% | 7.1 / 5.3 |
-| Tiger | 1500 | 5.9 | 89% | 9.9 / 1.7 |
-| PzH 2000 | 1100 | 3.8 | 71% | 7.0 / 1.4 |
-| Dozer | 1000 | 3.4 | 100% | 0.6 / 4.5 |
-| Leopard 2A6 | 1000 | 3.0 | 75% | 3.6 / 2.3 |
-| Eurofighter Typhoon | 1500 | 1.0 | 67% | 2.4 / 0.2 |
+| Legion Squad | 340 | 39.8 | 100% | 34.4 / 44.4 |
+| MILAN Team | 430 | 29.1 | 87% | 24.6 / 32.0 |
+| Boxer | 800 | 15.1 | 79% | 15.2 / 13.8 |
+| Puma | 950 | 13.1 | 75% | 12.2 / 11.5 |
+| Flakpanzer Gepard | 950 | 12.9 | 76% | 12.3 / 10.5 |
+| FREMM Frigate | 2100 | 8.4 | 56% | 8.7 / 6.0 |
+| Supply Truck | 600 | 8.0 | 69% | 6.7 / 7.9 |
+| Leopard 2A6 | 1000 | 6.5 | 64% | 6.7 / 4.9 |
+| Leonidas | 2500 | 5.6 | 87% | 5.1 / 5.1 |
+| Tiger | 1500 | 5.3 | 90% | 5.6 / 3.3 |
+| NH90 | 850 | 4.3 | 93% | 4.1 / 4.3 |
+| PzH 2000 | 1100 | 4.3 | 78% | 4.0 / 3.4 |
+| Dozer | 1000 | 3.4 | 100% | 1.2 / 6.3 |
+| Eurofighter Typhoon | 1500 | 2.3 | 74% | 2.4 / 1.4 |
 
-Powers used per game: Orbital Lance 1.9, Artillery Barrage 8.1, Airborne Drop 5.0, Storm Shadow Strike 4.7. Superweapon launches per game: 1.95.
+Powers used per game: Sky Shield 0.8, Artillery Barrage 7.9, Airborne Drop 4.9, Storm Shadow Strike 4.6. Superweapon launches per game: 0.78.
 
 ### United States: Air Force General
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Flashbang Ranger | 300 | 57.0 | 100% | 42.5 / 61.7 |
-| Pathfinder Sniper | 650 | 20.4 | 87% | 18.1 / 20.9 |
-| Sentinel Battle Tank | 900 | 16.8 | 71% | 12.4 / 18.2 |
-| A-10 Thunderbolt | 1500 | 16.0 | 92% | 12.2 / 13.9 |
-| Avenger Laser Tank | 1200 | 14.7 | 64% | 12.6 / 13.0 |
-| Chinook | 800 | 11.3 | 70% | 8.0 / 12.0 |
-| AH-64 Apache | 1600 | 9.8 | 76% | 9.3 / 6.6 |
-| Frigate | 2200 | 8.2 | 50% | 7.0 / 7.8 |
-| Comanche Gunship | 1500 | 7.5 | 81% | 7.1 / 3.7 |
-| RHIB | 500 | 4.6 | 92% | 3.9 / 4.6 |
-| F-15E Strike Eagle | 1600 | 4.2 | 84% | 5.0 / 1.4 |
-| AC-130 Gunship | 2800 | 3.1 | 72% | 3.9 / 0.8 |
-| Disabled Vet | 2500 | 3.1 | 75% | 2.9 / 2.6 |
-| Dozer | 1000 | 2.5 | 100% | 0.5 / 4.8 |
-| Recon Drone | 400 | 1.4 | 65% | 1.3 / 1.6 |
-| F-22 Raptor | 1400 | 0.4 | 88% | 0.3 / 0.1 |
-| B-2 Spirit | 3000 | 0.0 | 0% | 0.0 / 0.0 |
+| Flashbang Ranger | 320 | 57.8 | 100% | 43.5 / 54.5 |
+| A-10 Thunderbolt | 1600 | 20.2 | 93% | 17.4 / 15.6 |
+| M2A3 Bradley | 1000 | 14.0 | 80% | 12.9 / 11.4 |
+| Pathfinder Sniper | 650 | 13.3 | 89% | 12.5 / 11.8 |
+| Avenger Laser Tank | 1200 | 10.4 | 71% | 11.3 / 6.5 |
+| Chinook | 800 | 9.9 | 72% | 6.8 / 10.6 |
+| AH-64 Apache | 1600 | 8.2 | 88% | 10.7 / 3.8 |
+| Sentinel Battle Tank | 900 | 7.7 | 73% | 7.5 / 6.9 |
+| M142 HIMARS | 1300 | 6.6 | 82% | 7.3 / 3.6 |
+| Frigate | 2200 | 5.6 | 35% | 7.2 / 3.7 |
+| Comanche Gunship | 1500 | 5.0 | 90% | 5.7 / 4.1 |
+| Dozer | 1000 | 3.5 | 100% | 0.9 / 5.8 |
+| Disabled Vet | 2500 | 3.4 | 79% | 2.3 / 3.0 |
+| RHIB | 500 | 3.4 | 93% | 4.0 / 2.6 |
+| AC-130 Gunship | 2800 | 2.7 | 85% | 3.0 / 1.4 |
+| Recon Drone | 400 | 2.3 | 83% | 1.8 / 2.7 |
+| F-15E Strike Eagle | 1600 | 1.9 | 89% | 2.5 / 1.3 |
+| F-22 Raptor | 1400 | 1.6 | 94% | 1.8 / 1.4 |
+| B-2 Spirit | 3000 | 0.8 | 73% | 1.1 / 0.4 |
 
-Powers used per game: Particle Cannon 1.5, B-2 Fuel-Air Bomb 5.6, Paratrooper Drop 5.4. Superweapon launches per game: 1.48.
+Powers used per game: Particle Cannon 1.0, B-2 Fuel-Air Bomb 6.0, Paratrooper Drop 5.5. Superweapon launches per game: 0.97.
 
 ### United States: Marine Corps General
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Flashbang Ranger | 300 | 53.3 | 100% | 36.4 / 43.4 |
-| LAV-25 | 800 | 25.4 | 81% | 21.3 / 13.7 |
-| A-10 Thunderbolt | 1500 | 17.3 | 93% | 10.5 / 9.2 |
-| AH-1Z Viper | 1300 | 14.6 | 87% | 10.9 / 6.0 |
-| Pathfinder Sniper | 650 | 12.2 | 85% | 10.8 / 9.4 |
-| SEAL Team | 900 | 11.8 | 78% | 12.0 / 7.0 |
-| Avenger Laser Tank | 1200 | 10.4 | 60% | 7.7 / 4.6 |
-| Chinook | 800 | 10.1 | 66% | 5.9 / 10.7 |
-| Frigate | 2200 | 8.0 | 46% | 6.1 / 5.5 |
-| Comanche Gunship | 1500 | 7.7 | 85% | 5.6 / 2.2 |
-| Sentinel Battle Tank | 900 | 6.2 | 64% | 4.1 / 3.6 |
-| RHIB | 500 | 4.5 | 90% | 3.5 / 3.3 |
-| Disabled Vet | 2500 | 3.5 | 75% | 2.8 / 1.8 |
-| Dozer | 1000 | 2.6 | 100% | 0.6 / 5.3 |
-| Recon Drone | 400 | 1.5 | 69% | 1.2 / 1.2 |
-| F-22 Raptor | 1400 | 0.2 | 45% | 0.3 / 0.0 |
+| Flashbang Ranger | 320 | 47.9 | 100% | 44.1 / 44.1 |
+| A-10 Thunderbolt | 1600 | 19.7 | 92% | 20.0 / 11.4 |
+| LAV-25 | 800 | 13.4 | 79% | 13.4 / 9.8 |
+| M2A3 Bradley | 1000 | 12.2 | 75% | 11.7 / 8.7 |
+| Avenger Laser Tank | 1200 | 10.1 | 70% | 11.4 / 4.9 |
+| Pathfinder Sniper | 650 | 8.6 | 88% | 9.7 / 6.8 |
+| Chinook | 800 | 8.6 | 67% | 6.6 / 7.7 |
+| SEAL Team | 900 | 7.8 | 80% | 7.9 / 3.7 |
+| M142 HIMARS | 1300 | 6.8 | 82% | 9.2 / 3.5 |
+| AH-1Z Viper | 1300 | 6.7 | 91% | 8.6 / 3.2 |
+| Frigate | 2200 | 6.3 | 37% | 6.8 / 5.2 |
+| Sentinel Battle Tank | 900 | 4.6 | 76% | 4.5 / 4.4 |
+| Dozer | 1000 | 4.3 | 100% | 1.6 / 7.5 |
+| Comanche Gunship | 1500 | 4.2 | 91% | 4.6 / 1.9 |
+| RHIB | 500 | 3.7 | 89% | 3.9 / 3.2 |
+| Disabled Vet | 2500 | 3.2 | 78% | 2.7 / 2.9 |
+| Recon Drone | 400 | 2.4 | 84% | 2.2 / 2.1 |
+| F-22 Raptor | 1400 | 1.5 | 89% | 1.6 / 1.1 |
 | AC-130 Gunship | 2800 | 0.0 | - | 0.0 / 0.0 |
 | B-2 Spirit | 3000 | 0.0 | - | 0.0 / 0.0 |
 | AH-64 Apache | 1600 | 0.0 | - | 0.0 / 0.0 |
 | Mk V Combat Boat | 1400 | 0.0 | - | 0.0 / 0.0 |
 
-Powers used per game: Particle Cannon 1.9, Tomahawk Strike 7.9, Paratrooper Drop 5.0. Superweapon launches per game: 1.93.
+Powers used per game: Particle Cannon 1.4, Tomahawk Strike 8.0, Paratrooper Drop 4.9. Superweapon launches per game: 1.35.
 
 ### China: Cyber General
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Conscript Squad | 250 | 75.9 | 91% | 74.2 / 64.9 |
-| Inferno Cannon | 850 | 16.3 | 76% | 18.6 / 9.3 |
-| Z-10 Gunship | 1500 | 15.1 | 84% | 17.1 / 8.1 |
-| Battlemaster Tank | 750 | 12.5 | 73% | 12.0 / 9.5 |
-| Supply Truck | 600 | 8.0 | 69% | 6.2 / 7.8 |
-| Corvette | 1900 | 7.6 | 41% | 8.0 / 6.5 |
-| Overlord Heavy Tank | 2000 | 4.3 | 54% | 5.0 / 2.3 |
-| J-11 Fighter | 1200 | 3.8 | 64% | 4.5 / 2.0 |
-| Hacker Squad | 600 | 3.0 | 54% | 2.6 / 4.0 |
-| Fook Mie | 2500 | 3.0 | 75% | 2.8 / 2.3 |
-| Scout Car | 450 | 2.1 | 86% | 1.9 / 2.6 |
-| Dozer | 1000 | 1.5 | 100% | 0.5 / 3.9 |
+| Conscript Squad | 240 | 63.5 | 93% | 49.6 / 75.0 |
+| ZBD-04A | 850 | 21.5 | 89% | 18.4 / 24.0 |
+| PGZ-09 | 900 | 19.1 | 81% | 19.5 / 16.4 |
+| Z-10 Gunship | 1500 | 15.7 | 91% | 14.6 / 14.1 |
+| Corvette | 1900 | 9.4 | 66% | 9.8 / 8.1 |
+| Battlemaster Tank | 700 | 9.3 | 78% | 8.1 / 10.8 |
+| Supply Truck | 600 | 8.6 | 73% | 5.7 / 9.4 |
+| Inferno Cannon | 850 | 6.8 | 83% | 7.0 / 6.5 |
+| J-11 Fighter | 1200 | 4.6 | 81% | 4.7 / 3.4 |
+| Hacker Squad | 600 | 4.3 | 75% | 4.6 / 4.5 |
+| Overlord Heavy Tank | 2000 | 3.9 | 71% | 3.6 / 3.8 |
+| Fook Mie | 2500 | 3.3 | 76% | 3.4 / 2.9 |
+| Dozer | 1000 | 2.9 | 100% | 0.9 / 5.0 |
+| Scout Car | 450 | 2.1 | 88% | 2.1 / 2.3 |
 | Landing Craft | 700 | 0.0 | - | 0.0 / 0.0 |
 
-Powers used per game: Nuclear Missile 2.0, Artillery Barrage 7.1, Cash Hack 3.1, Fuel-Air Bomb 2.0. Superweapon launches per game: 2.05.
+Powers used per game: Nuclear Missile 1.4, Artillery Barrage 9.3, Cash Hack 2.9, Fuel-Air Bomb 2.3. Superweapon launches per game: 1.40.
 
 ### China: Mass Assault General
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Conscript Squad | 250 | 82.5 | 95% | 61.5 / 98.1 |
-| Z-10 Gunship | 1500 | 24.6 | 92% | 21.5 / 13.4 |
-| Battlemaster Tank | 750 | 20.7 | 83% | 13.8 / 26.0 |
-| Inferno Cannon | 850 | 20.1 | 84% | 16.4 / 13.7 |
-| Supply Truck | 600 | 12.6 | 85% | 6.3 / 9.4 |
-| Overlord Heavy Tank | 2000 | 9.4 | 69% | 8.6 / 6.6 |
-| Corvette | 1900 | 9.2 | 51% | 8.7 / 7.2 |
-| J-11 Fighter | 1200 | 7.0 | 83% | 6.7 / 3.3 |
-| Hacker Squad | 600 | 3.8 | 66% | 3.0 / 4.4 |
-| Fook Mie | 2500 | 3.3 | 77% | 2.7 / 3.4 |
-| Dozer | 1000 | 3.0 | 100% | 0.6 / 5.1 |
-| Scout Car | 450 | 2.3 | 83% | 2.3 / 1.9 |
+| Conscript Squad | 240 | 66.4 | 97% | 46.2 / 69.7 |
+| ZBD-04A | 850 | 20.7 | 88% | 15.9 / 18.0 |
+| PGZ-09 | 900 | 20.7 | 84% | 19.6 / 13.7 |
+| Z-10 Gunship | 1500 | 19.5 | 95% | 16.4 / 13.5 |
+| Battlemaster Tank | 700 | 15.9 | 83% | 12.9 / 16.3 |
+| Supply Truck | 600 | 12.2 | 85% | 7.4 / 8.2 |
+| Corvette | 1900 | 9.7 | 59% | 9.1 / 8.8 |
+| Inferno Cannon | 850 | 7.6 | 89% | 7.1 / 4.9 |
+| J-11 Fighter | 1200 | 6.5 | 83% | 6.5 / 4.8 |
+| Overlord Heavy Tank | 2000 | 6.0 | 70% | 6.2 / 4.3 |
+| Hacker Squad | 600 | 4.7 | 69% | 3.1 / 5.6 |
+| Fook Mie | 2500 | 3.3 | 79% | 2.8 / 2.5 |
+| Dozer | 1000 | 3.2 | 100% | 0.6 / 5.5 |
+| Scout Car | 450 | 2.3 | 89% | 2.2 / 1.9 |
 | Landing Craft | 700 | 0.0 | - | 0.0 / 0.0 |
 
-Powers used per game: Nuclear Missile 3.3, Artillery Barrage 8.3, Cash Hack 1.6, Fuel-Air Bomb 1.6. Superweapon launches per game: 3.27.
+Powers used per game: Nuclear Missile 2.8, Artillery Barrage 8.7, Cash Hack 1.9, Fuel-Air Bomb 1.9. Superweapon launches per game: 2.82.
 
 ### ISIS: Stealth General
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| RPG Trooper | 300 | 62.3 | 100% | 35.0 / 66.5 |
-| FPV Attack Drone | 350 | 54.5 | 94% | 46.2 / 50.4 |
-| Guerrilla Squad | 225 | 50.6 | 100% | 28.3 / 54.5 |
-| Toxin Tractor | 600 | 36.1 | 93% | 22.1 / 41.5 |
-| Quad Cannon | 500 | 33.5 | 94% | 16.4 / 33.8 |
-| Suicide Bomber | 300 | 24.7 | 97% | 15.8 / 22.9 |
-| Scorpion Light Tank | 700 | 20.4 | 87% | 15.3 / 18.0 |
-| Drone Boat | 400 | 19.9 | 95% | 16.9 / 17.7 |
-| Rocket Buggy | 900 | 15.0 | 92% | 11.5 / 13.1 |
-| Supply Pickup | 600 | 14.8 | 86% | 6.3 / 17.2 |
-| Shahed Launcher | 1200 | 13.8 | 89% | 7.9 / 13.5 |
-| Technical Pickup | 450 | 12.9 | 94% | 8.3 / 12.7 |
-| Missile Boat | 1500 | 10.2 | 89% | 8.8 / 8.9 |
-| Worker | 250 | 4.5 | 100% | 1.1 / 7.1 |
-| The Phantom | 2500 | 4.5 | 85% | 3.2 / 5.1 |
+| FPV Attack Drone | 350 | 65.0 | 95% | 62.8 / 52.9 |
+| RPG Trooper | 320 | 62.0 | 100% | 37.7 / 59.4 |
+| Guerrilla Squad | 250 | 38.8 | 100% | 24.6 / 39.8 |
+| Quad Cannon | 575 | 37.1 | 94% | 27.5 / 33.0 |
+| Scorpion Light Tank | 775 | 25.2 | 88% | 27.5 / 19.4 |
+| Toxin Tractor | 600 | 23.8 | 95% | 13.8 / 22.8 |
+| Mortar Team | 450 | 21.1 | 93% | 17.2 / 18.9 |
+| Technical Pickup | 450 | 20.0 | 95% | 11.4 / 20.3 |
+| Drone Boat | 400 | 18.2 | 95% | 17.6 / 16.2 |
+| Shahed Launcher | 1200 | 11.6 | 91% | 8.4 / 10.2 |
+| Supply Pickup | 600 | 11.1 | 85% | 6.6 / 12.2 |
+| Missile Boat | 1500 | 9.3 | 92% | 9.2 / 8.2 |
+| Rocket Buggy | 900 | 8.0 | 93% | 10.1 / 6.6 |
+| Captured T-55 | 650 | 7.7 | 93% | 4.3 / 6.4 |
+| Worker | 250 | 7.4 | 100% | 2.1 / 9.3 |
+| Suicide Bomber | 300 | 5.6 | 100% | 5.3 / 5.4 |
+| The Phantom | 2500 | 4.5 | 87% | 3.5 / 4.3 |
 | Saboteur | 700 | 0.0 | - | 0.0 / 0.0 |
 
-Powers used per game: Scud Storm 2.9, Ambush Squad 6.7, Toxin Bomb 0.0, Sneak Attack 9.4. Superweapon launches per game: 2.93.
+Powers used per game: Scud Storm 2.2, Ambush Squad 6.9, Toxin Bomb 0.0, Sneak Attack 9.8. Superweapon launches per game: 2.17.
 
 ### ISIS: WMD General
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| RPG Trooper | 300 | 74.2 | 100% | 64.3 / 61.6 |
-| Guerrilla Squad | 225 | 59.4 | 100% | 54.5 / 47.6 |
-| Toxin Tractor | 600 | 30.1 | 91% | 24.5 / 27.9 |
-| Quad Cannon | 500 | 29.1 | 92% | 21.3 / 27.0 |
-| Drone Boat | 400 | 18.4 | 93% | 18.6 / 14.1 |
-| Scorpion Light Tank | 700 | 14.6 | 83% | 15.7 / 10.1 |
-| Scud Launcher | 1500 | 14.2 | 86% | 14.5 / 9.6 |
-| Supply Pickup | 600 | 14.0 | 80% | 5.8 / 17.6 |
-| Shahed Launcher | 1200 | 13.8 | 88% | 13.0 / 10.6 |
-| Rocket Buggy | 900 | 11.8 | 89% | 13.0 / 7.8 |
-| Technical Pickup | 450 | 11.5 | 93% | 8.1 / 11.8 |
-| Missile Boat | 1500 | 9.4 | 86% | 9.7 / 7.3 |
-| The Phantom | 2500 | 5.3 | 85% | 4.8 / 4.9 |
-| Worker | 250 | 5.0 | 98% | 1.9 / 8.9 |
+| RPG Trooper | 320 | 58.1 | 100% | 41.4 / 50.9 |
+| Guerrilla Squad | 250 | 41.2 | 100% | 35.7 / 36.9 |
+| Quad Cannon | 575 | 29.6 | 93% | 26.7 / 23.5 |
+| Mortar Team | 450 | 22.9 | 92% | 25.9 / 15.1 |
+| Scorpion Light Tank | 775 | 21.0 | 90% | 17.2 / 13.0 |
+| Toxin Tractor | 600 | 20.1 | 94% | 22.5 / 17.4 |
+| Drone Boat | 400 | 17.3 | 95% | 14.2 / 13.3 |
+| Technical Pickup | 450 | 15.0 | 94% | 11.6 / 14.1 |
+| Scud Launcher | 1500 | 12.2 | 91% | 11.1 / 9.2 |
+| Shahed Launcher | 1200 | 11.7 | 91% | 10.3 / 9.1 |
+| Missile Boat | 1500 | 8.8 | 88% | 7.5 / 6.9 |
+| Supply Pickup | 600 | 8.5 | 78% | 5.1 / 9.4 |
+| Worker | 250 | 6.3 | 100% | 3.2 / 7.9 |
+| Captured T-55 | 650 | 5.2 | 90% | 4.6 / 3.0 |
+| Rocket Buggy | 900 | 5.0 | 93% | 3.6 / 3.5 |
+| The Phantom | 2500 | 4.2 | 84% | 3.6 / 3.5 |
 | Saboteur | 700 | 0.0 | - | 0.0 / 0.0 |
 
-Powers used per game: Scud Storm 3.4, Ambush Squad 6.5, Toxin Bomb 0.0, Sneak Attack 9.2. Superweapon launches per game: 3.42.
+Powers used per game: Scud Storm 2.4, Ambush Squad 5.9, Toxin Bomb 0.0, Sneak Attack 8.5. Superweapon launches per game: 2.42.
 
 ### Russia: Wagner Group
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Convict Squad | 160 | 61.3 | 94% | 43.8 / 58.9 |
-| RPG Team | 320 | 54.6 | 92% | 38.4 / 45.7 |
-| BMP-3 | 900 | 38.8 | 90% | 39.0 / 34.7 |
-| Motor Rifle Squad | 280 | 24.6 | 100% | 18.4 / 23.9 |
-| Supply Truck | 600 | 19.1 | 95% | 8.2 / 15.2 |
-| Ka-52 | 1500 | 18.2 | 94% | 23.4 / 12.6 |
-| T-90 | 800 | 15.2 | 87% | 9.8 / 13.8 |
-| Steregushchiy Corvette | 1900 | 13.5 | 76% | 11.8 / 10.3 |
-| 2K22 Tunguska | 1000 | 10.6 | 88% | 10.8 / 7.8 |
-| TOS-1A | 1100 | 6.3 | 87% | 9.0 / 5.3 |
-| Dozer | 1000 | 5.8 | 100% | 0.8 / 7.2 |
-| IT’S HIM! | 2500 | 3.2 | 83% | 3.0 / 3.2 |
-| Su-27 | 1300 | 1.8 | 84% | 3.4 / 1.5 |
+| RPG Team | 290 | 45.7 | 91% | 20.7 / 48.5 |
+| Convict Squad | 160 | 39.7 | 92% | 31.4 / 36.8 |
+| BMP-3 | 750 | 24.9 | 89% | 19.7 / 23.9 |
+| Su-25 Frogfoot | 1250 | 18.8 | 94% | 17.8 / 14.5 |
+| Motor Rifle Squad | 250 | 18.0 | 100% | 12.8 / 22.2 |
+| BTR-82A | 600 | 17.3 | 94% | 11.0 / 16.0 |
+| 2K22 Tunguska | 900 | 15.6 | 88% | 13.0 / 11.6 |
+| Supply Truck | 600 | 13.6 | 86% | 8.3 / 14.6 |
+| Spetsnaz Team | 650 | 13.1 | 93% | 11.4 / 12.7 |
+| T-90 | 700 | 12.6 | 78% | 11.1 / 7.1 |
+| Steregushchiy Corvette | 1900 | 12.4 | 71% | 11.3 / 10.9 |
+| Ka-52 | 1500 | 11.4 | 92% | 10.0 / 9.0 |
+| Dozer | 1000 | 4.3 | 100% | 1.5 / 8.3 |
+| TOS-1A | 1000 | 3.5 | 88% | 3.0 / 3.8 |
+| Mi-8 | 900 | 3.1 | 94% | 1.8 / 4.4 |
+| 2S19 Msta-S | 1000 | 2.8 | 87% | 2.6 / 1.9 |
+| IT’S HIM! | 2500 | 2.6 | 74% | 2.1 / 2.0 |
+| Su-27 | 1300 | 2.3 | 90% | 1.7 / 1.4 |
 
-Powers used per game: Iskander Strike 3.2, Artillery Barrage 9.8, VDV Airdrop 6.1, ODAB Fuel-Air Bomb 5.8. Superweapon launches per game: 3.22.
+Powers used per game: Kinzhal Strike 3.1, Artillery Barrage 9.2, VDV Airdrop 5.6, ODAB Fuel-Air Bomb 5.4, Iskander Strike 0.0. Superweapon launches per game: 3.15.
 
 ### Russia: Vacation Command Group
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| RPG Team | 320 | 62.9 | 91% | 24.3 / 59.0 |
-| Motor Rifle Squad | 280 | 49.4 | 100% | 23.3 / 48.3 |
-| BMP-3 | 900 | 35.5 | 87% | 20.0 / 30.9 |
-| Supply Truck | 600 | 16.4 | 97% | 6.0 / 11.2 |
-| T-90 | 800 | 12.9 | 82% | 5.3 / 12.9 |
-| Ka-52 | 1500 | 11.9 | 92% | 14.7 / 6.2 |
-| Steregushchiy Corvette | 1900 | 10.5 | 65% | 7.3 / 6.9 |
-| 2K22 Tunguska | 1000 | 9.0 | 86% | 4.7 / 6.7 |
-| TOS-1A | 1100 | 5.5 | 80% | 7.7 / 3.7 |
-| Dozer | 1000 | 4.9 | 100% | 3.0 / 5.9 |
-| IT’S HIM! | 2500 | 3.1 | 82% | 2.0 / 2.8 |
-| Su-57 | 1600 | 1.5 | 92% | 4.0 / 0.9 |
-| T-14 Armata | 1650 | 0.8 | 69% | 2.3 / 0.3 |
-| Su-27 | 1300 | 0.7 | 85% | 1.7 / 0.4 |
+| RPG Team | 290 | 46.7 | 92% | 25.3 / 46.9 |
+| Motor Rifle Squad | 250 | 29.0 | 100% | 18.9 / 29.6 |
+| BMP-3 | 750 | 22.5 | 85% | 17.8 / 19.2 |
+| BTR-82A | 600 | 20.9 | 88% | 17.5 / 21.9 |
+| Su-25 Frogfoot | 1250 | 18.2 | 94% | 15.4 / 16.0 |
+| 2K22 Tunguska | 900 | 14.5 | 85% | 9.6 / 13.4 |
+| Supply Truck | 600 | 13.3 | 85% | 6.2 / 12.7 |
+| Steregushchiy Corvette | 1900 | 12.9 | 70% | 9.7 / 11.3 |
+| Spetsnaz Team | 650 | 11.5 | 90% | 10.0 / 10.1 |
+| T-90 | 700 | 10.8 | 80% | 8.8 / 7.4 |
+| Ka-52 | 1500 | 10.1 | 94% | 6.4 / 11.3 |
+| 2S19 Msta-S | 1000 | 4.7 | 84% | 4.1 / 3.6 |
+| Dozer | 1000 | 4.4 | 100% | 1.1 / 8.3 |
+| TOS-1A | 1000 | 3.3 | 86% | 2.6 / 3.0 |
+| Mi-8 | 900 | 2.8 | 93% | 2.1 / 3.2 |
+| IT’S HIM! | 2500 | 2.8 | 75% | 2.3 / 2.6 |
+| T-14 Armata | 1650 | 2.5 | 74% | 2.7 / 2.0 |
+| Su-57 | 1600 | 1.9 | 98% | 1.5 / 1.6 |
+| Su-27 | 1300 | 1.4 | 92% | 1.1 / 1.6 |
 
-Powers used per game: Iskander Strike 2.7, Artillery Barrage 8.9, VDV Airdrop 5.7, ODAB Fuel-Air Bomb 5.5. Superweapon launches per game: 2.73.
+Powers used per game: Kinzhal Strike 3.3, Artillery Barrage 10.0, VDV Airdrop 6.1, ODAB Fuel-Air Bomb 5.9, Iskander Strike 0.0. Superweapon launches per game: 3.32.
 
 ### Europe: Laser General
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Legion Squad | 340 | 59.0 | 100% | 50.1 / 48.8 |
-| MILAN Team | 430 | 44.4 | 87% | 38.9 / 36.5 |
-| Puma | 950 | 22.4 | 77% | 23.4 / 14.0 |
-| Flakpanzer Gepard | 950 | 12.5 | 77% | 12.4 / 7.6 |
-| FREMM Frigate | 2100 | 10.3 | 70% | 9.9 / 5.5 |
-| Supply Truck | 600 | 9.0 | 78% | 6.5 / 8.7 |
-| Leonidas | 2500 | 6.7 | 89% | 6.8 / 4.6 |
-| Tiger | 1500 | 5.3 | 83% | 7.2 / 1.0 |
-| Laser Leopard | 1300 | 3.1 | 63% | 3.6 / 0.9 |
-| Leopard 2A6 | 1000 | 2.9 | 70% | 2.7 / 2.1 |
-| PzH 2000 | 1100 | 2.8 | 63% | 4.8 / 0.7 |
-| Dozer | 1000 | 2.3 | 100% | 1.2 / 4.0 |
-| Eurofighter Typhoon | 1500 | 1.0 | 58% | 1.8 / 0.0 |
+| Legion Squad | 340 | 48.7 | 100% | 34.1 / 58.3 |
+| MILAN Team | 430 | 29.7 | 88% | 21.1 / 36.1 |
+| Boxer | 800 | 16.5 | 78% | 12.8 / 16.5 |
+| Puma | 950 | 12.3 | 77% | 12.3 / 9.5 |
+| Flakpanzer Gepard | 950 | 10.4 | 83% | 6.4 / 12.6 |
+| Supply Truck | 600 | 9.5 | 77% | 7.3 / 11.2 |
+| FREMM Frigate | 2100 | 9.3 | 66% | 8.8 / 7.1 |
+| Leonidas | 2500 | 6.3 | 91% | 5.6 / 6.4 |
+| NH90 | 850 | 5.9 | 94% | 5.0 / 6.3 |
+| Leopard 2A6 | 1000 | 5.6 | 67% | 5.6 / 4.0 |
+| PzH 2000 | 1100 | 5.0 | 71% | 6.0 / 4.0 |
+| Tiger | 1500 | 4.3 | 92% | 4.7 / 2.7 |
+| Dozer | 1000 | 3.9 | 100% | 1.1 / 7.0 |
+| Laser Leopard | 1300 | 3.8 | 63% | 5.0 / 1.2 |
+| Eurofighter Typhoon | 1500 | 1.9 | 82% | 2.2 / 1.0 |
 
-Powers used per game: Orbital Lance 1.8, Artillery Barrage 8.3, Airborne Drop 5.2, Storm Shadow Strike 4.9. Superweapon launches per game: 1.82.
+Powers used per game: Sky Shield 0.6, Artillery Barrage 8.6, Airborne Drop 5.4, Storm Shadow Strike 5.1. Superweapon launches per game: 0.60.
 
 ### Europe: Panzer General
 
 | Unit | Cost | Built per game | Died | Built in wins / losses |
 |---|---|---|---|---|
-| Legion Squad | 340 | 52.2 | 100% | 47.5 / 49.1 |
-| MILAN Team | 430 | 41.4 | 89% | 37.2 / 39.7 |
-| Puma | 950 | 21.1 | 77% | 24.3 / 16.1 |
-| Supply Truck | 600 | 11.3 | 81% | 7.4 / 10.9 |
-| Flakpanzer Gepard | 950 | 10.9 | 77% | 13.3 / 7.9 |
-| FREMM Frigate | 2100 | 9.2 | 66% | 10.1 / 6.2 |
-| Leonidas | 2500 | 6.4 | 90% | 6.6 / 6.0 |
-| Leopard 2A6 | 1000 | 6.2 | 77% | 6.0 / 5.8 |
-| Tiger | 1500 | 5.6 | 88% | 9.5 / 2.5 |
-| PzH 2000 | 1100 | 4.0 | 76% | 6.5 / 1.7 |
-| Dozer | 1000 | 3.6 | 100% | 1.0 / 5.4 |
-| Eurofighter Typhoon | 1500 | 1.1 | 64% | 2.3 / 0.3 |
-| KF51 Panther | 1700 | 0.8 | 42% | 1.2 / 0.5 |
+| Legion Squad | 340 | 49.7 | 100% | 34.9 / 62.7 |
+| MILAN Team | 430 | 27.7 | 88% | 20.5 / 33.2 |
+| Boxer | 800 | 15.1 | 83% | 10.4 / 18.4 |
+| Flakpanzer Gepard | 950 | 14.3 | 80% | 12.1 / 13.7 |
+| Puma | 950 | 13.5 | 78% | 12.4 / 12.6 |
+| FREMM Frigate | 2100 | 8.6 | 66% | 8.2 / 6.8 |
+| Supply Truck | 600 | 7.8 | 72% | 5.0 / 7.9 |
+| Leonidas | 2500 | 6.2 | 89% | 5.0 / 6.8 |
+| Tiger | 1500 | 5.9 | 90% | 6.1 / 3.8 |
+| PzH 2000 | 1100 | 5.2 | 75% | 6.1 / 3.2 |
+| Leopard 2A6 | 1000 | 4.9 | 72% | 5.0 / 3.4 |
+| NH90 | 850 | 4.1 | 91% | 4.0 / 3.7 |
+| Dozer | 1000 | 3.4 | 100% | 1.6 / 6.1 |
+| KF51 Panther | 1700 | 2.1 | 70% | 2.3 / 1.5 |
+| Eurofighter Typhoon | 1500 | 2.1 | 79% | 1.8 / 1.6 |
 
-Powers used per game: Orbital Lance 2.0, Artillery Barrage 8.0, Airborne Drop 5.0, Storm Shadow Strike 4.7. Superweapon launches per game: 1.97.
+Powers used per game: Sky Shield 0.7, Artillery Barrage 8.4, Airborne Drop 5.3, Storm Shadow Strike 5.0. Superweapon launches per game: 0.65.
 

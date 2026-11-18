@@ -47,7 +47,7 @@ const cellOf = (x, z) => Math.floor(z / CELL) * N + Math.floor(x / CELL);
   // any number per side, and the lobby rule
   const sim = new Sim({ ai: false }); const T = sim.teams[PLAYER]; T.money = 20000; open(sim);
   const dz = sim.ents.find(e => e.team === PLAYER && e.kind === 'unit' && UNITS[e.type].builder), F = FACTIONS[T.faction].roles;
-  const fb = makeBldg(sim, F.factory, PLAYER, 20, 190); sim.nav.rebuild();
+  const fb = makeBldg(sim, F.factory, PLAYER, 20, 190); makeBldg(sim, F.tech, PLAYER, 34, 200); sim.nav.rebuild();   // a superweapon needs the command building (batch 14)
   const count = () => sim.ents.filter(e => e.type === F.super && e.team === PLAYER).length;
   sim.issue({ t: 'build', id: dz.id, type: F.super, cx: 60, cz: 180 }); run(sim, 2); const first = count();
   sim.issue({ t: 'build', id: dz.id, type: F.super, cx: 84, cz: 180 }); run(sim, 2);

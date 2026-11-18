@@ -2,7 +2,7 @@
 // mirrored through the map centre by the generator, so both sides always get the same ground.
 // No Three.js here: the preview is a 2D picture drawn from the same generateMap() the match uses.
 import { N, setMapSize } from '../sim/defs.js';
-import { DEFAULT_MAP, MAPS, BIOMES, CIV_KINDS, FOOT, MAP_LIMITS, cloneSpec, validateMap, scaleSpec } from '../sim/map.js';
+import { DEFAULT_MAP, MAPS, BIOMES, CIV_KINDS, FOOT, MAP_LIMITS, cloneSpec, validateMap, scaleSpec, town } from '../sim/map.js';
 
 export const MAP_KEY = 'cz-map';
 export const TOOLS = [
@@ -17,6 +17,11 @@ export const TOOLS = [
   ['dock', 'Supply Dock', 'Click to place. Trucks collect supplies here.'],
   ['derrick', 'Oil Derrick', 'Click to place. Capture it for steady income.'],
   ['civ', 'Building', 'Click to place the type chosen under "Building type". Infantry can garrison it.'],
+  ['town', 'Town block', 'Click to stamp six buildings on a street grid with a main street each way, starting from the chosen building type.'],
+  ['site_repair', 'Repair Depot', 'Click to place. Whoever captures it has vehicles nearby repaired.'],
+  ['site_hospital', 'Field Hospital', 'Click to place. Whoever captures it has infantry nearby healed.'],
+  ['site_radar', 'Radar Tower', 'Click to place. Whoever captures it sees a wide circle round it.'],
+  ['site_gun', 'Artillery Platform', 'Click to place. A howitzer that fires for whoever captures it.'],
   ['start', 'Your base', 'Click to move your Command Center. The enemy gets the mirror spot.'],
   ['erase', 'Erase', 'Click any object to remove it and its mirror twin.'],
 ];
@@ -45,6 +50,8 @@ export function applyTool(spec, tool, a, b, opt = {}) {
     case 'road': { if (Math.hypot(x1 - x0, z1 - z0) < 6 || spec.roads.length >= MAP_LIMITS.roads) return false; spec.roads.push([x0, z0, x1, z1, 3.5]); return true; }
     case 'dock': if (spec.docks.length >= MAP_LIMITS.docks) return false; spec.docks.push({ x: Math.round(x0 - 4), z: Math.round(z0 - 3), amount: 30000 }); return true;
     case 'derrick': if (spec.derricks.length >= MAP_LIMITS.derricks) return false; spec.derricks.push([Math.round(x0 - 2), Math.round(z0 - 2)]); return true;
+    case 'town': { const k = (opt.kind | 0) % CIV_KINDS.length, t = town(Math.round(x0 - 12), Math.round(z0 - 7), 3, 2, [k, (k + 1) % CIV_KINDS.length, k, (k + 2) % CIV_KINDS.length, k, (k + 1) % CIV_KINDS.length]); if (spec.civs.length + t.civs.length > MAP_LIMITS.civs || spec.roads.length + t.roads.length > MAP_LIMITS.roads) return false; spec.civs.push(...t.civs); spec.roads.push(...t.roads); return true; }
+    case 'site_repair': case 'site_hospital': case 'site_radar': case 'site_gun': spec.sites = spec.sites || []; if (spec.sites.length >= MAP_LIMITS.sites) return false; spec.sites.push([Math.round(x0 - 2), Math.round(z0 - 2), tool.slice(5)]); return true;
     case 'civ': if (spec.civs.length >= MAP_LIMITS.civs) return false; spec.civs.push([Math.round(x0 - 3), Math.round(z0 - 3), (opt.kind | 0) % CIV_KINDS.length]); return true;
     case 'start': spec.start = [Math.round(x0 - 5), Math.round(z0 - 5)]; delete spec.rampTop; return true;
     case 'erase': {
@@ -56,6 +63,7 @@ export function applyTool(spec, tool, a, b, opt = {}) {
         const inRect = (x, z, w, h) => p[0] >= x && p[0] <= x + w && p[1] >= z && p[1] <= z + h;
         let i = spec.docks.findIndex(d => inRect(d.x, d.z, 8, 6)); if (i >= 0) { spec.docks.splice(i, 1); return true; }
         i = spec.derricks.findIndex(d => inRect(d[0], d[1], 4, 4)); if (i >= 0) { spec.derricks.splice(i, 1); return true; }
+        i = (spec.sites || []).findIndex(d => inRect(d[0], d[1], 4, 4)); if (i >= 0) { spec.sites.splice(i, 1); return true; }
         i = spec.civs.findIndex(d => inRect(d[0], d[1], 6, 6)); if (i >= 0) { spec.civs.splice(i, 1); return true; }
         i = spec.ramps.findIndex(r => segDist(p[0], p[1], r.x, r.z, r.x + r.dx * r.len, r.z + r.dz * r.len) <= r.hw); if (i >= 0) { spec.ramps.splice(i, 1); delete spec.rampTop; return true; }
         i = (spec.bridges || []).findIndex(r => segDist(p[0], p[1], r[0], r[1], r[2], r[3]) <= r[4]); if (i >= 0) { spec.bridges.splice(i, 1); return true; }
@@ -70,7 +78,7 @@ export function applyTool(spec, tool, a, b, opt = {}) {
   return false;
 }
 export const BRUSH = { paintrock: 0, painthill: 1, paintwater: 2 };
-const normalise = (s) => { const o = cloneSpec(s); for (const k of ['mesas', 'ramps', 'roads', 'docks', 'derricks', 'civs', 'water', 'bridges', 'paint']) o[k] = o[k] || []; o.biome = o.biome || 'desert'; o.size = o.size || 256; o.name = 'Custom map'; return o; };
+const normalise = (s) => { const o = cloneSpec(s); for (const k of ['mesas', 'ramps', 'roads', 'docks', 'derricks', 'sites', 'civs', 'water', 'bridges', 'paint']) o[k] = o[k] || []; o.biome = o.biome || 'desert'; o.size = o.size || 256; o.name = 'Custom map'; return o; };
 
 export function openMapBuilder(initial, onDone) {
   const root = $('mapbuilder'), cv = $('mb-canvas'), g = cv.getContext('2d'), base = document.createElement('canvas');
@@ -87,6 +95,7 @@ export function openMapBuilder(initial, onDone) {
     for (const r of m.ramps) { g.strokeStyle = '#f2e3b0'; g.lineWidth = 2; g.beginPath(); g.moveTo(r.x * S, r.z * S); g.lineTo((r.x + r.dx * r.len) * S, (r.z + r.dz * r.len) * S); g.stroke(); g.fillStyle = '#f2e3b0'; g.beginPath(); g.arc((r.x + r.dx * r.len) * S, (r.z + r.dz * r.len) * S, 4, 0, 6.283); g.fill(); }
     for (const d of m.docks) rect(d.x, d.z, 8, 6, '#2f7fd0', '#0b2a4a');
     for (const d of m.derricks) rect(d[0], d[1], 4, 4, '#1c1c1e', '#f2a93b');
+    for (const d of m.sites) { rect(d[0], d[1], 4, 4, '#3a2f4a', '#c9a3ff'); g.fillStyle = '#fff'; g.font = '9px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText({ repair: 'Rep', hospital: 'Hosp', radar: 'Rad', gun: 'Gun' }[d[2]], (d[0] + 2) * S, (d[1] + 2) * S); }
     for (const r of m.bridges) { g.strokeStyle = '#8a6a44'; g.lineWidth = r[4] * 2 * S; g.lineCap = 'butt'; g.beginPath(); g.moveTo(r[0] * S, r[1] * S); g.lineTo(r[2] * S, r[3] * S); g.stroke(); g.lineCap = 'round'; }
     for (const c of m.civs) { rect(c[0], c[1], 6, 6, '#8d8f93', '#33363a'); g.fillStyle = '#111'; g.font = '9px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(CIV_KINDS[c[2]].split(' ')[0].slice(0, 4), (c[0] + 3) * S, (c[1] + 3) * S); }
     m.start.forEach((st, i) => { rect(st.cc[0], st.cc[1], 10, 10, i ? '#d6453a' : '#3fae5a', '#111'); g.fillStyle = '#fff'; g.font = 'bold 12px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(i ? 'ENEMY' : 'YOU', (st.cc[0] + 5) * S, (st.cc[1] + 5) * S); });

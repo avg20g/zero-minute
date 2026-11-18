@@ -111,8 +111,8 @@ function match(fa, fb, lv, ticks, extra) {
 // everything the AI is not allowed to know: where they are, what they are, and the player's hidden
 // economy, rank, promotions and upgrades. A non-cheating AI must issue a byte-identical order log.
 {
-  const run = (variant) => {
-    const sim = new Sim({ factions: ['vanguard', 'redhammer'], difficulty: 'hard' }); const a = sim.ais[0]; a.log = [];
+  const run = (variant, aiNotes = null) => {
+    const sim = new Sim({ factions: ['vanguard', 'redhammer'], difficulty: 'hard', aiNotes }); const a = sim.ais[0]; a.log = [];
     const T = sim.teams[PLAYER], cells = [], B = variant === 'B';
     if (B) { T.money += 50000; T.rank = 5; T.points = 4; T.promos.add('v_strike'); T.upgrades.add('v_pdl'); T.xp = 5000; }
     const b = makeBldg(sim, B ? 'v_barracks' : 'v_power', PLAYER, B ? 14 : 20, B ? 236 : 232); sim.nav.rebuild(); cells.push(cellOf(b.x, b.z));
@@ -123,7 +123,7 @@ function match(fa, fb, lv, ticks, extra) {
     }
     let leaked = 0;
     for (let t = 0; t < 8400 && sim.winner < 0; t++) { sim.step(); sim.events.length = 0; for (const c of cells) if (sim.fog.vis[ENEMY][c]) leaked++; }
-    return { log: a.log, leaked, end: sim.tick };
+    return { log: a.log, leaked, end: sim.tick, plan: a.doctrineId, key: a.noteKey, learned: JSON.stringify([a.card, a.graves, a.raids, a.firstRaid, a.sawVal, a.front, a.mix, a.notebookEntry()]) };   // batch 14: everything the AI learned during the match
   };
   const A = run('A'), B = run('B');
   ok(A.leaked === 0 && B.leaked === 0, `scenario valid: the AI never had sight of the hidden assets (${A.leaked}, ${B.leaked})`);
@@ -131,6 +131,13 @@ function match(fa, fb, lv, ticks, extra) {
   const identical = A.log.length === B.log.length && same === A.log.length;
   ok(A.log.length >= 40 && identical, `identical order log across the swap (${A.log.length} vs ${B.log.length} orders, first ${same} match)`);
   ok(A.end === B.end, `matches end on the same tick (${A.end} vs ${B.end})`);
+  // batch 14: the learning AI. Its report card, route memory, raid memory, doctrine and the notebook entry it would
+  // write must be the same in both runs, and a notebook handed to it must not open a side door either.
+  ok(A.plan && A.learned.length > 80 && A.learned === B.learned, `what it learned (report card, where attacks died, raids on its base, its plan '${A.plan}', its notebook entry) is identical across the swap`);
+  const book = { [A.key]: { n: 20, d: Object.fromEntries(['combined', 'armour', 'infantry', 'aircav', 'siege'].map(k => [k, k === 'siege' ? [9, 0] : [0, 6]])), first: 3000, fn: 6, saw: { inf: 0.2, light: 0.1, heavy: 0.6, air: 0.1 } } };
+  const A2 = run('A', book), B2 = run('B', book); let same2 = 0; while (same2 < A2.log.length && same2 < B2.log.length && A2.log[same2] === B2.log[same2]) same2++;
+  ok(A2.leaked === 0 && B2.leaked === 0 && A2.log.length >= 40 && A2.log.length === B2.log.length && same2 === A2.log.length && A2.learned === B2.learned, `with a notebook from earlier matches: still an identical order log across the swap (${A2.log.length} orders, plan '${A2.plan}')`);
+  ok(A2.log.join('|') !== A.log.join('|'), 'and the notebook does change how it plays (so the check above is not empty)');
   console.log(`blind swap     : hidden +$50,000, Rank 5, promotion, upgrade, and 7 fogged assets moved and re-typed: ${identical ? 'all ' + A.log.length + ' AI orders identical' : 'ORDERS DIVERGED at #' + same} over ${(A.end / 20).toFixed(0)} s`);
 }
 
@@ -175,11 +182,11 @@ function match(fa, fb, lv, ticks, extra) {
     return { a, top: units[0].name, units, def: (a.lastScores.find(s => s.name === 'defense') || {}).score || 0, sh: a.shares() };
   };
   // best counters among the units this AI can actually train right now (promotion-gated units count once unlocked)
-  const rank = (a, arm) => a.combat.filter(t => !UNITS[t].promo || a.sim.teams[a.team].promos.has(UNITS[t].promo)).sort((x, y) => EFFECT[y][arm] - EFFECT[x][arm]);
+  const rank = (a, arm) => a.combat.filter(t => (!UNITS[t].promo || a.sim.teams[a.team].promos.has(UNITS[t].promo)) && (!UNITS[t].needs || a.sim.ents.some(e => e.team === a.team && e.type === UNITS[t].needs))).sort((x, y) => EFFECT[y][arm] - EFFECT[x][arm]);
   const rows = [];
   for (const f of FACTION_IDS) {
     const H = probe(f, 'medium', ['r_overlord', 'r_overlord', 'r_overlord', 'r_tank']);
-    ok(rank(H.a, 'heavy').slice(0, 2).includes(H.top) && H.sh.heavy > 0.9, `${f}: heavy armor spotted -> ${H.top}`);
+    ok(EFFECT[H.top].heavy >= 0.6 * EFFECT[rank(H.a, 'heavy')[0]].heavy && H.sh.heavy > 0.9, `${f}: heavy armor spotted -> ${H.top}`);   // a good answer, not always the single best one: since batch 14 the plan it drew weighs in as well (Europe takes the Leopard 2, within a point of its Tiger)
     const I = probe(f, 'medium', Array(10).fill('r_conscript'));
     ok(rank(I.a, 'inf').slice(0, 2).includes(I.top) && I.sh.inf > 0.9, `${f}: massed infantry spotted -> ${I.top}`);
     const A = probe(f, 'medium', ['v_comanche', 'v_comanche', 'v_comanche']);

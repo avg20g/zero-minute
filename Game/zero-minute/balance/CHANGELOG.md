@@ -1,5 +1,94 @@
 # Balance changelog
 
+## Batch 14, drop B (2026-11-17): towns, sites, command buildings, an AI that plans and learns
+
+Hard v Hard, 2,250 matches (15 sides, five 1 km maps, two seeds), friendly fire on, 40-minute limit. Full table:
+`report.md`; the drop A table is kept as `report-batch14a.md`. Medium: `report-medium.md`. Sea maps: `report-sea.md`.
+
+| Side | Drop A (Hard) | Drop B, first sweep | Drop B, final |
+|---|---|---|---|
+| ISIS: WMD General | 43% | 73% | 60% |
+| United States (no general) | 49% | 62% | 58% |
+| ISIS: Stealth General | 47% | 76% | 58% |
+| ISIS (no general) | 44% | 71% | 56% |
+| United States: Marine Corps General | 54% | 65% | 53% |
+| Europe: Laser General | 47% | 51% | 51% |
+| Russia: Vacation Command Group | 59% | 23% | 51% |
+| Europe: Panzer General | 50% | 50% | 51% |
+| Russia: Wagner Group | 58% | 31% | 50% |
+| China: Mass Assault General | 58% | 43% | 49% |
+| Europe (no general) | 48% | 49% | 46% |
+| Russia (no general) | 40% | 22% | 45% |
+| United States: Air Force General | 45% | 56% | 45% |
+| China: Cyber General | 56% | 43% | 42% |
+| China (no general) | 52% | 36% | 37% |
+
+Fourteen of fifteen sides are inside 40 to 60%. China without a general is just under (37%) and is the first thing
+to look at next time.
+
+**Tempo** (targets: under 5% of matches over before 8 minutes, median 14 to 20 minutes):
+
+| | Drop A | Drop B |
+|---|---|---|
+| Over before 6 minutes | 4.7% | 0.2% |
+| Over before 8 minutes | 18.4% | 6.3% |
+| Median length | 15.8 min | 17.4 min |
+| Still running at 30 minutes | 5.8% | 12.4% |
+| Draws at 40 minutes | 59 | 91 |
+
+Early wins are a third of what they were; the 5% target is not quite reached (most of what is left is ISIS on
+Arctic and Urban, the two maps with the shortest road between the bases).
+
+**Start positions** (target: neither above 55%): canyon 44/56, forest 49/51, urban 52/48, arctic 43/57, open 45/55.
+Drop A was 58/42, 45/55, 51/49, 44/56, 58/43. Canyon and Arctic are a point or two over, both toward the second
+position.
+
+### Two fairness bugs the first sweep found
+The first drop B sweep had the **second start position winning 60% of matches on every map, 80% on Desert Canyon**.
+Neither cause was a start position:
+- **The plan draw.** The match's random stream starts from the seed, and for seeds 1, 2, 3... its first number is
+  nearly the same (0.63, 0.73, 0.72). The first AI to draw therefore got the same plan (air cavalry) in almost every
+  match, the second a varied one. The draw is now hashed from the seed, the side, the match-up and the map.
+- **Ties.** From the middle of the map the two mirrored Artillery Platforms are exactly as far away as each other,
+  and the scout's "nearest next" tour broke the tie by list order: one player's scout drove into the enemy half and
+  died, the other toured its own half and found its sites. Each AI's points of interest are now sorted the same way
+  seen from its own end (nearest to home first, then left before right), so both make mirror-image choices. Tested.
+
+### What the AI was getting wrong (found by the new tests)
+- It never saved up for its airfield, command building or first defense: anything it could not afford that second
+  lost out to the next rifle squad. Those now score in the "save for it" band. On sea maps the same was true of
+  the shipyard.
+- A plan's pull on what it builds is a little weaker (+16 at most, was +22) and the report card a little stronger
+  (plus or minus 14, was 8): what earns its keep is built more.
+
+### Why the factions moved, and what was changed
+- **ISIS rose 25 points** once its AI learned which of its units pay off: 15 Toxin Tractors a match instead of 40,
+  more Scorpions and RPG teams. With learning and plans switched off it was back at 47%. Its core is now a little
+  dearer: Guerrilla $250 (225), RPG Team $320 (300), Quad Cannon $575 (500), Scorpion $775 (700), Mortar Team $450
+  (400).
+- **Russia fell to 20-30%.** It kills more than it loses (1.16) but has the smallest income of any faction: no
+  income building, so everything comes from trucks and Oil Derricks. Changes: **an Oil Derrick pays Russia 30% more**
+  ($39 every 2 s); T-90 and T-14 guns do half damage to infantry (35% for other tanks: high-explosive shells);
+  Rifle Squad $250 and 290 health (280, 270); RPG Team $290 (320); BTR-82A $600 (650); BMP-3 $750 (900); T-90 $700
+  (800); Tunguska $900 (1,000); TOS-1A and Msta-S $1,000 (1,100); Spetsnaz $650 (700); Su-25 $1,250 (1,350).
+- **China**: Conscripts $240 (250), ZBD-04A $850 (900), Type 99 $700 (750).
+- **United States**: Flashbang Ranger $320 (300), A-10 $1,600 (1,500).
+
+### Medium and the sea maps
+- **Medium v Medium** (1,125 matches, one seed): 29 to 65%. Marine Corps General 65, Laser General 64, Europe 63,
+  United States 62, Wagner 59, Panzer 58, Stealth 52, Air Force 48, Russia 46, Vacation 44, Mass Assault 44, ISIS 41,
+  Cyber 39, WMD 37, China 29. No match is over before 6 minutes; 6% before 8; median 18.7 minutes. China without a
+  general is the weak side at both levels.
+- **Sea maps, Hard** (Strait of Sand and Emerald Isles, 450 matches, one seed): 23 to 67% (batch 13: 10 to 75).
+  Russia 67, China 62, Panzer 62 ... WMD 32, Stealth 28, ISIS 23. Start positions 54/46 on both. These maps are slow:
+  the median decided match takes 34 minutes and 134 of 450 are undecided at 40. Still not tuned; they stay on the
+  open list.
+
+### What the AI builds now (Hard, per match)
+Every unit type open to a side is built in the sweep; the only "never built" entries in the report are ships on
+land maps. Examples: Russia 5.2 T-90s, 5.5 Su-25s, 4.8 Tunguskas, 2.8 TOS-1As and 2.4 Msta-S (drop A: 1.2, 2.5,
+1.1, 0.5 and 0); every side builds its command building in nearly every match and has a defense up early.
+
 ## Batch 14, drop A (2026-11-17): new units for every faction, two new superweapons
 
 Hard v Hard, 2,250 matches (15 sides, five 1 km maps, two seeds), friendly fire on, 40-minute limit. Full table:

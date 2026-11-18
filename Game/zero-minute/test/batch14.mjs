@@ -24,7 +24,7 @@ const run = (s, n, f) => { for (let i = 0; i < n; i++) { s.step(); if (f) f(s.ev
 const hold = (u) => { u.order = { t: 'hold' }; u.cds = [1e9, 1e9, 1e9]; return u; };
 const src = (f) => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
-const base = (s, f) => { s.teams[0].money = 99999; for (let i = 0; i < 6; i++) makeBldg(s, f + '_power', PLAYER, 40 + i * 8, 440); makeBldg(s, f + '_factory', PLAYER, 40, 400); };
+const base = (s, f) => { s.teams[0].money = 99999; for (let i = 0; i < 6; i++) makeBldg(s, f + '_power', PLAYER, 40 + i * 8, 440); makeBldg(s, f + '_factory', PLAYER, 40, 400); makeBldg(s, FACTIONS[s.teams[0].faction].roles.tech, PLAYER, 40, 420); };
 
 // ---------------------------------------------------------------- the fix list: rules
 {
@@ -190,6 +190,145 @@ const base = (s, f) => { s.teams[0].money = 99999; for (let i = 0; i < 6; i++) m
   const view = src('js/render/view.js'), hud = src('js/ui/uiHUD.js');
   ok(/case 'kinzhal':/.test(view) && /case 'intercept':/.test(view) && /case 'era':/.test(view) && /p\.kind === 'shield'/.test(view) && /this\.takeoffs/.test(view) && /v\.jet\.visible/.test(view), 'the view draws the Kinzhal hit, the MiG-31 leaving its shelter, interceptions, the shield\'s edge and reactive-armour flashes');
   ok(/'Unload'/.test(hud) && /Aboard the /.test(hud) && /' raised'/.test(hud), 'the HUD words carriers and helicopters as carriers (not Landing Craft) and says the Sky Shield is raised');
+}
+
+// ================================================================ drop B
+const MAP = await import('../js/sim/map.js');
+const AI = await import('../js/sim/aiController.js');
+const { ReplayRecorder, ReplayPlayer } = await import('../js/sim/replayManager.js');
+const keepUp = (q) => { for (const e of q.ents) if (e.kind === 'bldg' && e.team < 2 && !e.dead && e.done) e.hp = e.maxHp; };   // in the long AI matches below nobody's buildings fall, so each runs its full length
+
+// ---------------------------------------------------------------- towns and capturable sites
+{
+  const t = MAP.town(100, 200, 3, 2, [0, 1, 2]);
+  ok(t.civs.length === 6 && t.civs[1][0] - t.civs[0][0] === 9 && t.civs[3][1] - t.civs[0][1] === 9 && t.roads.length === 2 && t.civs[4][2] === 1, 'a town block: buildings on a 9-cell grid (6 m streets) with a main street each way');
+  for (const m of MAP.MAPS) { const r = MAP.validateMap(m.spec), civs = r.map.civs, near = civs.filter(c => civs.some(o => o !== c && Math.abs(o[0] - c[0]) <= 10 && Math.abs(o[1] - c[1]) <= 10)).length;
+    ok(r.ok && near === civs.length && civs.length >= 16, `${m.name}: valid, and all ${civs.length} civilian buildings stand in towns (each has a neighbour across a street)`);
+    const st = r.map.sites; ok(st.length === 4 && st.every(q => st.some(o => o !== q && o[2] === q[2] && o[0] === MAP_N(r) - q[0] - 4 && o[1] === MAP_N(r) - q[1] - 4)), `${m.name}: four capturable sites, each with its mirror twin of the same kind`); }
+  const s = new Sim({ ai: false, map: MAP.CANYON_BIG, factions: ['vanguard', 'redhammer'] }); s.fog.exp[0].fill(1); s.fog.exp[1].fill(1);
+  const sites = s.ents.filter(e => BLDGS[e.type] && BLDGS[e.type].site), gun = sites.find(e => e.type === 'site_gun'), rep = sites.find(e => e.type === 'site_repair');
+  ok(sites.length === 4 && sites.every(e => e.team === 2 && BLDGS[e.type].indestructible && BLDGS[e.type].capturable), 'sites start neutral, can be captured and cannot be destroyed');
+  const foe = hold(makeUnit(s, 'r_tank', ENEMY, gun.x + 60, gun.z + 10, 0)); makeUnit(s, 'v_drone', PLAYER, foe.x - 12, foe.z, 0); let shots = 0; run(s, 200, (ev) => { foe.cds = [1e9, 1e9, 1e9]; for (const e of ev) if (e.sid === gun.id) shots++; });
+  ok(shots === 0, 'an Artillery Platform nobody holds does not fire');
+  const sq = makeUnit(s, 'v_ranger', PLAYER, gun.x + 8, gun.z, 0); s.issue({ t: 'capture', ids: [sq.id], target: gun.id }); run(s, 160); const h0 = foe.hp; run(s, 400, (ev) => { foe.cds = [1e9, 1e9, 1e9]; for (const e of ev) if (e.sid === gun.id) shots++; });
+  ok(gun.team === PLAYER && shots >= 2 && foe.hp < h0, `captured by infantry, it fires for its new owner (${shots} shells at a tank 60 m away)`);
+  const sq2 = makeUnit(s, 'v_ranger', PLAYER, rep.x + 8, rep.z, 0); s.issue({ t: 'capture', ids: [sq2.id], target: rep.id }); run(s, 160); const tk = hold(makeUnit(s, 'v_tank', PLAYER, rep.x + 10, rep.z + 6, 0)), far = hold(makeUnit(s, 'v_tank', PLAYER, rep.x + 60, rep.z + 60, 0)), et = hold(makeUnit(s, 'r_tank', ENEMY, rep.x - 12, rep.z + 4, 0)); tk.hp = far.hp = et.hp = 100; run(s, 200);
+  ok(rep.team === PLAYER && tk.hp > 250 && far.hp === 100 && et.hp <= 100, 'Repair Depot: your vehicles within its radius are repaired; ones out of reach, and the enemy\'s, are not');
+  const q2 = new Sim({ ai: false, map: MAP.OPEN_BIG, factions: ['vanguard', 'redhammer'] }); q2.fog.exp[0].fill(1); const hos = q2.ents.find(e => e.type === 'site_hospital'), rad = q2.ents.find(e => e.type === 'site_radar');
+  const cap = (b) => { const u = makeUnit(q2, 'v_ranger', PLAYER, b.x + 8, b.z, 0); q2.issue({ t: 'capture', ids: [u.id], target: b.id }); return u; }; cap(hos); const before = q2.fog.visAt(PLAYER, rad.x + 70, rad.z); cap(rad); run(q2, 170);
+  const hurt = makeUnit(q2, 'v_ranger', PLAYER, hos.x + 10, hos.z + 4, 0), tank2 = makeUnit(q2, 'v_tank', PLAYER, hos.x + 12, hos.z - 4, 0); hurt.hp = 60; tank2.hp = 60; run(q2, 200);
+  ok(hos.team === PLAYER && hurt.hp >= 170 && tank2.hp === 60, 'Field Hospital: infantry nearby heal; vehicles do not');
+  ok(rad.team === PLAYER && !before && q2.fog.visAt(PLAYER, rad.x + 70, rad.z) && !q2.fog.visAt(PLAYER, rad.x + 110, rad.z), 'Radar Tower: its owner sees 90 m round it');
+  const thief = makeUnit(q2, 'r_conscript', ENEMY, rad.x + 8, rad.z + 2, 0); q2.issue({ t: 'capture', team: ENEMY, ids: [thief.id], target: rad.id }); for (const e of q2.ents) if (e.team === PLAYER && e.kind === 'unit') hold(e); run(q2, 170);
+  ok(rad.team === ENEMY && rad.hp > 1e8, 'the enemy can take a site from you the same way; it changes hands, it is never destroyed');
+  const TOOLS = (await importTools()).TOOLS; ok(['town', 'site_repair', 'site_hospital', 'site_radar', 'site_gun'].every(k => TOOLS.some(x => x[0] === k)), 'the map builder has a town stamp and the four sites');
+  console.log('towns and sites: every map\'s buildings stand in towns | Repair Depot, Field Hospital, Radar Tower, Artillery Platform work for whoever holds them');
+}
+function MAP_N(r) { return r.map.N; }
+async function importTools() { globalThis.localStorage = globalThis.localStorage || { getItem: () => null, setItem() {}, removeItem() {} }; return import('../js/ui/mapBuilder.js'); }
+
+// ---------------------------------------------------------------- command buildings and the stages of a match
+{
+  for (const f of Object.keys(FACTIONS)) { const R = FACTIONS[f].roles, gated = Object.keys(UNITS).filter(k => UNITS[k].needs === R.tech);
+    ok(R.tech && BLDGS[R.tech].role === 'tech' && BLDGS[R.tech].needs === R.factory && BLDGS[R.super].needs === R.tech && FACTIONS[f].build.includes(R.tech) && gated.length >= 1, `${FACTIONS[f].name}: ${BLDGS[R.tech].name} (after the War Factory) is needed for the superweapon and for ${gated.map(k => UNITS[k].name).join(', ')}`); }
+  ok(BLDGS.v_stratfield.needs === 'v_toc', 'the Strategic Airfield needs the Tactical Operations Center');
+  const s = bare({ factions: ['ursa', 'vanguard'] }); base(s, 'u'); const fac = s.ents.find(e => e.type === 'u_factory'); let msg = ''; const hq = s.ents.find(e => e.type === 'u_hq'); hq.dead = true; hq.hp = 0; s.ents.splice(s.ents.indexOf(hq), 1); s.byId.delete(hq.id);
+  s.issue({ t: 'train', id: fac.id, type: 'u_msta' }); run(s, 2, (ev) => { for (const e of ev) if (e.t === 'msg') msg = e.text; });
+  ok(fac.queue.length === 0 && /Requires Field Headquarters/.test(msg), 'without it a Msta-S cannot be ordered: "Requires Field Headquarters"');
+  s.issue({ t: 'train', id: fac.id, type: 'u_tank' }); run(s, 2); ok(fac.queue.length === 1, 'ordinary units need nothing new');
+  const m5 = LM.buildModel({ kind: 'bldg', type: 'v_toc', team: 0 }), m6 = LM.buildModel({ kind: 'bldg', type: 's_council', team: 0 }); let a5 = 0, a6 = 0; m5.g.traverse(o => { if (o.isMesh) a5++; }); m6.g.traverse(o => { if (o.isMesh) a6++; });
+  ok(a5 > 12 && a6 > 12 && a5 !== a6 && /Tactical Operations Center: two joined tents/.test(src('js/render/models.js')), 'each faction\'s command building has its own look');
+}
+
+// ---------------------------------------------------------------- the AI: limits by level, doctrines, variety
+{
+  const D = AI.DIFFICULTY;
+  ok(D.easy.doctrines === 0 && D.easy.learn === 0 && !D.easy.notebook && !D.easy.counters && D.medium.doctrines === 3 && D.medium.learn === 1 && !D.medium.notebook && !D.medium.flank && D.hard.doctrines === 5 && D.hard.learn === 2 && D.hard.notebook && D.hard.flank && D.hard.focus, 'three fixed sets of limits: Easy (one simple plan, no learning), Medium (three plans, report card), Hard (everything)');
+  ok(Object.keys(D).every(k => typeof D[k].note === 'string' && D[k].note.length > 20) && !Object.keys(D.hard).some(k => /money|income|sight|cheat|bonus|handicap/i.test(k)), 'each level describes itself in the lobby, and none has a setting that gives money or sight');
+  const combat = Object.keys(UNITS).filter(k => { const d = UNITS[k]; return d.weapon && !d.harvester && !d.builder && !d.hero && !d.ship; });
+  ok(combat.every(k => AI.ROLE[k]) && new Set(Object.values(AI.ROLE)).size >= 9 && AI.ROLE.u_msta === 'arty' && AI.ROLE.v_bradley === 'carrier' && AI.ROLE.r_pgz === 'aa' && AI.ROLE.u_mi8 === 'lift' && AI.ROLE.u_tank === 'armor', `every fighting unit has a role (${new Set(Object.values(AI.ROLE)).size} roles)`);
+  ok(Object.values(AI.DOCTRINES).every(d => Math.abs(Object.values(d.mix).reduce((a, b) => a + b, 0) - 1) < 1e-9) && AI.DOCTRINE_ORDER.length === 5, 'five doctrines, each a share of the army by role that adds up to 1');
+  const mk = (lv, seed, f = ['ursa', 'aegis'], extra = {}) => new Sim({ ai: 'both', difficulty: [lv, lv], factions: f, map: MAP.OPEN_BIG, seed, ...extra });
+  ok(mk('easy', 1).ais[0].mix === null && mk('easy', 1).ais[0].doctrineId === null, 'Easy has no doctrine');
+  const med = new Set(), hard = new Set(); for (let sd = 1; sd <= 12; sd++) { med.add(mk('medium', sd).ais[0].doctrineId); hard.add(mk('hard', sd).ais[0].doctrineId); }
+  ok([...med].every(d => AI.DOCTRINE_ORDER.slice(0, 3).includes(d)) && med.size >= 2 && hard.size >= 4, `over twelve matches Medium used ${med.size} of its three plans and Hard ${hard.size} of its five`);
+  ok(mk('hard', 5).ais[0].doctrineId === mk('hard', 5).ais[0].doctrineId && Math.abs(Object.values(mk('hard', 5).ais[1].mix).reduce((a, b) => a + b, 0) - 1) < 1e-9, 'the same match always gets the same plan; the mix is rescaled to the roles the roster has');
+  // fairness between the two start positions (found by the first drop B sweep: the second player won 60% of matches)
+  { const W = (await import('../js/sim/defs.js')); let same = true, n = 0;
+    for (const m of MAP.MAPS.filter(m => !m.spec.naval).concat([{ spec: MAP.CANYON_BIG }, { spec: MAP.ARCTIC_BIG }, { spec: MAP.URBAN_BIG }, { spec: MAP.FOREST_BIG }, { spec: MAP.OPEN_BIG }])) { const q = new Sim({ ai: 'both', difficulty: ['hard', 'hard'], factions: ['ursa', 'ursa'], map: m.spec, seed: 1 }), [p0, p1] = q.ais.map(x => x.pois); n++;
+      if (p0.length !== p1.length || !p0.every((p, i) => p.k === p1[i].k && Math.abs(p.x + p1[i].x - W.WORLD) < 0.01 && Math.abs(p.z + p1[i].z - W.WORLD) < 0.01)) same = false; }
+    ok(same && n >= 5, `the two AIs read the map as mirror images: the same points of interest in the same order from each end (${n} maps), so a tie between two equally distant sites is broken the same way for both`);
+    const cnt = [{}, {}]; for (let sd = 1; sd <= 40; sd++) { const q = mk('hard', sd, ['ursa', 'ursa']); for (const t of [0, 1]) cnt[t][q.ais[t].doctrineId] = (cnt[t][q.ais[t].doctrineId] || 0) + 1; }
+    ok(cnt.every(c => Object.keys(c).length === 5 && Math.max(...Object.values(c)) <= 16), `over seeds 1 to 40 each side draws all five plans, none more than 16 times (first player ${Object.entries(cnt[0]).map(([k, v]) => k + ' ' + v).join(', ')})`); }
+  // variety: across a handful of Hard matches each faction's AI fields nearly everything it can build
+  const rows = [];
+  for (const [f, foe] of [['vanguard', 'ursa'], ['redhammer', 'aegis'], ['sandstorm', 'vanguard'], ['ursa', 'redhammer'], ['aegis', 'sandstorm']]) {
+    const built = new Set(), plans = new Set(); let can = null, techs = 0, defs = 0, boarded = 0, sited = 0, n = 0;
+    for (const sd of [1, 2, 3, 4, 5, 6]) { const q = mk('hard', sd, [f, foe]), a = q.ais[0]; can = can || a.combat.filter(k => !UNITS[k].promo); plans.add(a.doctrineId); let def4 = false;
+      for (let t = 0; t < 20 * 60 * 16; t++) { if (t % 20 === 0) keepUp(q); q.step(); for (const e of q.events) if (e.t === 'spawn' && e.team === 0) built.add(e.type); q.events.length = 0; if (t === 20 * 60 * 5) def4 = q.ents.some(e => e.team === 0 && e.kind === 'bldg' && BLDGS[e.type].role === 'defense'); }
+      n++; if (q.ents.some(e => e.team === 0 && e.kind === 'bldg' && BLDGS[e.type].role === 'tech')) techs++; if (def4) defs++; boarded += a.stats.boarded || 0; if (q.ents.some(e => BLDGS[e.type] && BLDGS[e.type].site && e.team === 0)) sited++; }
+    const used = can.filter(k => built.has(k)); rows.push(`${FACTIONS[f].name} ${used.length}/${can.length}`);
+    ok(used.length >= can.length * 0.85, `${FACTIONS[f].name}: over six Hard matches (${plans.size} different plans) the AI built ${used.length} of the ${can.length} unit types open to it` + (used.length < can.length ? ' (never: ' + can.filter(k => !built.has(k)).map(k => UNITS[k].name).join(', ') + ')' : ''));
+    ok(techs >= 4 && defs >= 5, `${FACTIONS[f].name}: it built its command building in ${techs} of ${n} matches and had a defense up by 5:00 in ${defs}`);
+    if (['ursa', 'aegis', 'vanguard', 'redhammer'].includes(f)) ok(boarded >= 1, `${FACTIONS[f].name}: squads rode into battle in its troop carriers (${boarded} boardings)`);
+    ok(sited >= 2, `${FACTIONS[f].name}: it held a capturable site at the end of ${sited} of ${n} matches`);
+  }
+  console.log('AI variety     : unit types fielded over six Hard matches: ' + rows.join(' | '));
+}
+
+// ---------------------------------------------------------------- the AI learns (and only from what it saw)
+{
+  const q = new Sim({ ai: 'both', difficulty: ['hard', 'medium'], factions: ['ursa', 'aegis'], map: MAP.OPEN_BIG, seed: 2 }), a = q.ais[0], b = q.ais[1];
+  for (let t = 0; t < 20 * 60 * 12; t++) { if (t % 20 === 0) keepUp(q); q.step(); q.events.length = 0; }
+  const c = a.census(), cb = b.census();
+  ok(Object.keys(a.card).length >= 5 && c.eff && Object.values(c.eff).some(v => v > 1.05) && Object.values(c.eff).some(v => v < 0.95) && Math.abs(Object.values(c.eff).reduce((x, y) => x + y, 0) / Object.keys(c.eff).length - 1) < 1e-9, `report card: after 12 minutes it has rated ${Object.keys(c.eff).length} of its unit types against each other (experience earned per credit spent)`);
+  const best = Object.entries(c.eff).sort((x, y) => y[1] - x[1])[0][0], worst = Object.entries(c.eff).sort((x, y) => x[1] - y[1])[0][0], plain = { ...c, eff: null };
+  ok(a.unitScore(best, null, c) - a.unitScore(best, null, plain) > 0 && a.unitScore(worst, null, c) - a.unitScore(worst, null, plain) < 0, `it now favours its ${UNITS[best].name} and holds back on its ${UNITS[worst].name}`);
+  ok(cb.eff && b.graves.length === 0 && b.cfg.learn === 1, 'Medium keeps the report card too, and nothing else');
+  // route memory
+  { const mem = (id, type, x, z, weapon) => a.aiMemoryMap.set(id, { id, kind: 'bldg', type, team: ENEMY, first: q.tick, tick: q.tick, x, z, hp: 1, vet: 0, cost: 1000, armor: 'bldg', weapon, rect: null });
+    for (const k of [...a.aiMemoryMap.keys()]) if (a.aiMemoryMap.get(k).kind === 'bldg') a.aiMemoryMap.delete(k);
+    mem(-11, 'e_barracks', 700, 300, false); mem(-12, 'e_factory', 800, 420, false); a.graves.length = 0; a.hasArty = false;
+    const first = a.pickTarget(); a.graves.push({ x: first.x, z: first.z, tick: q.tick }); const second = a.pickTarget();
+    ok(first.id === -11 && second.id === -12, 'route memory: where an attack was wiped out is not where the next one goes');
+    mem(-13, 'e_iris', 705, 310, true); mem(-14, 'e_supply', 810, 430, false); a.graves.length = 0; const wary = a.pickTarget(); a.hasArty = true; const bold = a.pickTarget();
+    ok(wary.id === -14 && bold.id === -11, 'targets: without artillery it goes round the defended building for the supply line; with artillery along it takes the direct road');
+    for (const k of [-11, -12, -13, -14]) a.aiMemoryMap.delete(k); }
+  // habit memory: raids on its base are remembered, with their direction
+  const r = new Sim({ ai: 'both', difficulty: ['hard', 'easy'], factions: ['ursa', 'aegis'], map: MAP.OPEN_BIG, seed: 3 }), ar = r.ais[0], f0 = { ...ar.front };
+  const raid = (dx, dz) => { const u = makeUnit(r, 'e_tank', ENEMY, ar.homeW.x + dx, ar.homeW.z + dz, 0); u.hp = u.maxHp = 1e6; hold(u); return u; };
+  run(r, 40); const u1 = raid(-34, 6); run(r, 200); const n1 = ar.raids.length, fr1 = ar.firstRaid; (await import('../js/sim/entities.js')).kill(r, u1); run(r, 1000); const u2 = raid(-32, -14); run(r, 200);
+  ok(n1 === 1 && fr1 > 0 && ar.raids.length === 2 && ar.front.x < -0.5 && (ar.front.x !== f0.x), `habit memory: two raids from the west and its defenses will go up on that side (front ${f0.x.toFixed(2)}, ${f0.z.toFixed(2)} -> ${ar.front.x.toFixed(2)}, ${ar.front.z.toFixed(2)})`);
+  // the notebook
+  const e1 = a.notebookEntry(); ok(e1.key === 'ursa>aegis@Open Desert' && e1.doctrine === a.doctrineId && typeof e1.won === 'boolean' && Math.abs(Object.values(e1.saw).reduce((x, y) => x + y, 0) - 1) < 0.01, `notebook entry: ${e1.key}, plan ${e1.doctrine}, what it met by armour class`);
+  const blind = new Sim({ ai: 'both', difficulty: ['hard', 'hard'], factions: ['ursa', 'aegis'], map: MAP.OPEN_BIG, seed: 2 }); run(blind, 300); ok(Object.values(blind.ais[0].notebookEntry().saw).every(v => v === 0) && blind.ais[0].firstRaid === 0, 'it writes down only what it has seen: five seconds in, having met nothing, the entry is empty');
+  let notes = {}; AI.mergeNote(notes, { key: 'k', doctrine: 'siege', won: true, first: 4000, saw: { inf: 1, light: 0, heavy: 0, air: 0 } }); AI.mergeNote(notes, { key: 'k', doctrine: 'siege', won: false, first: 0, saw: { inf: 0, light: 0, heavy: 1, air: 0 } }); AI.mergeNote(notes, { key: 'k', doctrine: 'armour', won: true, first: 2000, saw: { inf: 0.5, light: 0, heavy: 0.5, air: 0 } });
+  ok(notes.k.n === 3 && notes.k.d.siege.join() === '1,1' && notes.k.d.armour.join() === '1,0' && notes.k.first === 3000 && Math.abs(notes.k.saw.inf - 0.5) < 0.01, 'entries are merged: wins and losses per plan, the average time of the first raid, the average of what it met');
+  const book = { 'ursa>aegis@Open Desert': { n: 30, d: { combined: [0, 12], armour: [0, 12], infantry: [0, 12], aircav: [0, 12], siege: [14, 0] }, first: 2600, fn: 5, saw: { inf: 0.1, light: 0.1, heavy: 0.7, air: 0.1 } } };
+  let siege = 0; for (let sd = 1; sd <= 12; sd++) if (mk2('hard', sd, book).ais[0].doctrineId === 'siege') siege++;
+  ok(siege >= 6, `a plan that always won against you is chosen far more often: Artillery siege in ${siege} of 12 matches (2 or 3 by chance)`);
+  const nb = mk2('hard', 4, book).ais[0], md = mk2('medium', 4, book).ais[0];
+  ok(nb.expectRaid === 2600 && nb.prior.heavy === 0.7 && md.expectRaid === 0 && md.prior === null, 'Hard reads the notebook (expects the first raid at 2:10, expects armour); Medium does not');
+  ok(nb.unitScore('u_rpg', null, nb.census()) > nb.unitScore('u_rifle', null, nb.census()), 'before it has seen a single enemy it already prefers anti-tank teams to riflemen against this opponent');
+  // a replay carries the notebook it was played with
+  const live = new Sim({ difficulty: 'hard', factions: ['aegis', 'ursa'], map: MAP.OPEN_BIG, seed: 4, aiNotes: book }), rec = new ReplayRecorder(live);   // you (Europe) against the Hard Russian AI for (let t = 0; t < 2400; t++) { live.step(); rec.mark(); live.events.length = 0; }
+  const data = JSON.parse(JSON.stringify(rec.export())), pl = new ReplayPlayer(data); while (pl.step()) pl.sim.events.length = 0;
+  ok(data.setup.aiNotes && live.ais[0].noteKey === 'ursa>aegis@Open Desert' && live.ais[0].prior && pl.sim.ais[0].doctrineId === live.ais[0].doctrineId && pl.sim.hash() === live.hash() && pl.diverged < 0, 'the notebook is stored with the replay, and the replay plays back exactly');
+  const none = mk2('hard', 4, null); ok(none.aiNotes === null && none.ais[0].prior === null, 'with no notebook (tests, balance sweeps) the AI starts from nothing');
+  const html = src('index.html'), play = src('play.html'), setup = src('js/ui/setup.js'), game = src('js/game.js');
+  ok([html, play].every(h => /id="setup-ainotes-reset"/.test(h) && /Reset AI memory/.test(h)) && /removeItem\(NOTES_KEY\)/.test(setup) && /saveNote\(sim\)/.test(game) && /=== 'hard' && !o\.noEnemy \? loadNotes\(\)/.test(game), 'both pages have the Reset AI memory button; the page hands the notebook to Hard matches only and adds an entry when a live match ends');
+  console.log(`AI learning    : report card on ${Object.keys(c.eff).length} unit types | route and raid memory | notebook: siege chosen ${siege}/12 after it kept winning`);
+}
+function mk2(lv, seed, notes) { return new Sim({ ai: 'both', difficulty: [lv, lv], factions: ['ursa', 'aegis'], map: MAP.OPEN_BIG, seed, aiNotes: notes }); }
+
+// ---------------------------------------------------------------- drop B balance pass
+{
+  const s = new Sim({ ai: false, map: MAP.OPEN_BIG, factions: ['ursa', 'vanguard'] }); const dk = s.ents.filter(e => e.type === 'derrick'); dk[0].team = PLAYER; dk[1].team = ENEMY; const m0 = [s.teams[0].money, s.teams[1].money]; let cash = [0, 0];
+  run(s, 400, (ev) => { for (const e of ev) if (e.t === 'cash' && (e.x === dk[0].x && e.z === dk[0].z || e.x === dk[1].x && e.z === dk[1].z)) cash[e.team] += e.amt; });
+  ok(FACTIONS.ursa.oil === 1.3 && cash[0] === 39 * 10 && cash[1] === 30 * 10 && /Oil Derricks pay Russia 30% more/.test(FACTIONS.ursa.blurb), `an Oil Derrick pays Russia $39 every 2 s and everyone else $30 (over 20 s: ${cash[0]} against ${cash[1]})`);
+  ok(/FACTIONS\[sim\.teams\[PLAYER\]\.faction\]\.oil/.test(src('js/ui/uiHUD.js')), 'the derrick\'s info line shows the amount your own faction is paid');
+  ok(WEAPONS.gun125.vs.inf === 0.5 && WEAPONS.gun125a.vs.inf === 0.5 && WEAPONS.cannon.vs.inf === 0.35, 'T-90 and T-14 guns fire high-explosive shells at infantry (half damage, other tanks 35%)');
+  ok(UNITS.u_rifle.cost === 250 && UNITS.u_rifle.hp === 290 && UNITS.u_tank.cost === 700 && UNITS.u_bmp.cost === 750 && UNITS.s_guerrilla.cost === 250 && UNITS.s_quad.cost === 575 && UNITS.v_ranger.cost === 320 && UNITS.v_a10.cost === 1600 && UNITS.r_conscript.cost === 240, 'prices after the drop B sweep: Russia and China cheaper, ISIS core and US Rangers and A-10 a little dearer');
 }
 
 console.log(fail ? `BATCH14: ${fail} FAILURES of ${pass + fail}` : `BATCH14: all ${pass} checks passed`);

@@ -38,7 +38,7 @@ export function terrainAttributes(map) {
   const stamp = (cx, cz, w, h, reach) => { for (let j = Math.max(0, cz - reach); j <= Math.min(N, cz + h + reach); j++) for (let i = Math.max(0, cx - reach); i <= Math.min(N, cx + w + reach); i++) {
     const d = Math.hypot(Math.max(cx - i, 0, i - cx - w), Math.max(cz - j, 0, j - cz - h)) + (fbm(i * 0.5, j * 0.5, 57) - 0.5) * 3, v = sstep(reach, reach * 0.35, d); if (v > pad[j * V + i]) pad[j * V + i] = v; } };
   for (const d of map.docks) stamp(d.x, d.z, 8, 6, 9);
-  for (const d of map.derricks || []) stamp(d[0], d[1], 4, 4, 6);
+  for (const d of (map.derricks || []).concat(map.sites || [])) stamp(d[0], d[1], 4, 4, 6);
   for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
     const k = j * V + i;
     pos[k * 3] = i * CELL; pos[k * 3 + 1] = H[k]; pos[k * 3 + 2] = j * CELL;

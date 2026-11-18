@@ -4,6 +4,7 @@
 import { DT, PLAYER } from './sim/defs.js';
 import { BLDGS, WEAPONS } from './sim/factionRegistry.js';
 import { Sim } from './sim/simulationTick.js';
+import { NOTES_KEY, mergeNote } from './sim/aiController.js';
 import { fxVisible } from './sim/powers.js';
 import { ReplayRecorder, ReplayPlayer } from './sim/replayManager.js';
 import { View } from './render/view.js';
@@ -49,11 +50,15 @@ export function boot() {
   window.__rtsReplay = (data) => { document.getElementById('setup').hidden = true; return run({ replay: data }); }; // test hook
 }
 
+// The Hard AI's notebook lives in this browser. It is read when a match starts (and stored with the replay), and one
+// entry is added when a live match ends. Replays and sandbox games never write to it.
+const loadNotes = () => { try { return JSON.parse(localStorage.getItem(NOTES_KEY) || 'null') || {}; } catch (e) { return {}; } };
+function saveNote(sim) { const a = sim.ais.find(k => k.cfg.notebook); if (!a) return; try { localStorage.setItem(NOTES_KEY, JSON.stringify(mergeNote(loadNotes(), a.notebookEntry()))); } catch (e) { /* storage blocked: the AI simply does not remember */ } }
 function start(o) {
   const canvas = document.getElementById('gl'), app = document.getElementById('app'), audio = o.audio;
   let sim, player = null, rec = null;
   if (o.replay) { player = new ReplayPlayer(o.replay); sim = player.sim; }
-  else { sim = new Sim({ factions: o.factions, difficulty: o.level || 'medium', money: o.money, treaty: o.treaty || 0, noSuper: o.noSuper, friendlyFire: o.friendlyFire, koth: o.koth, noEnemy: o.noEnemy, noShroud: true, map: o.map || undefined, generals: o.generals }); rec = new ReplayRecorder(sim); }
+  else { sim = new Sim({ aiNotes: (o.level || 'medium') === 'hard' && !o.noEnemy ? loadNotes() : null, factions: o.factions, difficulty: o.level || 'medium', money: o.money, treaty: o.treaty || 0, noSuper: o.noSuper, friendlyFire: o.friendlyFire, koth: o.koth, noEnemy: o.noEnemy, noShroud: true, map: o.map || undefined, generals: o.generals }); rec = new ReplayRecorder(sim); }
 
   const ui = {
     selection: new Set(), groups: [], place: null, amove: false, guard: false, power: null, hover: 0, promoOpen: false, paused: false, toast: null, togglePromo: null,
@@ -85,7 +90,7 @@ function start(o) {
 
   const hear = (e) => ui.reveal || fxVisible(sim, PLAYER, e);   // you only hear what you could see
   const cdOf = (w) => (WEAPONS[w] ? WEAPONS[w].cd : 99);
-  let last = performance.now(), acc = 0, fps = 60, simMs = 0, ended = false;
+  let last = performance.now(), acc = 0, fps = 60, simMs = 0, ended = false, noted = false;
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(0.25, (now - last) / 1000); last = now;
@@ -106,6 +111,7 @@ function start(o) {
       if (n === cap) acc = 0; // fell behind (tab was throttled): drop the backlog rather than spiral
       if (player && player.done && !ended) { ended = true; hud.showReport(sim.winner); if (player.diverged >= 0) ui.toast && ui.toast('Replay drifted from the recording at tick ' + player.diverged, 'bad'); }
     }
+    if (!player && sim.winner >= 0 && !noted) { noted = true; saveNote(sim); }
     const alpha = ui.paused || (player && player.done) ? 1 : Math.min(1, acc / DT);
     controls.update(dt);
     view.render(alpha, ui.paused ? 0 : dt, rig, ui);

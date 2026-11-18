@@ -3,11 +3,12 @@
 import { Sim } from '../js/sim/simulationTick.js';
 import { UNITS, BLDGS, WEAPONS, FACTIONS, GENERALS, POWERS, UPGRADES, HORDE } from '../js/sim/factionRegistry.js';
 import { MAPS } from '../js/sim/map.js';
+import { DIFFICULTY } from '../js/sim/aiController.js';
 
 // Trial changes without editing the game: ZM_TWEAK='{"UNITS.s_guerrilla.hp":280,"GENERALS.cyber.spy":0}' node balance/run.mjs
 // Each key is a path into the registry. Worker threads inherit the variable. Never set in the game itself.
 if (process.env.ZM_TWEAK) {
-  const root = { UNITS, BLDGS, WEAPONS, FACTIONS, GENERALS, POWERS, UPGRADES, HORDE };
+  const root = { UNITS, BLDGS, WEAPONS, FACTIONS, GENERALS, POWERS, UPGRADES, HORDE, DIFFICULTY };   // DIFFICULTY: the AI's limits per level, e.g. "DIFFICULTY.hard.carriers": false
   for (const [path, value] of Object.entries(JSON.parse(process.env.ZM_TWEAK))) {
     const keys = path.split('.'), last = keys.pop(); let o = root;
     for (const k of keys) { if (o[k] === undefined) throw new Error('ZM_TWEAK: no such path ' + path); o = o[k]; }

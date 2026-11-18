@@ -42,6 +42,7 @@ const mirrorRect = (x, z, w, h) => [N - x - w, N - z - h];
 //   ramps (half)    { x, z, dx, dz, len, hw }         slopes up onto a mesa
 //   docks (half)    { x, z, amount }                  Supply Docks (8 x 6 cells, top-left cell)
 //   derricks (half) [x, z]                            Oil Derricks (4 x 4)
+//   sites (half)    [x, z, kind]                      capturable sites (4 x 4): kind 'repair' | 'hospital' | 'radar' | 'gun'
 //   civs (half)     [x, z]                            civilian buildings (6 x 6)
 //   roads (half)    [x0, z0, x1, z1, halfWidth]
 //   civs (half)     [x, z, kind]                      kind is an index into CIV_KINDS (see below)
@@ -101,6 +102,17 @@ export const ARCTIC_MAP = {
 // rivers and roads, but not the footprints of buildings, and keeps the first Supply Dock at its old distance from the
 // Command Center so the opening economy is unchanged. `extra` then adds what the new room is for (already in big-map
 // cells): an expansion dock, flank derricks, villages, more road.
+export const SITE_KINDS = ['repair', 'hospital', 'radar', 'gun'];
+// A town block: `cols` x `rows` civilian buildings on a street grid, `pitch` cells from one to the next (a building
+// is 6 cells, so the default leaves 6 m streets), with a main street each way through the middle. `kinds` is read
+// row by row. Returns { civs, roads } in the same half-map form as a spec's own lists.
+export function town(x, z, cols, rows, kinds, pitch = 9) {
+  const civs = [], w = (cols - 1) * pitch + 6, h = (rows - 1) * pitch + 6, mc = x + Math.floor(cols / 2) * pitch - 1.5, mr = z + Math.floor(rows / 2) * pitch - 1.5;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) civs.push([x + c * pitch, z + r * pitch, kinds[(r * cols + c) % kinds.length]]);
+  const roads = []; if (rows > 1) roads.push([x - 4, mr, x + w + 4, mr, 1.5]); if (cols > 1) roads.push([mc, z - 4, mc, z + h + 4, 1.5]);
+  return { civs, roads };
+}
+const towns = (...list) => ({ civs: list.flatMap(t => t.civs), roads: list.flatMap(t => t.roads) });
 export function scaleSpec(S, k = 2, extra = {}) {
   const c = (v, half) => (v + half) * k - half;   // scale a footprint by its centre, keeping its size
   const seg = (r, wk) => [r[0] * k, r[1] * k, r[2] * k, r[3] * k, r[4] * wk];
@@ -113,58 +125,70 @@ export function scaleSpec(S, k = 2, extra = {}) {
   o.roads = (S.roads || []).map(r => seg(r, 1.25));
   o.docks = (S.docks || []).map((d, i) => i ? { x: c(d.x, 4), z: c(d.z, 3), amount: d.amount } : { x: o.start[0] + d.x - st[0], z: o.start[1] + d.z - st[1], amount: d.amount });
   o.derricks = (S.derricks || []).map(d => [c(d[0], 2), c(d[1], 2)]);
+  o.sites = (S.sites || []).map(d => [c(d[0], 2), c(d[1], 2), d[2]]);
   o.civs = (S.civs || []).map(v => [c(v[0], 3), c(v[1], 3), v[2]]);
   if (S.civsFixed) o.civsFixed = S.civsFixed.map(v => [c(v[0], 3), c(v[1], 3), v[2]]);
   if (S.rampTop) o.rampTop = [S.rampTop[0] * k, S.rampTop[1] * k];
   if (S.islands) o.islands = S.islands.map(q => q.map(v => v * k));
-  for (const key of ['docks', 'derricks', 'civs', 'roads', 'paint', 'water', 'bridges', 'mesas']) if (extra[key]) o[key] = o[key].concat(extra[key]);
+  for (const key of ['docks', 'derricks', 'sites', 'civs', 'roads', 'paint', 'water', 'bridges', 'mesas']) if (extra[key]) o[key] = o[key].concat(extra[key]);
   return o;
 }
 const D3 = 30000;   // every Supply Dock holds the same
-export const CANYON_BIG = scaleSpec(DEFAULT_MAP, 2, {   // third dock up on the ridge plateau; derricks in the far corner and the south gap; a farm village in the east basin
-  docks: [{ x: 150, z: 248, amount: D3 }], derricks: [[468, 468], [250, 470]],
-  civs: [[440, 380, 5], [454, 394, 7], [472, 378, 6], [486, 366, 4], [470, 408, 8]], roads: [[330, 400, 446, 388, 3.75]],
+// Civilian buildings stand together as towns (batch 14): a city of sixteen blocks either side of the central avenue on
+// Desert Canyon, a downtown and districts on Urban Megacity, villages elsewhere. Each side also has two capturable
+// sites: one nearer its own base, one nearer the enemy's (the mirror of the other side's near one).
+const bare = (S) => ({ ...S, civs: [], civsFixed: undefined });   // the small maps' scattered buildings are replaced, not scaled
+const T_CANYON = towns(town(229, 236, 2, 4, [0, 2, 1, 0, 2, 3, 0, 1]), town(438, 370, 3, 2, [5, 7, 6, 4, 8, 5]));
+export const CANYON_BIG = scaleSpec(bare(DEFAULT_MAP), 2, {   // third dock up on the ridge plateau; derricks in the far corner and the south gap; the city in the middle, a farm village in the east basin
+  docks: [{ x: 150, z: 248, amount: D3 }], derricks: [[468, 468], [250, 470]], sites: [[330, 420, 'repair'], [250, 180, 'gun']],
+  civs: T_CANYON.civs, roads: [[330, 400, 446, 388, 3.75]].concat(T_CANYON.roads),
 });
-export const OPEN_BIG = scaleSpec(OPEN_MAP, 2, {        // third dock in the far corner with a village; a small town either side of the centre
-  docks: [{ x: 400, z: 440, amount: D3 }], derricks: [[60, 250], [300, 470]],
-  civs: [[212, 262, 0], [232, 282, 1], [198, 286, 4], [424, 404, 5], [440, 418, 7], [408, 420, 6], [428, 386, 9]], roads: [[256, 256, 404, 432, 3.75], [100, 430, 300, 466, 3.5]],
+const T_OPEN = towns(town(204, 262, 3, 3, [0, 1, 2, 4, 3, 0, 2, 0, 8]), town(410, 388, 3, 2, [5, 7, 6, 9, 5, 6]));
+export const OPEN_BIG = scaleSpec(bare(OPEN_MAP), 2, {        // third dock in the far corner with a village; a town either side of the centre
+  docks: [{ x: 400, z: 440, amount: D3 }], derricks: [[60, 250], [300, 470]], sites: [[150, 300, 'hospital'], [256, 150, 'radar']],
+  civs: T_OPEN.civs, roads: [[256, 256, 404, 432, 3.75], [100, 430, 300, 466, 3.5]].concat(T_OPEN.roads),
 });
-export const FOREST_BIG = scaleSpec(FOREST_MAP, 2, {    // third dock on the west bank; derricks by the river and in the south woods; a logging village
-  docks: [{ x: 40, z: 200, amount: D3 }], derricks: [[60, 156], [200, 470]],
-  civs: [[150, 334, 6], [168, 348, 5], [134, 352, 7], [156, 368, 6]], roads: [[98, 200, 50, 204, 3.5]],
+const T_FOREST = towns(town(140, 336, 3, 2, [6, 5, 7, 6, 6, 5]), town(220, 330, 2, 2, [6, 7, 5, 6]));
+export const FOREST_BIG = scaleSpec(bare(FOREST_MAP), 2, {    // third dock on the west bank; derricks by the river and in the south woods; a logging town and a hamlet
+  docks: [{ x: 40, z: 200, amount: D3 }], derricks: [[60, 156], [200, 470]], sites: [[120, 280, 'repair'], [300, 380, 'radar']],
+  civs: T_FOREST.civs, roads: [[98, 200, 50, 204, 3.5]].concat(T_FOREST.roads),
 });
-export const URBAN_BIG = scaleSpec(URBAN_MAP, 2, {      // third dock in the south-east; more city on the edges
-  docks: [{ x: 450, z: 470, amount: D3 }], derricks: [[474, 330], [228, 484]],
-  civs: [[150, 350, 2], [124, 474, 0], [160, 474, 1], [196, 474, 2], [474, 400, 0], [474, 432, 4]],
+const T_URBAN = towns(town(140, 300, 4, 3, [0, 2, 0, 1, 2, 0, 3, 2, 0, 2, 1, 0]), town(300, 330, 3, 3, [2, 0, 2, 0, 1, 0, 2, 0, 4]), town(120, 440, 4, 2, [0, 4, 8, 0, 4, 0, 9, 4]), town(440, 390, 2, 3, [0, 2, 4, 0, 8, 4]));
+export const URBAN_BIG = scaleSpec(bare(URBAN_MAP), 2, {      // third dock in the south-east; downtown, a second district, an industrial quarter and an east-side block
+  docks: [{ x: 450, z: 470, amount: D3 }], derricks: [[474, 330], [228, 484]], sites: [[230, 420, 'hospital'], [360, 250, 'gun']],
+  civs: T_URBAN.civs, roads: T_URBAN.roads,
 });
-export const ARCTIC_BIG = scaleSpec(ARCTIC_MAP, 2, {    // third dock on the west flank; a trappers' village in the south
-  docks: [{ x: 30, z: 340, amount: D3 }], derricks: [[250, 484]],
-  civs: [[112, 470, 6], [128, 486, 5], [146, 470, 7], [162, 486, 6]], roads: [[100, 430, 150, 462, 3.5]],
+const T_ARCTIC = towns(town(216, 290, 3, 3, [4, 8, 9, 4, 9, 8, 4, 5, 9]), town(118, 468, 3, 2, [6, 5, 7, 6, 5, 6]));
+export const ARCTIC_BIG = scaleSpec(bare(ARCTIC_MAP), 2, {    // third dock on the west flank; the refinery town by the oil field, a trappers' village in the south
+  docks: [{ x: 30, z: 340, amount: D3 }], derricks: [[250, 484]], sites: [[160, 350, 'repair'], [330, 300, 'radar']],
+  civs: T_ARCTIC.civs, roads: [[100, 430, 150, 462, 3.5]].concat(T_ARCTIC.roads),
 });
 // ---- the two sea maps: 2 km x 2 km (1,024 cells). Both keep a land route between the bases; the sea is for fleets.
 // Strait of Sand: a channel about 550 m wide runs corner to corner between the bases and stops short of both far corners,
 // which leaves a neck of land at each end. Each base has a harbour inlet off the channel.
+const T_STRAIT = towns(town(176, 694, 3, 2, [5, 4, 6, 9, 8, 5]), town(64, 176, 3, 2, [5, 7, 6, 4, 5, 6]), town(138, 432, 2, 2, [0, 1, 3, 4]));
 export const STRAIT_MAP = {
   name: 'Strait of Sand', size: 1024, biome: 'desert', naval: true, coast: 12,
   water: [[262, 262, 762, 762, 135], [420, 604, 290, 730, 55]], bridges: [],
   mesas: [[205, 470, 26, 16, 9], [84, 330, 20, 14, 8], [70, 940, 34, 14, 8], [470, 860, 28, 14, 8], [330, 990, 30, 10, 7]], ramps: [],
-  roads: [[155, 805, 120, 500, 4.5], [120, 500, 96, 300, 4.5], [96, 300, 110, 130, 4.5], [165, 815, 324, 904, 4.5], [324, 904, 624, 934, 4.5], [624, 934, 914, 894, 4.5], [165, 800, 236, 748, 3.5]],
+  roads: [[155, 805, 120, 500, 4.5], [120, 500, 96, 300, 4.5], [96, 300, 110, 130, 4.5], [165, 815, 324, 904, 4.5], [324, 904, 624, 934, 4.5], [624, 934, 914, 894, 4.5], [165, 800, 236, 748, 3.5]].concat(T_STRAIT.roads),
   docks: [{ x: 182, z: 826, amount: D3 }, { x: 56, z: 700, amount: D3 }, { x: 330, z: 826, amount: D3 }, { x: 50, z: 372, amount: D3 }],
   derricks: [[116, 640], [250, 866], [56, 520], [150, 384], [430, 936], [650, 962]],
-  civs: [[196, 694, 5], [210, 710, 4], [184, 712, 6], [200, 728, 9], [172, 694, 8], [70, 180, 5], [86, 196, 7], [60, 210, 6], [100, 172, 4], [150, 430, 0], [166, 446, 1], [136, 452, 3], [160, 468, 4]],
+  civs: T_STRAIT.civs, sites: [[230, 780, 'repair'], [120, 560, 'gun']],
   start: [150, 800],
 };
 // Emerald Isles: each base on its own large island, open sea all round. A central island joins the two by long
 // causeways (the land route: narrow, and in reach of ships' guns). Two small wooded islets are scenery and cover.
+const T_ISLES = towns(town(258, 718, 3, 2, [6, 5, 7, 6, 5, 6]), town(106, 732, 2, 2, [5, 8, 4, 5]), town(474, 480, 2, 2, [0, 1, 3, 2]));
 export const ISLES_MAP = {
   name: 'Emerald Isles', size: 1024, biome: 'woods', trees: 0.4, naval: true, coast: 14, rim: false,
   islands: [[232, 800, 190, 168], [512, 512, 108, 108], [215, 260, 62, 46]], water: [],
   bridges: [[330, 698, 452, 572, 8]],
   mesas: [[306, 846, 16, 11, 6], [130, 706, 14, 10, 6], [214, 258, 20, 12, 6]], ramps: [],
-  roads: [[215, 805, 330, 698, 4], [330, 698, 452, 572, 6], [452, 572, 512, 512, 4], [215, 810, 130, 866, 3.5]],
+  roads: [[215, 805, 330, 698, 4], [330, 698, 452, 572, 6], [452, 572, 512, 512, 4], [215, 810, 130, 866, 3.5]].concat(T_ISLES.roads),
   docks: [{ x: 237, z: 821, amount: D3 }, { x: 110, z: 858, amount: D3 }, { x: 196, z: 676, amount: D3 }, { x: 462, z: 536, amount: D3 }],
   derricks: [[300, 906], [96, 770], [346, 770], [168, 924], [548, 566]],
-  civs: [[270, 716, 6], [286, 732, 5], [254, 734, 7], [290, 750, 6], [120, 730, 5], [104, 748, 8], [136, 750, 4], [498, 498, 0], [482, 478, 1], [470, 506, 3]],
+  civs: T_ISLES.civs, sites: [[300, 820, 'hospital'], [500, 560, 'radar']],
   start: [205, 795],
 };
 // The maps the lobby offers, in order. `id` is what the lobby and saved settings use.
@@ -258,6 +282,7 @@ export function generateMap(spec) {
   const docks = both(S.docks, 8, 6, (d, mir) => { if (!mir) return { x: d.x, z: d.z, amount: d.amount }; const [mx, mz] = mirrorRect(d.x, d.z, 8, 6); return { x: mx, z: mz, amount: d.amount }; });
   const roads = both(S.roads, 0, 0, (r, mir) => mir ? [N - r[0], N - r[1], N - r[2], N - r[3], r[4]] : r.slice());
   const derricks = both(S.derricks, 4, 4, (d, mir) => mir ? mirrorRect(d[0], d[1], 4, 4) : d.slice());
+  const sites = both(S.sites, 4, 4, (d, mir) => { const p = mir ? mirrorRect(d[0], d[1], 4, 4) : d; return [p[0], p[1], SITE_KINDS.includes(d[2]) ? d[2] : 'repair']; });
   // Road mask: ground vehicles are faster on a road or a bridge deck (see stepMovement).
   const road = new Uint8Array(N * N);
   for (const r of roads.concat(bridges)) {
@@ -273,7 +298,7 @@ export function generateMap(spec) {
     const dens = S.trees ?? 0.6, keep = new Uint8Array(N * N);
     const mark = (x, z, w, h, pad) => { for (let j = Math.max(0, z - pad); j < Math.min(N, z + h + pad); j++) for (let i = Math.max(0, x - pad); i < Math.min(N, x + w + pad); i++) keep[j * N + i] = 1; };
     mark(st[0], st[1], 10, 10, 20); const es = mirrorRect(st[0], st[1], 10, 10); mark(es[0], es[1], 10, 10, 20);
-    for (const d of docks) mark(d.x, d.z, 8, 6, 5); for (const d of derricks) mark(d[0], d[1], 4, 4, 3); for (const c of civs) mark(c[0], c[1], 6, 6, 2);
+    for (const d of docks) mark(d.x, d.z, 8, 6, 5); for (const d of derricks) mark(d[0], d[1], 4, 4, 3); for (const d of sites) mark(d[0], d[1], 4, 4, 3); for (const c of civs) mark(c[0], c[1], 6, 6, 2);
     for (let gz = 5; gz < N - 5; gz += 2) for (let gx = 5; gx < N - 5; gx += 2) {
       const k = gz * N + gx; if (blocked[k] || keep[k] || rock[gz * V + gx] > 0.15) continue;
       if (fbm(gx * 0.055, gz * 0.055, 5) < 0.62 - dens * 0.3 || hash2(gx, gz, 77) > 0.3 + dens * 0.5) continue;
@@ -287,7 +312,7 @@ export function generateMap(spec) {
     }
   }
   return {
-    N, V, height, rock, blocked, water, road, naval: !!S.naval, hasWater: wet, bridges, trees, biome: S.biome || 'desert', civs, docks, derricks, roads, ramps, mirrorRect, custom: !!spec, name: S.name || 'Custom',
+    N, V, height, rock, blocked, water, road, naval: !!S.naval, hasWater: wet, bridges, trees, biome: S.biome || 'desert', civs, docks, derricks, sites, roads, ramps, mirrorRect, custom: !!spec, name: S.name || 'Custom',
     start: [{ cc: [st[0], st[1]] }, { cc: mirrorRect(st[0], st[1], 10, 10) }],
     rampTop: [{ x: rt[0] * CELL, z: rt[1] * CELL }, { x: (N - rt[0]) * CELL, z: (N - rt[1]) * CELL }],
   };
@@ -295,7 +320,7 @@ export function generateMap(spec) {
 
 // Checks a spec before a match starts. Errors stop the match; warnings do not.
 // Returns { ok, errors, warnings, map } with the generated map so the caller can draw a preview.
-export const MAP_LIMITS = { mesas: 24, docks: 8, derricks: 12, civs: 40, roads: 32, water: 24, bridges: 12, paint: 400, islands: 16 };
+export const MAP_LIMITS = { mesas: 24, docks: 8, derricks: 12, sites: 8, civs: 40, roads: 32, water: 24, bridges: 12, paint: 400, islands: 16 };
 export function validateMap(spec) {
   const errors = [], warnings = [];
   const S = spec; let map = null;
@@ -313,7 +338,7 @@ export function validateMap(spec) {
   if (Math.hypot(sx + 5 - N / 2, sz + 5 - N / 2) < 60) errors.push('The two bases are too close together. Move the start further from the centre.');
   // footprints: in bounds, on open ground, not overlapping each other or a base
   const rects = [{ n: 'your base', r: [sx - 3, sz - 3, 16, 16] }, { n: 'the enemy base', r: [map.start[1].cc[0] - 3, map.start[1].cc[1] - 3, 16, 16] }];
-  const items = [].concat(map.docks.map(d => ['Supply Dock', d.x, d.z, 8, 6]), map.derricks.map(d => ['Oil Derrick', d[0], d[1], 4, 4]), map.civs.map(c => ['Building', c[0], c[1], 6, 6]));
+  const items = [].concat(map.docks.map(d => ['Supply Dock', d.x, d.z, 8, 6]), map.derricks.map(d => ['Oil Derrick', d[0], d[1], 4, 4]), map.sites.map(d => ['Capturable site', d[0], d[1], 4, 4]), map.civs.map(c => ['Building', c[0], c[1], 6, 6]));
   const occupied = new Uint8Array(N * N);
   for (const [name, x, z, w, h] of items) {
     if (x < 4 || z < 4 || x + w > N - 4 || z + h > N - 4) { errors.push(`${name} at ${x}, ${z} is off the map.`); continue; }

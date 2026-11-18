@@ -40,7 +40,7 @@ const src = (f) => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
     ok(b.pads.every((p, i) => { const h = L.hangars[i], dx = Math.abs(p.x - b.x - h[0]), dz = Math.abs(p.z - b.z - h[1]); return (h[2] === 'e' ? dx < HANGAR.d / 2 && dz < HANGAR.w / 2 : dx < HANGAR.w / 2 && dz < HANGAR.d / 2) && Math.hypot(p.ax - p.x, p.az - p.z) > 5; }), `${BLDGS[type].name} (${FACTIONS[BLDGS[type].faction].name}): every jet parks inside its hangar, with an apron outside the door`);
   }
   // a jet leaves its hangar by the door: first to the apron, then to the runway
-  const a = bare({ factions: ['vanguard', 'redhammer'] }), T = a.teams[0]; T.money = 9000; for (let i = 0; i < 3; i++) makeBldg(a, 'v_power', PLAYER, 20 + i * 8, 20); makeBldg(a, 'v_factory', PLAYER, 20, 40);
+  const a = bare({ factions: ['vanguard', 'redhammer'] }), T = a.teams[0]; T.money = 9000; for (let i = 0; i < 3; i++) makeBldg(a, 'v_power', PLAYER, 20 + i * 8, 20); makeBldg(a, 'v_factory', PLAYER, 20, 40); makeBldg(a, 'v_toc', PLAYER, 34, 40);   // the F-22 needs the command building since batch 14
   const af = makeBldg(a, 'v_airfield', PLAYER, 60, 60); a.nav.rebuild(); a.issue({ t: 'train', id: af.id, type: 'v_raptor' }); run(a, 20 * 14);
   const jet = a.ents.find(e => e.type === 'v_raptor'), pad = af.pads[jet.pad];
   ok(jet && jet.as === 'parked' && Math.hypot(jet.x - pad.x, jet.z - pad.z) < 0.1 && Math.abs(angDiff(jet.facing, pad.f)) < 0.05, 'a new jet stands inside its hangar with its nose to the door');
@@ -81,7 +81,7 @@ for (const [type, fac] of [['v_frigate', 'vanguard'], ['r_corvette', 'redhammer'
   ok(generalsOf('ursa').join() === 'wagner,vacation' && generalsOf('aegis').join() === 'lasergen,panzer' && GENERALS.wagner.name === 'Wagner Group' && GENERALS.vacation.name === 'Vacation Command Group', 'Russia: Wagner Group and Vacation Command Group; Europe: a Laser general and a Panzer general');
   for (const f of ['ursa', 'aegis']) {
     const F = FACTIONS[f], R = F.roles, units = Object.keys(UNITS).filter(k => UNITS[k].faction === f), bl = Object.keys(BLDGS).filter(k => BLDGS[k].faction === f);
-    ok(F.build.every(b => BLDGS[b] && BLDGS[b].faction === f) && ['cc', 'power', 'supply', 'barracks', 'factory', 'airfield', 'shipyard', 'defense', 'super', 'builder', 'truck', 'squad'].every(r => R[r] && (BLDGS[R[r]] || UNITS[R[r]])) && bl.length === 9, `${F.name}: a full base of nine buildings, every role filled`);
+    ok(F.build.every(b => BLDGS[b] && BLDGS[b].faction === f) && ['cc', 'power', 'supply', 'barracks', 'factory', 'airfield', 'shipyard', 'defense', 'super', 'builder', 'truck', 'squad'].every(r => R[r] && (BLDGS[R[r]] || UNITS[R[r]])) && bl.length === 10 && R.tech && BLDGS[R.tech].role === 'tech', `${F.name}: a full base of ten buildings (the command building came in batch 14), every role filled`);
     ok(F.tree.length === 7 && F.tree.every(n => (!n.req || F.tree.some(k => k.id === n.req)) && (!n.power || POWERS[n.power]) && (!n.unlock || UNITS[n.unlock])) && F.tree.filter(n => n.power).length >= 3, `${F.name}: seven promotions, three of them support powers`);
     const trained = new Set(); for (const b of bl) for (const g of [null, ...generalsOf(f)]) for (const t of trainsOf({ general: g }, b)) trained.add(t);
     ok(units.every(u => trained.has(u)) && units.filter(u => UNITS[u].placeholder).length >= 11 && units.length >= 13, `${F.name}: ${units.length} unit types, every one buildable somewhere; the batch 12 line-up is still marked as a placeholder (batch 14 added units of its own)`);
@@ -94,7 +94,7 @@ for (const [type, fac] of [['v_frigate', 'vanguard'], ['r_corvette', 'redhammer'
     const s = bare({ map: STRAIT_MAP, factions: [f, 'vanguard'], generals: [gen, null] }), T = s.teams[0], R = FACTIONS[f].roles; T.money = 200000;
     for (let i = 0; i < 6; i++) makeBldg(s, R.power, PLAYER, 150 + i * 8, 840);
     const at = { [R.barracks]: [150, 800], [R.factory]: [165, 800], [R.airfield]: [180, 790], [R.cc]: [135, 800] }, made = {};
-    for (const b in at) made[b] = makeBldg(s, b, PLAYER, at[b][0], at[b][1]); made[R.shipyard] = makeBldg(s, R.shipyard, PLAYER, 230, 752); s.nav.rebuild();
+    for (const b in at) made[b] = makeBldg(s, b, PLAYER, at[b][0], at[b][1]); made[R.shipyard] = makeBldg(s, R.shipyard, PLAYER, 230, 752); makeBldg(s, R.tech, PLAYER, 60, 880); s.nav.rebuild();
     const want = []; for (const b in made) for (const t of trainsOf(T, b)) want.push([b, t]);
     let got = 0; const missing = [];
     for (const [b, t] of want) { const before = s.ents.filter(e => e.type === t).length; made[b].queue.length = 0; s.issue({ t: 'train', id: made[b].id, type: t }); run(s, UNITS[t].secs * 20 + 30); if (s.ents.filter(e => e.type === t).length > before) got++; else missing.push(t); }

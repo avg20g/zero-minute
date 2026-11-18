@@ -80,7 +80,8 @@ export function stepUpkeep(sim) {
       const d = BLDGS[e.type];
       if (d.income && e.done && e.team < 2 && !e.offline && (tick + e.id) % d.income.every === 0) {
         const T = sim.teams[e.team];
-        if (!(d.power < 0 && T.low)) { T.money += d.income.amt; T.passive += d.income.amt; sim.events.push({ t: 'cash', x: e.x, z: e.z, amt: d.income.amt, team: e.team, quiet: true }); }
+        const amt = Math.round(d.income.amt * (e.type === 'derrick' && FACTIONS[T.faction].oil || 1));   // Russia's Oil Derricks pay more
+        if (!(d.power < 0 && T.low)) { T.money += amt; T.passive += amt; sim.events.push({ t: 'cash', x: e.x, z: e.z, amt, team: e.team, quiet: true }); }
       }
       continue;
     }
@@ -109,6 +110,8 @@ export function stepUpkeep(sim) {
           if (rr && !!BLDGS[b.type].shore === !!d.ship && rectDist(b, e.x, e.z) <= rr) { e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.02); e.repairing = tick; break; }
         }
       }
+      // Field Hospital (a capturable site): the owner's infantry nearby heal once they have been out of combat for 3 s
+      if (d.infantry && e.hp < e.maxHp && tick - e.lastHit > 60) for (const b of sim.ents) { if (b.kind !== 'bldg' || b.team !== e.team) continue; const hr = BLDGS[b.type].heal; if (hr && rectDist(b, e.x, e.z) <= hr) { e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.025); break; } }
       if (FACTIONS[T.faction].horde && d.weapon) {
         let n = 0;
         for (const o of sim.ents) {

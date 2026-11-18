@@ -13,7 +13,7 @@ const blank = () => ({ name: 'Custom map', mesas: [], ramps: [], roads: [], dock
 // ---------------------------------------------------------------- A. built-in maps and the edit tools
 {
   ok(validateMap(DEFAULT_MAP).ok && validateMap(OPEN_MAP).ok, 'Desert Canyon and Open Desert both validate');
-  ok(TOOLS.length === 13, '13 tools: three free-hand brushes, rock, ramp, road, river, bridge, dock, derrick, building, your base, erase');
+  ok(TOOLS.length === 18 && ['town', 'site_repair', 'site_hospital', 'site_radar', 'site_gun'].every(k => TOOLS.some(t => t[0] === k)), '18 tools: three free-hand brushes, rock, ramp, road, river, bridge, dock, derrick, building, town block, four capturable sites, your base, erase');
   const s = blank();
   ok(applyTool(s, 'rock', [100, 60], [150, 90]) && s.mesas.length === 1 && s.mesas[0][0] === 125 && s.mesas[0][2] === 25, 'rock: a dragged rectangle becomes a plateau');
   ok(!applyTool(s, 'rock', [10, 10], [12, 12]), 'rock: a tiny drag is ignored');

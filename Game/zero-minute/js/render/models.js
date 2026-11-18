@@ -585,6 +585,51 @@ function derrick() {
   const flags = [0, 1].map(t => { const f = box(pole, M.glow[t], 1.6, 0.95, 0.06, 0.85, 3.4, 0); f.visible = false; return f; });
   return { g, pump, flags, top: 10 };
 }
+// ---------------- capturable sites (4 x 4 cells). Whoever holds one flies their flag from its pole. ----------------
+function sitePad(g, mat = M.concrete) { slab(g, 7.6, 7.6, mat, 0.35); const pole = grp(g, -3.2, 0.3, 3.2); cyl(pole, M.steel, 0.06, 4.6, 0, 2.3, 0); return [0, 1].map(t => { const f = box(pole, M.glow[t], 1.6, 0.95, 0.06, 0.85, 4.0, 0); f.visible = false; return f; }); }
+// Repair Depot: an open-fronted workshop with a gantry hoist over the bay, hazard stripes on the floor, tyres and a tool cart.
+function siteRepair() {
+  const g = new THREE.Group(), flags = sitePad(g);
+  box(g, M.steel, 5.2, 3.0, 0.2, 0.4, 1.8, -2.6); for (const s of [-1, 1]) box(g, M.steel, 0.2, 3.0, 4.6, 0.4 + s * 2.5, 1.8, -0.4); box(g, M.dark, 5.6, 0.2, 5.0, 0.4, 3.4, -0.3).rotation.x = 0.06;   // shed: back wall, sides, tin roof
+  box(g, M.yellow, 5.0, 0.25, 0.25, 0.4, 2.9, 1.2); cyl(g, M.gun, 0.03, 1.2, 0.9, 2.2, 1.2); box(g, M.gun, 0.3, 0.3, 0.3, 0.9, 1.5, 1.2);                       // hoist beam, chain, hook block
+  for (let i = -2; i <= 2; i++) box(g, i % 2 ? M.yellow : M.dark, 0.9, 0.04, 0.5, 0.4 + i * 0.95, 0.34, 2.6);                                           // hazard stripes at the bay mouth
+  for (let i = 0; i < 3; i++) cyl(g, M.rubber, 0.42, 0.26, -2.6, 0.5 + i * 0.27, -1.6); box(g, M.red, 0.9, 0.7, 0.5, 2.2, 0.7, -1.9); box(g, M.crateB, 0.8, 0.6, 0.8, -1.4, 0.65, -1.8);
+  box(g, M.white, 0.9, 0.9, 0.05, 0.4, 2.6, -2.48); box(g, M.red, 0.6, 0.16, 0.06, 0.4, 2.6, -2.45); box(g, M.red, 0.16, 0.6, 0.06, 0.4, 2.6, -2.45).rotation.z = 0.785;   // a wrench-cross sign
+  return { g, flags, top: 6 };
+}
+// Field Hospital: a white ward tent with a red cross on the roof, a smaller triage tent, stretchers and an ambulance.
+function siteHospital() {
+  const g = new THREE.Group(), flags = sitePad(g, M.sandbag);
+  box(g, M.white, 4.6, 1.8, 3.2, -0.3, 1.2, -1.4); for (const s of [-1, 1]) box(g, M.white, 4.8, 0.12, 1.9, -0.3, 2.5, -1.4 + s * 0.8).rotation.x = s * 0.5;   // ward tent with a pitched roof
+  box(g, M.red, 1.5, 0.05, 0.42, -0.3, 2.86, -1.4); box(g, M.red, 0.42, 0.05, 1.5, -0.3, 2.86, -1.4);                                                     // the red cross, flat on the ridge so it is seen from above
+  box(g, M.red, 0.9, 0.3, 0.04, -0.3, 1.5, 0.22); box(g, M.red, 0.3, 0.9, 0.04, -0.3, 1.5, 0.22);
+  box(g, M.white, 1.8, 1.3, 1.6, 2.4, 0.95, 1.6); add(g, G.pyr, M.white, 1.5, 0.8, 1.5, 2.4, 2.0, 1.6).rotation.y = 0.785;                                 // triage tent
+  box(g, M.white, 2.0, 0.9, 1.0, -1.8, 0.95, 2.2); box(g, M.white, 0.8, 0.6, 1.0, -0.5, 0.8, 2.2); box(g, M.glass, 0.05, 0.36, 0.8, -0.1, 0.95, 2.2); box(g, M.red, 0.6, 0.3, 0.03, -1.8, 1.0, 2.72); wheels(grp(g, -1.4, 0.3, 2.2), [0.7, -0.9], 0.52, 0.26, 0.2);   // ambulance
+  for (const z of [0.9, 1.6]) box(g, M.olive, 1.6, 0.08, 0.5, 0.6, 0.5, z);
+  return { g, flags, top: 6 };
+}
+// Radar Tower: a steel lattice mast on a control hut, with a dish that turns all the time.
+function siteRadar() {
+  const g = new THREE.Group(), flags = sitePad(g);
+  box(g, M.concrete, 3.0, 1.8, 2.4, 0.6, 1.2, -1.8); box(g, M.dark, 3.2, 0.2, 2.6, 0.6, 2.2, -1.8);
+  for (const [a, b2] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const leg = cyl(g, M.steel, 0.08, 8.2, 0.2 + a * 0.75, 4.3, 0.8 + b2 * 0.75); leg.rotation.z = a * 0.09; leg.rotation.x = -b2 * 0.09; }
+  for (const y of [2.2, 4.4, 6.4]) { const w = 1.5 - y * 0.1; box(g, M.steel, w * 2, 0.07, 0.07, 0.2, y, 0.8 + w); box(g, M.steel, w * 2, 0.07, 0.07, 0.2, y, 0.8 - w); box(g, M.steel, 0.07, 0.07, w * 2, 0.2 + w, y, 0.8); box(g, M.steel, 0.07, 0.07, w * 2, 0.2 - w, y, 0.8); }
+  box(g, M.dark, 1.0, 0.4, 1.0, 0.2, 8.5, 0.8);
+  const spin = grp(g, 0.2, 8.8, 0.8); const dish = add(spin, G.dome, M.white, 1.9, 0.7, 1.9, 0.5, 1.0, 0); dish.rotation.z = -1.9; cyl(spin, M.steel, 0.1, 1.0, 0, 0.5, 0); add(spin, G.sph, M.laser, 0.16, 0.16, 0.16, 1.1, 1.3, 0);
+  return { g, flags, spin, top: 12 };
+}
+// Artillery Platform: a 155 mm towed howitzer dug in on a concrete platform behind a sandbag wall, shells stacked beside it.
+function siteGun() {
+  const g = new THREE.Group(), flags = sitePad(g);
+  cyl(g, M.concrete, 3.2, 0.5, 0.3, 0.5, 0, 'y', G.cyl8);
+  for (let i = 0; i < 7; i++) { const a = -1.2 + i * 0.4; add(g, G.sph, M.sandbag, 0.8, 0.4, 0.45, 0.3 + Math.cos(a) * 3.0, 1.0, Math.sin(a) * 3.0).rotation.y = -a + 1.57; }
+  for (let i = 0; i < 4; i++) cyl(g, M.olive, 0.13, 0.7, -1.8 + (i % 2) * 0.32, 1.1, -1.9 + (i >> 1) * 0.32); box(g, M.crateA, 0.9, 0.6, 0.7, -1.9, 1.05, 1.6);
+  const t = grp(g, 0.3, 0.75, 0);
+  cyl(t, M.steel, 0.9, 0.2, 0, 0.1, 0); box(t, M.olive, 1.6, 0.5, 0.9, -0.2, 0.75, 0); for (const s of [-1, 1]) { const tr = box(t, M.olive, 2.6, 0.16, 0.2, -1.5, 0.35, s * 0.7); tr.rotation.y = s * 0.3; cyl(t, M.rubber, 0.5, 0.3, 0.1, 0.5, s * 1.0, 'z'); }   // carriage, split trails, wheels
+  const brl = grp(t, 0.3, 1.1, 0); brl.rotation.z = 0.5; cyl(brl, M.gun, 0.11, 4.2, 2.1, 0, 0, 'x'); cyl(brl, M.gun, 0.17, 0.5, 4.1, 0, 0, 'x'); cyl(brl, M.gun, 0.16, 1.0, 0.5, 0.26, 0, 'x'); box(t, M.olive, 0.1, 1.2, 1.5, 0.5, 1.2, 0);   // barrel with muzzle brake, recuperator, gun shield
+  return { g, flags, turret: t, muzzle: 3.9, muzzleY: 3.0, top: 6 };
+}
+const SITE = { site_repair: siteRepair, site_hospital: siteHospital, site_radar: siteRadar, site_gun: siteGun };
 function civ(kind) {
   const variant = ((kind | 0) % M.civ.length + M.civ.length) % M.civ.length;   // never an unknown kind: that is what left custom buildings white
   const g = new THREE.Group(), main = grp(g), rub = grp(g);
@@ -813,7 +858,48 @@ function skyshield(T) {
   add(g, G.sph, T.glow, 0.3, 0.3, 0.3, 0, 7.5, -0.6);
   return { g, spin, top: 8.5 };
 }
-const BLDG = { kinzhal, skyshield, cc, power, supply, barracks, factory, airfield, patriot, gatling, stinger, pantsir, irist, uplink, tunnel, market, particle, silo, scud, shipyard };
+// The command building, one look per faction (6 x 6 cells). Top units and the superweapon need it.
+//   United States: a Tactical Operations Center: two joined tents, an aerial farm, a satellite dish, a generator.
+//   China: a Command Bunker: low sloped concrete, a blast door, an aerial mast.
+//   ISIS: a War Council: a mud-brick house in a walled yard with a flag and a pickup.
+//   Russia: a Field Headquarters: two command trucks under a camouflage net with a telescopic mast.
+//   Europe: a Command Post: container modules stacked two high with a mast and a dish.
+function command(T) {
+  const g = new THREE.Group(), f = T.faction; let spin = null;
+  if (f === 'vanguard') {
+    slab(g, 11.4, 11.4, M.sandbag, 0.25);
+    for (const [x, z, w] of [[-1.6, -1.2, 6.4], [1.4, 2.6, 4.6]]) { box(g, M.khaki, w, 1.9, 3.4, x, 1.15, z); for (const s of [-1, 1]) box(g, M.khaki, w + 0.2, 0.12, 2.0, x, 2.5, z + s * 0.85).rotation.x = s * 0.5; }
+    box(g, T.accent, 6.5, 0.3, 0.1, -1.6, 1.9, 0.55); for (const x of [-4.2, -3.2, -2.2]) cyl(g, M.gun, 0.04, 4.6 + (x + 4) * 0.6, x, 2.6, -3.8);
+    cyl(g, M.steel, 0.2, 1.6, 3.9, 1.0, -3.4); spin = grp(g, 3.9, 1.9, -3.4); const dish = add(spin, G.dome, M.white, 1.5, 0.5, 1.5, 0.3, 0.7, 0); dish.rotation.z = -1.3;
+    box(g, T.dark, 1.6, 1.1, 1.0, 4.2, 0.8, 3.9); box(g, M.crateB, 1.0, 0.8, 1.0, -4.3, 0.65, 3.6);
+  } else if (f === 'redhammer') {
+    slab(g, 11.4, 11.4);
+    box(g, M.concrete, 8.6, 2.2, 7.0, 0, 1.55, -0.6); for (const s of [-1, 1]) { const w = box(g, M.concrete, 8.6, 2.6, 1.6, 0, 1.1, -0.6 + s * 3.9); w.rotation.x = -s * 0.6; }
+    box(g, T.roof, 8.9, 0.3, 5.6, 0, 2.8, -0.6); box(g, T.accent, 8.7, 0.35, 5.7, 0, 2.35, -0.6); box(g, M.gun, 0.25, 1.8, 2.2, 4.42, 1.3, -0.6);
+    cyl(g, M.steel, 0.14, 6.0, -3.0, 5.9, -1.6); for (const y of [5.4, 7.0, 8.4]) box(g, M.steel, 1.4, 0.06, 0.06, -3.0, y, -1.6); add(g, G.sph, T.glow, 0.3, 0.3, 0.3, -3.0, 9.0, -1.6);
+    box(g, M.red, 0.06, 0.9, 0.9, 4.46, 2.4, 1.6);
+  } else if (f === 'sandstorm') {
+    slab(g, 11.4, 11.4, M.sandbag, 0.25);
+    for (const [x, z, w, d] of [[0, -5.2, 10.6, 0.4], [0, 5.2, 10.6, 0.4], [-5.1, 0, 0.4, 10.6], [5.1, -2.2, 0.4, 6.2]]) box(g, M.cloth, w, 1.8, d, x, 1.1, z);   // the yard wall, with a gate on one side
+    box(g, M.cloth, 5.6, 3.0, 4.6, -1.6, 1.7, -2.0); box(g, M.sandbag, 5.9, 0.25, 4.9, -1.6, 3.3, -2.0); box(g, M.dark, 1.2, 2.0, 0.2, -1.6, 1.2, 0.32); box(g, T.accent, 5.7, 0.3, 4.7, -1.6, 2.7, -2.0);
+    cyl(g, M.wood, 0.07, 5.0, 1.6, 3.4, -3.8); box(g, T.accent, 1.8, 1.0, 0.06, 2.55, 5.3, -3.8);
+    box(g, T.hull, 3.0, 0.7, 1.4, 2.4, 0.95, 2.6); box(g, T.hull, 1.1, 0.6, 1.3, 2.7, 1.55, 2.6); wheels(grp(g, 2.4, 0.3, 2.6), [1.0, -1.0], 0.72, 0.34, 0.24);
+    for (let i = 0; i < 3; i++) box(g, M.crateA, 0.9, 0.7, 0.9, -3.8 + i * 1.0, 0.65, 3.6);
+  } else if (f === 'ursa') {
+    slab(g, 11.4, 11.4, M.slab, 0.3);
+    for (const z of [-2.2, 1.6]) { const tr = grp(g, -0.6, 0.3, z); box(tr, M.dark, 6.4, 0.35, 1.9, 0, 0.75, 0); wheels(tr, [2.2, 0.9, -1.4, -2.5], 1.0, 0.5, 0.36); box(tr, T.hull, 1.5, 1.3, 2.0, 2.4, 1.55, 0); box(tr, M.glass, 0.06, 0.5, 1.7, 3.17, 1.75, 0); box(tr, T.dark, 4.4, 1.7, 2.1, -0.9, 1.8, 0); box(tr, T.accent, 4.45, 0.25, 2.15, -0.9, 2.3, 0); }
+    box(g, M.ghillie, 9.0, 0.08, 7.6, -0.6, 3.4, -0.3).rotation.z = 0.04; for (const [x, z] of [[-5.0, -4.0], [3.8, -4.0], [-5.0, 3.4], [3.8, 3.4]]) cyl(g, M.wood, 0.07, 3.2, x, 1.8, z);   // camouflage net
+    cyl(g, M.steel, 0.1, 8.0, 4.4, 4.3, 0); for (const y of [6.6, 7.6]) box(g, M.steel, 0.06, 0.06, 1.6, 4.4, y, 0); box(g, T.dark, 1.5, 1.0, 1.0, 4.3, 0.8, 3.9);
+  } else {
+    slab(g, 11.4, 11.4);
+    for (const [x, y, z, m] of [[-2.2, 1.55, -1.4, T.wall], [2.4, 1.55, -1.4, T.hull], [-2.2, 1.55, 1.8, T.hull], [0.2, 4.05, -1.4, T.wall]]) { box(g, m, 4.4, 2.4, 2.4, x, y, z); box(g, M.dark, 0.08, 1.5, 0.9, x + 2.22, y - 0.3, z); }
+    box(g, T.accent, 4.45, 0.3, 2.45, 0.2, 5.0, -1.4); box(g, M.glass, 2.6, 0.7, 0.06, 0.2, 4.2, -0.18);
+    cyl(g, M.steel, 0.1, 5.0, 3.6, 5.2, 2.6); spin = grp(g, 3.6, 7.7, 2.6); const dish = add(spin, G.dome, M.white, 1.3, 0.45, 1.3, 0.3, 0.3, 0); dish.rotation.z = -1.2;
+    box(g, T.dark, 1.6, 1.1, 1.0, -4.2, 0.85, 3.8); cyl(g, M.gun, 0.04, 3.6, -3.6, 4.6, -1.4);
+  }
+  return spin ? { g, spin, top: 9 } : { g, top: 9 };
+}
+const BLDG = { command, kinzhal, skyshield, cc, power, supply, barracks, factory, airfield, patriot, gatling, stinger, pantsir, irist, uplink, tunnel, market, particle, silo, scud, shipyard };
 
 export function buildModel(e) {
   init();
@@ -821,7 +907,7 @@ export function buildModel(e) {
   if (e.kind === 'unit') { const d = UNITS[e.type]; v = (UNIT[d.model] || UNIT.scorpion)(mats(d.faction, e.team)); }
   else {
     const d = BLDGS[e.type];
-    if (d.model === 'civ') v = civ(e.variant); else if (d.model === 'dock') v = dock(); else if (d.model === 'derrick') v = derrick();
+    if (d.model === 'civ') v = civ(e.variant); else if (d.model === 'dock') v = dock(); else if (d.model === 'derrick') v = derrick(); else if (SITE[d.model]) v = SITE[d.model]();
     else v = (BLDG[d.model] || BLDG.power)(mats(d.faction, e.team), d);
   }
   v.kind = e.kind; v.type = e.type;

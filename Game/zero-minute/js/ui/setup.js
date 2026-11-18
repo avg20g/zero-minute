@@ -1,7 +1,7 @@
 // Pre-match faction selector. Pure DOM + registry data; no Three.js needed,
 // so it can show while the 3D library is still loading.
 import { FACTIONS, FACTION_IDS, UNITS, BLDGS, POWERS, GENERALS, generalsOf } from '../sim/factionRegistry.js';
-import { DIFFICULTY } from '../sim/aiController.js';
+import { DIFFICULTY, NOTES_KEY } from '../sim/aiController.js';
 import { MAPS } from '../sim/map.js';
 import { openMapBuilder, loadSavedMap } from './mapBuilder.js';
 import { PALETTE, resolveColors } from './teamColors.js';
@@ -31,7 +31,7 @@ export function showSetup(onStart) {
   }).join('');
   foes.innerHTML = [['random', 'Random'], ...FACTION_IDS.map(id => [id, FACTIONS[id].name])].map(([id, n]) => `<label class="fchip"><input type="radio" name="foe" id="foe-${id}" value="${id}"><span>${esc(n)}</span></label>`).join('');
   // difficulty tiers are behavioural caps only: every tier plays by the same rules with the same money
-  tiers.innerHTML = Object.entries(DIFFICULTY).map(([id, d]) => `<label class="fchip lvl"><input type="radio" name="level" id="lvl-${id}" value="${id}"><span><b>${esc(d.label)}</b><small>${d.apm} actions/min · reacts in ${d.react / 20} s</small></span></label>`).join('')
+  tiers.innerHTML = Object.entries(DIFFICULTY).map(([id, d]) => `<label class="fchip lvl"><input type="radio" name="level" id="lvl-${id}" value="${id}"><span><b>${esc(d.label)}</b><small>${d.apm} actions/min · reacts in ${d.react / 20} s. ${esc(d.note)}</small></span></label>`).join('')
     + `<label class="fchip lvl"><input type="radio" name="level" id="lvl-none" value="none"><span><b>No enemy</b><small>Sandbox: no AI and no enemy base</small></span></label>`;
   const mapNote = document.getElementById('setup-map-note');
   const drawMaps = () => {
@@ -65,6 +65,12 @@ export function showSetup(onStart) {
     const eg = generalsOf(pick); opt.generals = o.generals || [a === mine ? myGen() : generalsOf(a)[0], eg[Math.floor(Math.random() * eg.length)]];   // the enemy's general is drawn here, before the sim starts
     root.hidden = true; onStart([a, pick], lv === 'none' ? 'medium' : lv, opt);
   };
+  { // the Hard AI's notebook: how many match-ups it has notes on, and a button to wipe them
+    const btn = document.getElementById('setup-ainotes-reset'), cnt = document.getElementById('setup-ainotes-count');
+    const show = () => { let n = 0; try { n = Object.keys(JSON.parse(localStorage.getItem(NOTES_KEY) || '{}') || {}).length; } catch (e) { n = 0; } if (cnt) cnt.textContent = n ? `Notes on ${n} match-up${n === 1 ? '' : 's'}.` : 'No notes yet.'; };
+    if (btn) btn.addEventListener('click', () => { try { localStorage.removeItem(NOTES_KEY); } catch (e) { /* nothing stored */ } show(); });
+    show();
+  }
   document.getElementById('setup-start').addEventListener('click', () => go(mine, foe), { once: true });
   window.__rtsStart = (a, b, lv, o) => go(a || mine, b || foe, lv || level, o);
 }

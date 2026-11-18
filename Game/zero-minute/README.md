@@ -425,13 +425,58 @@ tactics (counters, retreat, focus fire, flanking, power combos) are switched on.
     are not stopped. The AI raises it over its base when it hears the enemy's launch klaxon (`sim.lastSuper`).
 - **Two new units for the other factions**: United States M142 HIMARS (six rockets to 96 m) and M2A3 Bradley; China
   PGZ-09 (mobile anti-aircraft) and ZBD-04A; ISIS Captured T-55 and Mortar Team; Europe Boxer and NH90.
-- Tests: `node test/batch14.mjs` (71 checks).
+- Tests: `node test/batch14.mjs` (71 checks for drop A).
+
+## Batch 14 (drop B): towns, capturable sites, an AI that learns, command buildings
+- **Towns** (`town()`, `towns()` in `js/sim/map.js`): on all seven maps the civilian buildings stand in blocks with
+  6 m streets between them and a main street each way, instead of alone. The map builder has a **Town block** stamp.
+- **Capturable sites** (map `sites: [[x, z, kind]]`, two per half, mirrored): captured by infantry like an Oil
+  Derrick; they change hands and are never destroyed.
+  - **Repair Depot** (`site_repair`): your vehicles within 26 m are repaired once out of combat for 3 s.
+  - **Field Hospital** (`site_hospital`): your infantry within 26 m heal.
+  - **Radar Tower** (`site_radar`): you see 90 m round it.
+  - **Artillery Platform** (`site_gun`): a howitzer that fires for whoever holds it; neutral, it does nothing.
+  The map builder has a tool for each. The AI captures them.
+- **Command buildings** (role `tech`, $1,500, after the War Factory): Tactical Operations Center (US), Command Bunker
+  (China), War Council (ISIS), Field Headquarters (Russia), Command Post (Europe). Each faction's superweapon, the
+  Strategic Airfield and the top units need it: HIMARS, F-22; Overlord; Scud Launcher, Shahed Launcher; Msta-S,
+  TOS-1A, T-14, Su-57; PzH 2000, KF51 Panther, Laser Leopard. A match now has an early, a middle and a late stage.
+- **The AI** (`js/sim/aiController.js`). It still reads only what its own units see, pays the same prices and obeys
+  the same limits; `test/ai.mjs` proves it (every order audited, and the blind-swap test now also compares
+  everything the AI learned and runs a second time with a notebook).
+  - **Doctrines**: each match it picks a plan (combined arms, armour push, infantry and carriers, air cavalry,
+    artillery siege) and builds toward that mix by role (`ROLE`, `DOCTRINES`) while still countering what it sees.
+    A unit type it has not fielded yet is owed a turn, more so the longer the match runs. Over six Hard matches
+    each faction's AI builds every unit type open to it (tested).
+  - **Learning during a match**: a report card (experience earned per credit spent, per unit type) shifts what it
+    builds; where an attack was wiped out is remembered, and the next one is bigger, flanks from the other side or
+    goes elsewhere, with more artillery; raids on its base are remembered, defenses go up on that side and a guard
+    stays home; without artillery it goes round defended buildings for the supply line.
+  - **Learning between matches (Hard only)**: a notebook in the browser (`cz-ainotes`), per opponent faction and map:
+    which plan won or lost, when your first raid came, what it met. It is handed to the match as `aiNotes`, stored in
+    the replay (replays still play back exactly) and empty in tests and sweeps. **Reset AI memory** is in the lobby.
+  - **Levels are fixed limits** (`DIFFICULTY`): Easy has one simple plan and learns nothing; Medium has three plans
+    and the report card; Hard has all five, every kind of memory, the notebook, flanking and focus fire. No level
+    gets extra money or sight.
+  - It uses troop carriers and transport helicopters (squads board before the march and get out at the fight or
+    when shot at), builds its command building, one defense early, an airfield when its plan flies, and saves up for
+    what the plan is short of instead of buying whatever it can afford that second.
+- **Fair to both start positions**: each AI sorts the map's points of interest as seen from its own end, so the two
+  make mirror-image choices (a tie between two equally distant sites used to send one player's scout into the
+  enemy half), and the plan is drawn from a hash of the seed, side, match-up and map (the match's random stream
+  starts nearly the same for seeds 1, 2, 3...).
+- **Balance pass** (`balance/CHANGELOG.md`): **an Oil Derrick pays Russia 30% more** (`oil` on the faction: it has no
+  income building); T-90 and T-14 guns do half damage to infantry; Russian and Chinese core units are cheaper, the
+  ISIS core, the US Ranger and the A-10 a little dearer. Hard: 14 of 15 sides between 40 and 60%; 6% of matches
+  are over before 8 minutes (18% in drop A); median length 17 minutes.
+- Tests: `node test/batch14.mjs` (150 checks: drop A and drop B); `test/ai.mjs` (110 checks).
 
 ## Tests
 Node (simulation only):
 
     node test/batch14.mjs     batch 13 play notes, defense models, Russia's new units and Reactive Armour, troop
-                              carriers, Kinzhal Strike, Sky Shield, the eight other new units
+                              carriers, Kinzhal Strike, Sky Shield, the eight other new units; towns, capturable
+                              sites, command buildings, AI doctrines, report card, memory and notebook
 
     node test/batch13.mjs     US aircraft as units, Strategic Airfield, Longbow, AH-1Z, new promotions, Quad Cannon,
                               Shahed Launcher, tunnels, the AI's swarm and airfields, team marks, detailed figures

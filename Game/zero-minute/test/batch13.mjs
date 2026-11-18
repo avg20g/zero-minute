@@ -57,7 +57,7 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 // ---------------------------------------------------------------- Strategic Airfield and the aircraft built there
 {
   const B = BLDGS.v_stratfield, L = B.layout;
-  ok(B.general === 'airforce' && B.pads === 2 && L.hangars.length === 2 && L.spots.length === 2 && L.helipad && B.big && B.needs === 'v_airfield', 'Strategic Airfield: Air Force General only, two large hangars, a helicopter pad, needs an Air Field first');
+  ok(B.general === 'airforce' && B.pads === 2 && L.hangars.length === 2 && L.spots.length === 2 && L.helipad && B.big && B.needs === 'v_toc', 'Strategic Airfield: Air Force General only, two large hangars, a helicopter pad, needs the Tactical Operations Center');
   ok(JSON.stringify(B.trains) === JSON.stringify(['v_ac130', 'v_b2', 'v_apache']) && B.upgrades.includes('v_longbow'), 'it builds the AC-130, the B-2 and the Apache, and sells the Longbow upgrade');
   ok(L.hangar.w > MF.HERCULES.span * MF.HERCULES.scale && L.hangar.w > MF.SPIRIT.span * MF.SPIRIT.scale && L.hangar.d > MF.HERCULES.length * MF.HERCULES.scale, `its hangars (${L.hangar.w} m wide, ${L.hangar.d} m deep) take an AC-130 or a B-2`);
   for (const g of [null, 'marine']) { const s = bare({ factions: ['vanguard', 'redhammer'], generals: [g, null] }), T = s.teams[0]; T.money = 9000;
@@ -180,7 +180,7 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
     return s.hash() + ':' + s2.hash();
   };
   ok(once() === once(), 'launches are deterministic');
-  ok(unitCost({ faction: 'sandstorm', general: 'stealth' }, 's_guerrilla') === 200 && unitCost({ faction: 'sandstorm', general: 'stealth' }, 's_fpv') === UNITS.s_fpv.cost && UNITS.s_fpv.cost === 350, 'Stealth General: infantry 10% cheaper (balance); the FPV drone itself is unchanged');
+  ok(unitCost({ faction: 'sandstorm', general: 'stealth' }, 's_guerrilla') === 230 && unitCost({ faction: 'sandstorm', general: 'stealth' }, 's_fpv') === UNITS.s_fpv.cost && UNITS.s_fpv.cost === 350, 'Stealth General: infantry 10% cheaper (balance); the FPV drone itself is unchanged');
   ok(POWERS.sneaktunnel.cd === 150 && POWERS.sneaktunnel.delay === 2 && FACTIONS.sandstorm.tree.find(n => n.power === 'sneaktunnel').tier === 3 && BLDGS.s_tunnel.secs === 5, 'tunnels: Sneak Attack recharges in 150 s (was 300), opens after 2 s (was 5), is a Rank 3 promotion (was 5); a Tunnel Network builds in 5 s (was 8)');
   console.log(`ISIS           : Quad Cannon $${Q.cost} | Shahed Launcher 3 drones 1.5 s apart, ${WEAPONS.shahed.range} m | Scud Launcher ${WEAPONS.scud_missile.range} m | faster tunnels`);
 }
@@ -199,7 +199,7 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
   ok(med.ais[0].swarmSize === 6 && med.ais[1].swarmType === null, 'Medium keeps 6; Easy has no swarm');
   // Air Force General AI: builds both airfields and the aircraft
   const u = new Sim({ ai: 'both', difficulty: ['hard', 'hard'], factions: ['vanguard', 'ursa'], generals: ['airforce', null], map: MAPSPEC('forest'), seed: 3 });
-  const built = {}; for (let t = 0; t < 20 * 60 * 24 && u.winner < 0; t++) { if (t % 20 === 0) keep(u, 1); u.step(); for (const e of u.events) if (e.team === 0 && (e.t === 'spawn' || e.t === 'done')) built[e.type] = (built[e.type] || 0) + 1; u.events.length = 0; }
+  const built = {}; for (let t = 0; t < 20 * 60 * 24 && u.winner < 0; t++) { if (t % 20 === 0) { keep(u, 0); keep(u, 1); } u.step(); for (const e of u.events) if (e.team === 0 && (e.t === 'spawn' || e.t === 'done')) built[e.type] = (built[e.type] || 0) + 1; u.events.length = 0; }
   ok(built.v_airfield >= 1 && built.v_stratfield >= 1 && (built.v_ac130 || 0) + (built.v_b2 || 0) + (built.v_apache || 0) >= 1 && built.v_a10 >= 1, `the Air Force General's AI builds the Air Field, the Strategic Airfield and their aircraft (${['v_a10', 'v_ac130', 'v_b2', 'v_apache'].map(k => (built[k] || 0) + ' ' + UNITS[k].name).join(', ')})`);
   ok(!new Sim({ ai: 'both', factions: ['vanguard', 'ursa'], generals: ['marine', null] }).ais[0].roster.includes('v_ac130'), 'another general\'s AI never plans for aircraft it cannot build');
   console.log(`AI             : swarm peak ${peak}, ${a.swarm.waves} waves | ${sneaks} sneak attacks | Air Force AI built ${Object.entries(built).filter(([k]) => UNITS[k] && UNITS[k].air).map(([k, v]) => v + ' ' + k).join(', ')}`);

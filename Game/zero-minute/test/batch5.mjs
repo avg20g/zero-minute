@@ -117,11 +117,11 @@ const hold = (u) => { u.order = { t: 'hold' }; return u; };
   s.issue({ t: 'power', id: 'cashhack', x: sup.x, z: sup.z }); run(s, 2);
   ok(T.money === m0 + 2000 && E.money === 7000, 'Cash Hack takes $2,000 (others take $1,500)');
   ok(Math.abs((T.powerReady.cashhack - s.tick) / 20 - 180) < 1, 'and recharges in 180 s (others: 240 s)');
-  ok(unitCost(T, 'r_tank') === 850 && unitCost(T, 'r_conscript') === 290 && unitCost(T, 'r_mig') === UNITS.r_mig.cost, 'Cyber pays 14% more for tanks and infantry; aircraft are unchanged');
+  ok(unitCost(T, 'r_tank') === 800 && unitCost(T, 'r_conscript') === 270 && unitCost(T, 'r_mig') === UNITS.r_mig.cost, 'Cyber pays 14% more for tanks and infantry; aircraft are unchanged');
   const M = new Sim({ ai: false, factions: ['redhammer', 'vanguard'], generals: ['mass', null] }), TM = M.teams[0], TN = n.teams[0];
-  ok(unitCost(TM, 'r_tank') === 690 && unitCost(TN, 'r_tank') === 750 && unitCost(TM, 'r_overlord') === 1840 && unitCost(TM, 'r_conscript') < unitCost(TN, 'r_conscript') && unitCost(TM, 'r_mig') === UNITS.r_mig.cost, 'tanks and infantry cost 8% less; aircraft do not');
+  ok(unitCost(TM, 'r_tank') === 640 && unitCost(TN, 'r_tank') === 700 && unitCost(TM, 'r_overlord') === 1840 && unitCost(TM, 'r_conscript') < unitCost(TN, 'r_conscript') && unitCost(TM, 'r_mig') === UNITS.r_mig.cost, 'tanks and infantry cost 8% less; aircraft do not');
   const fac = makeBldg(M, 'r_factory', PLAYER, 60, 180); M.nav.rebuild(); TM.money = 5000; M.issue({ t: 'train', id: fac.id, type: 'r_tank' }); run(M, 2);
-  ok(TM.money === 4310, 'the discounted price is what is charged'); M.issue({ t: 'cancel', id: fac.id, idx: 0 }); run(M, 2); ok(TM.money === 5000 && fac.queue.length === 0, 'and what is refunded');
+  ok(TM.money === 4360, 'the discounted price is what is charged'); M.issue({ t: 'cancel', id: fac.id, idx: 0 }); run(M, 2); ok(TM.money === 5000 && fac.queue.length === 0, 'and what is refunded');
   console.log(`cyber / mass   : from 5:00 a permanent watch on enemy buildings it has found; Cash Hack $2,000 / 180 s | tank $${unitCost(TM, 'r_tank')} (normal $${unitCost(TN, 'r_tank')}), Overlord $${unitCost(TM, 'r_overlord')}`);
 }
 

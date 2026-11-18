@@ -44,7 +44,8 @@ export class Sim {
       for (const n of FACTIONS[T.faction].tree) { T.promos.add(n.id); if (n.flag) T.flags[n.flag] = true; if (n.power) T.powerReady[n.power] = 0; }
     }
     this.tick = 0; this.winner = -1;
-    this.setup = { factions: f.slice(), money, difficulty: opts.difficulty || 'medium', seed: this.rng, treaty: opts.treaty || 0, noSuper: !!opts.noSuper, koth: !!opts.koth, noEnemy: !!opts.noEnemy, noShroud: !!opts.noShroud, friendlyFire: !!opts.friendlyFire, map: opts.map || null, generals: [gens[0] || null, gens[1] || null] }; // everything a replay needs
+    this.aiNotes = opts.aiNotes || null;            // the Hard AI's notebook from earlier matches (kept by the page, stored with the replay); null in tests and balance sweeps
+    this.setup = { aiNotes: this.aiNotes, factions: f.slice(), money, difficulty: opts.difficulty || 'medium', seed: this.rng, treaty: opts.treaty || 0, noSuper: !!opts.noSuper, koth: !!opts.koth, noEnemy: !!opts.noEnemy, noShroud: !!opts.noShroud, friendlyFire: !!opts.friendlyFire, map: opts.map || null, generals: [gens[0] || null, gens[1] || null] }; // everything a replay needs
     this.noSuper = !!opts.noSuper;               // lobby rule: superweapons cannot be built
     this.ff = !!opts.friendlyFire;               // lobby rule: explosions, gas and fire also hurt the side that made them
     this.koth = null;                            // King of the Hill state, set in setupSkirmish when the mode is on
@@ -144,6 +145,7 @@ function setupSkirmish(sim) {
   for (let i = 0; i < m.civs.length; i++) { const b = makeBldg(sim, 'civ', NEUTRAL, m.civs[i][0], m.civs[i][1]); b.variant = m.civs[i][2] | 0; } // variant = building kind (CIV_KINDS)
   for (const d of m.docks) { const b = makeBldg(sim, 'dock', NEUTRAL, d.x, d.z); b.supplies = b.maxSupplies = d.amount; }
   for (const d of m.derricks) makeBldg(sim, 'derrick', NEUTRAL, d[0], d[1]);
+  for (const d of m.sites || []) makeBldg(sim, 'site_' + d[2], NEUTRAL, d[0], d[1]);   // capturable sites: repair, hospital, radar, gun
   sim.nav.rebuild();
 
   // Player: Command Center, one builder, two squads

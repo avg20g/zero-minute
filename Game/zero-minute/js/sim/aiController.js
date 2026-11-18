@@ -15,10 +15,17 @@ import { padCount } from './air.js';
 import { placeError } from './entities.js';
 import { NAV_BOAT, NAV_WARSHIP } from './pathfinding.js';
 
+// Each level is a fixed set of limits on what the AI may think about. None of them gives it money, sight or speed
+// the rules do not give a player.
+//   doctrines  how many of the army plans below it may choose from (0: none, it just counters what it sees)
+//   learn      0 nothing; 1 keeps a report card on its own unit types; 2 also remembers where its attacks failed and
+//              where it was raided from, raids harvesters, and avoids or shells defended targets
+//   notebook   carries what it learned from one match to the next (see `notes` in the constructor)
+//   carriers   loads squads into troop carriers for an attack
 export const DIFFICULTY = {
-  easy:   { label: 'Easy',   apm: 25,  react: 50, counters: false, retreat: false, focus: false, flank: false, combo: false, reverse: false, superweapon: false, derrickAfter: 420, armyCap: 14, attackAt: 3400, firstAttack: 5400, castAt: 3.5, fleet: 2 },
-  medium: { label: 'Medium', apm: 60,  react: 20, counters: true,  retreat: true,  focus: false, flank: false, combo: false, reverse: false, superweapon: true,  derrickAfter: 180, armyCap: 20, attackAt: 3200, firstAttack: 4200, castAt: 2.5, fleet: 4 },
-  hard:   { label: 'Hard',   apm: 120, react: 6,  counters: true,  retreat: true,  focus: true,  flank: true,  combo: true,  reverse: true,  superweapon: true,  derrickAfter: 40,  armyCap: 26, attackAt: 3000, firstAttack: 3000, castAt: 2.5, fleet: 6 },
+  easy:   { label: 'Easy',   apm: 25,  react: 50, counters: false, retreat: false, focus: false, flank: false, combo: false, reverse: false, superweapon: false, derrickAfter: 420, armyCap: 14, attackAt: 3400, firstAttack: 5400, castAt: 3.5, fleet: 2, doctrines: 0, learn: 0, notebook: false, carriers: false, note: 'One simple plan. It does not counter what you build, flank, or learn.' },
+  medium: { label: 'Medium', apm: 60,  react: 20, counters: true,  retreat: true,  focus: false, flank: false, combo: false, reverse: false, superweapon: true,  derrickAfter: 180, armyCap: 20, attackAt: 3200, firstAttack: 4200, castAt: 2.5, fleet: 4, doctrines: 3, learn: 1, notebook: false, carriers: true, note: 'Counters what it sees. Picks one of three army plans and learns which of its units pay off.' },
+  hard:   { label: 'Hard',   apm: 120, react: 6,  counters: true,  retreat: true,  focus: true,  flank: true,  combo: true,  reverse: true,  superweapon: true,  derrickAfter: 40,  armyCap: 26, attackAt: 3000, firstAttack: 3000, castAt: 2.5, fleet: 6, doctrines: 5, learn: 2, notebook: true, carriers: true, note: 'Everything: flanks, focus fire, five army plans, learns from every fight and from past matches. No extra money or sight.' },
 };
 const ARM = ['inf', 'light', 'heavy', 'air'];
 const SCOUT_STALE = 75 * 20;
@@ -47,6 +54,33 @@ for (const fid in FACTIONS) {
   }
   for (const type in raw) { EFFECT[type] = {}; for (const a of ARM) EFFECT[type][a] = raw[type][a] / max[a]; }
 }
+// The notebook: one entry per (AI faction > opponent faction @ map). d: wins and losses per doctrine; first: the tick of the opponent's
+// first raid, averaged over the matches in which there was one; saw: the share of each armor class it met, averaged. n: matches.
+export const NOTES_KEY = 'cz-ainotes';
+export function mergeNote(notes, e) {
+  if (!e || !e.key) return notes;
+  const n = notes[e.key] || (notes[e.key] = { n: 0, d: {}, first: 0, fn: 0, saw: null });
+  if (e.doctrine) { const r = n.d[e.doctrine] || (n.d[e.doctrine] = [0, 0]); r[e.won ? 0 : 1]++; }
+  if (e.first > 0) { n.first = Math.round((n.first * (n.fn || 0) + e.first) / ((n.fn || 0) + 1)); n.fn = (n.fn || 0) + 1; }
+  if (e.saw) { if (!n.saw) n.saw = { ...e.saw }; else for (const k in e.saw) n.saw[k] = +(((n.saw[k] || 0) * n.n + e.saw[k]) / (n.n + 1)).toFixed(3); }
+  n.n++; return notes;
+}
+// What each unit is for (read off the registry: public rules). A doctrine is a target share of the army's value by role.
+export const ROLE = {};
+for (const type in UNITS) {
+  const d = UNITS[type]; if (!d.weapon || d.harvester || d.builder || d.hero || d.ship) continue;
+  const w = WEAPONS[d.weapon], w2 = d.weapon2 ? WEAPONS[d.weapon2] : null, reach = Math.max(w.range, w2 ? w2.range : 0), aa = Math.max(w.vs.air || 0, w2 ? w2.vs.air || 0 : 0);
+  ROLE[type] = d.air ? (d.suicide || d.drone ? 'special' : d.based ? 'air' : d.transport ? 'lift' : 'heli') : d.infantry ? (d.suicide ? 'special' : 'inf')
+    : reach >= 58 ? 'arty' : aa >= 1 && !d.tank ? 'aa' : d.transport ? 'carrier' : d.tank || d.armor === 'heavy' ? 'armor' : 'light';
+}
+export const DOCTRINES = {
+  combined: { name: 'Combined arms', mix: { inf: 0.22, armor: 0.22, light: 0.1, carrier: 0.06, arty: 0.12, aa: 0.1, air: 0.08, heli: 0.08, lift: 0.02 } },
+  armour:   { name: 'Armoured push', mix: { armor: 0.45, inf: 0.17, carrier: 0.08, aa: 0.1, arty: 0.1, light: 0.05, heli: 0.05 } },
+  infantry: { name: 'Infantry and transports', mix: { inf: 0.4, carrier: 0.15, lift: 0.05, light: 0.12, aa: 0.08, arty: 0.12, armor: 0.08 } },
+  aircav:   { name: 'Air cavalry', mix: { air: 0.24, heli: 0.24, lift: 0.04, inf: 0.2, armor: 0.12, aa: 0.06, light: 0.1 } },
+  siege:    { name: 'Artillery siege', mix: { arty: 0.3, armor: 0.24, inf: 0.2, aa: 0.1, light: 0.08, carrier: 0.04, heli: 0.04 } },
+};
+export const DOCTRINE_ORDER = ['combined', 'armour', 'infantry', 'aircav', 'siege'];   // Medium may use the first three, Hard all five
 const cellOf = (x, z) => Math.min(N - 1, Math.max(0, Math.floor(z / CELL))) * N + Math.min(N - 1, Math.max(0, Math.floor(x / CELL)));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
@@ -69,10 +103,16 @@ export class AIController {
     // Points of interest come from the map itself (public knowledge, like reading the minimap terrain).
     const m = sim.map; this.pois = [];
     for (const d of m.docks) this.pois.push({ x: (d.x + 4) * CELL, z: (d.z + 3) * CELL, k: 'dock' });
-    for (const d of m.derricks) this.pois.push({ x: (d[0] + 2) * CELL, z: (d[1] + 2) * CELL, k: 'derrick' });
+    for (const d of m.derricks.concat(m.sites || [])) this.pois.push({ x: (d[0] + 2) * CELL, z: (d[1] + 2) * CELL, k: 'derrick' });
     for (const r of m.rampTop) this.pois.push({ x: r.x, z: r.z, k: 'choke' });
     this.pois.push({ x: WORLD / 2, z: WORLD / 2, k: 'choke' });
     this.pois.push({ x: WORLD - this.homeW.x, z: WORLD - this.homeW.z, k: 'start' });           // the other start position
+    // Both players must read the map the same way. The lists above come in map order, which is not the same order seen
+    // from the two ends, and every "nearest first" choice below breaks an exact tie by list order (from the centre the
+    // two mirrored sites are exactly as far away as each other). So: nearest to home first, then left of the line to
+    // the centre before right. That order is a mirror image for the two players, and so is everything chosen from it.
+    { const hw = this.homeW, fr = this.front, key = (p) => [Math.round(dist(p, hw) * 100), Math.round(((p.x - hw.x) * fr.z - (p.z - hw.z) * fr.x) * 100)];
+      this.pois.sort((a, b) => { const ka = key(a), kb = key(b); return ka[0] - kb[0] || ka[1] - kb[1]; }); }
     const es = this.pois[this.pois.length - 1]; this.hunt = this.pois.slice().sort((a, b) => dist(a, es) - dist(b, es));
     this.homeDock = m.docks.map(d => ({ x: d.x + 4, z: d.z + 3 })).sort((a, b) => Math.hypot(a.x - this.home.x, a.z - this.home.z) - Math.hypot(b.x - this.home.x, b.z - this.home.z))[0];
     const Tm = sim.teams[team], can = new Set(this.F.build.filter(b => !BLDGS[b].general || BLDGS[b].general === Tm.general).flatMap(b => trainsOf(Tm, b)));   // what this side's general lets it build
@@ -81,6 +121,25 @@ export class AIController {
     const sw = (generalOf(Tm) || {}).aiSwarm; this.swarmType = sw && level !== 'easy' && can.has(sw[0]) ? sw[0] : null; this.swarmSize = sw ? sw[level === 'hard' ? 2 : 1] : 0; this.swarm = { sent: 0, waves: 0 };
     this.combat = this.roster.filter(k => UNITS[k].weapon && !UNITS[k].harvester && !UNITS[k].builder && !UNITS[k].scout && !UNITS[k].hero && !UNITS[k].ship && k !== this.swarmType);
     this.strat = { tries: 0 };
+    // --- the plan for this match, and what it learns
+    const cfg = this.cfg;
+    this.card = {}; this.track = new Map(); this.graves = []; this.raids = []; this.firstRaid = 0; this.sawVal = { inf: 0, light: 0, heavy: 0, air: 0 }; this.sawIds = new Set(); this.prior = null; this.expectRaid = 0;
+    // The notebook (Hard): what this AI wrote down after earlier matches against this faction on this map. It is handed in when the
+    // match is set up (sim.aiNotes, stored with the replay), holds only things the AI saw for itself, and is empty in balance sweeps.
+    this.noteKey = this.F.id + '>' + sim.teams[this.foe].faction + '@' + (sim.map.name || 'map');
+    const note = cfg.notebook && sim.aiNotes ? sim.aiNotes[this.noteKey] : null;
+    if (note) { if (note.first > 0) this.expectRaid = note.first; if (note.saw) this.prior = note.saw; }
+    this.doctrineId = null; this.mix = null;
+    if (cfg.doctrines) {
+      const pool = DOCTRINE_ORDER.slice(0, cfg.doctrines), roles = new Set(this.combat.map(k => ROLE[k]));
+      const wt = pool.map(id => { const r = note && note.d && note.d[id]; return (r ? (r[0] + 1) / (r[0] + r[1] + 2) : 0.5) * ((generalOf(Tm) || {}).aiAir && id === 'aircav' ? 3 : 1) * (Object.keys(DOCTRINES[id].mix).some(k => DOCTRINES[id].mix[k] >= 0.24 && !roles.has(k)) ? 0.15 : 1); });   // a plan that won before is likelier; one this roster cannot field is unlikely
+      // The draw is hashed from the match seed and the side. (The match's own random stream is not used: its first
+      // number is nearly the same for seeds 1, 2, 3..., which gave whoever drew first the same plan match after match.)
+      let h = Math.imul((sim.setup.seed >>> 0) + 1, 0x9E3779B1) + Math.imul(team + 1, 0x632BE5AB); for (const ch of this.noteKey + (Tm.general || '')) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193);
+      h = Math.imul(h ^ (h >>> 16), 0x85EBCA6B); h = Math.imul(h ^ (h >>> 13), 0xC2B2AE35); h = (h ^ (h >>> 16)) >>> 0;   // (the match-up and map are mixed in as well, so one seed does not hand every pairing the same two plans)
+      let pick = h / 4294967296 * wt.reduce((a, b) => a + b, 0), i = 0; while (i < pool.length - 1 && pick > wt[i]) pick -= wt[i++];
+      this.setDoctrine(pool[i], roles);
+    }
     // The fleet (maps flagged `naval` only): which ships to build, and the open sea they must be able to reach.
     this.navy = sim.map.naval ? (this.F.aiNavy || []).filter(k => can.has(k)) : []; this.navRot = 0; this.sea = -2; this.yardSite = null; this.yardTry = -1e9;
     this.fleet = { mode: 'guard', next: 0, target: null, raids: 0, shots: 0 };
@@ -94,6 +153,16 @@ export class AIController {
     this.stats = { builds: 0, trained: 0, scouts: 0, sweeps: 0, attacks: 0, flanks: 0, retreats: 0, reverses: 0, focus: 0, captures: 0, expands: 0, combos: 0, defended: 0, denied: 0, casts: [] };
     this.lastScores = [];
   }
+
+  // Take up a doctrine: its mix, limited to the roles this roster has and scaled back to 1.
+  setDoctrine(id, roles = new Set(this.combat.map(k => ROLE[k]))) {
+    const mix = {}; let sum = 0; for (const [r, v] of Object.entries(DOCTRINES[id].mix)) if (roles.has(r)) { mix[r] = v; sum += v; }
+    for (const r in mix) mix[r] /= sum || 1;
+    this.doctrineId = id; this.mix = mix;
+  }
+  // What this AI would write in its notebook after the match: its plan, whether it won, when it was first raided and
+  // what it met. Everything here is its own or something it saw.
+  notebookEntry() { const tot = Object.values(this.sawVal).reduce((a, b) => a + b, 0) || 1, saw = {}; for (const k in this.sawVal) saw[k] = +(this.sawVal[k] / tot).toFixed(3); return { key: this.noteKey, doctrine: this.doctrineId, won: this.sim.winner === this.team, first: this.firstRaid, saw }; }
 
   // ------------------------------------------------------------ plumbing
   snap(x, z) {
@@ -124,7 +193,7 @@ export class AIController {
       if (e.dead) continue;
       if (e.kind === 'bldg' && !BLDGS[e.type].faction) {                 // map features: only their state needs sight
         if (e.type === 'dock' && fog.canSee(team, e)) this.docks.set(e.id, { id: e.id, x: e.cx + 4, z: e.cz + 3, frac: e.maxSupplies ? e.supplies / e.maxSupplies : 0, tick });
-        else if (e.type === 'derrick' && fog.canSee(team, e)) this.derricks.set(e.id, { id: e.id, x: e.x, z: e.z, owner: e.team, tick });
+        else if (BLDGS[e.type].capturable && fog.canSee(team, e)) this.derricks.set(e.id, { id: e.id, x: e.x, z: e.z, owner: e.team, tick, site: !!BLDGS[e.type].site });   // Oil Derricks and capturable sites alike
         if (e.type !== 'civ') continue;
       }
       if (e.team !== this.foe) continue;
@@ -136,6 +205,7 @@ export class AIController {
         m = { id: e.id, kind: e.kind, type: e.type, team: e.team, first: tick, tick: 0, x: 0, z: 0, hp: 1, vet: 0, cost: d.cost || 600,
           armor: e.kind === 'unit' ? d.armor : 'bldg', weapon: !!d.weapon, rect: e.kind === 'bldg' ? [e.cx, e.cz, e.w, e.h] : null };
         mem.set(e.id, m);
+        if (e.kind === 'unit' && d.weapon && d.armor in this.sawVal && !this.sawIds.has(e.id)) { this.sawIds.add(e.id); this.sawVal[d.armor] += d.cost || 0; }
       } else if (tick - m.tick > 100) m.first = tick;                    // lost and re-acquired: reaction delay applies again
       m.x = e.x; m.z = e.z; m.tick = tick; m.hp = Math.max(0, e.hp / e.maxHp); m.vet = e.vet || 0;
       seen.push(m);
@@ -167,14 +237,22 @@ export class AIController {
       let w = 0; for (const a of ARM) w += sh[a] * E[a];
       if (sh.air > 0.15 && !E.air) w *= 0.6;
       s = 38 + 42 * w;
-    } else s = 40 + (this.F.aiArmy[this.rot % this.F.aiArmy.length] === type ? 12 : 0);
-    return s - 20 * (c.types[type] || 0) / n;                              // keep some variety
+    } else if (this.prior) { let w = 0; for (const a of ARM) w += (this.prior[a] || 0) * E[a]; s = 38 + 30 * w + (this.F.aiArmy[this.rot % this.F.aiArmy.length] === type ? 6 : 0); }   // no sightings yet, but the notebook says what this opponent brought last time
+    else s = 40 + (this.F.aiArmy[this.rot % this.F.aiArmy.length] === type ? 12 : 0);
+    s -= 20 * (c.types[type] || 0) / n;                                    // keep some variety
+    if (this.mix) { // the doctrine: build toward its share for this unit's role
+      const want = this.mix[ROLE[type]]; if (want !== undefined) s += Math.max(-12, Math.min(16, (want - (c.strength ? (c.roleVal[ROLE[type]] || 0) / c.strength : 0)) * 60));
+      if (!this.card[type] && this.sim.tick > 3600) s += 6 + Math.min(16, (this.sim.tick - 3600) / 500);   // never fielded this match: give it a turn, and the longer the match runs the more it is owed one
+    }
+    if (this.cfg.learn && c.eff) { const e = c.eff[type]; if (e !== undefined) s += Math.max(-14, Math.min(14, (e - 1) * 14)); }   // the report card: what earned its keep gets more, what died for nothing gets less
+    return s;
   }
 
   // ------------------------------------------------------------ own forces (full knowledge of own side is fair)
   census() {
     const sim = this.sim, team = this.team, tick = sim.tick, S = this.scout, R = this.F.roles;
-    const c = { builders: [], trucks: 0, army: [], types: {}, bl: {}, prod: [], undone: [], queued: {}, deployers: [], scout: null, strength: 0, mine: [], hero: null, fleet: [], swarm: [] };
+    const c = { builders: [], trucks: 0, army: [], types: {}, bl: {}, prod: [], undone: [], queued: {}, deployers: [], scout: null, strength: 0, mine: [], hero: null, fleet: [], swarm: [], roleVal: {}, eff: null };
+    const seenNow = new Set();
     const live = sim.byId.get(S.id); const haveScout = live && !live.dead && live.team === team;
     if (!haveScout) { if (S.id) S.lost = tick; S.id = 0; }
     const cap = sim.byId.get(this.capId);
@@ -199,12 +277,19 @@ export class AIController {
       else if (!S.id && e.type === R.scout && tick - S.lost >= 600) { S.id = e.id; c.scout = e; this.stats.scouts++; }   // a lost scout is replaced after 30 s
       else if (e === cap && e.order && e.order.t === 'capture') continue;
       else if (d.deploy) c.deployers.push(e);
-      else if (d.weapon) { c.army.push(e); c.types[e.type] = (c.types[e.type] || 0) + 1; c.strength += d.cost; }
+      else if (d.weapon) { c.army.push(e); c.types[e.type] = (c.types[e.type] || 0) + 1; c.strength += d.cost; const r = ROLE[e.type]; if (r) c.roleVal[r] = (c.roleVal[r] || 0) + d.cost;
+        if (this.cfg.learn || this.mix) { seenNow.add(e.id); let k = this.track.get(e.id); if (!k) { k = { type: e.type, xp: 0 }; this.track.set(e.id, k); const q = this.card[e.type] || (this.card[e.type] = { built: 0, lost: 0, xp: 0 }); q.built++; } k.xp = e.xp || 0; } }
+    }
+    if (this.cfg.learn) { // close the books on units that are gone, then rate each type against the others: experience earned per credit spent
+      const live = {}; for (const [id, k] of this.track) { if (seenNow.has(id)) live[k.type] = (live[k.type] || 0) + k.xp; else { const q = this.card[k.type]; q.lost++; q.xp += k.xp; this.track.delete(id); } }
+      const rate = {}; let sum = 0, nn = 0; for (const [type, q] of Object.entries(this.card)) { if (q.built < 3) continue; rate[type] = (q.xp + (live[type] || 0)) / (q.built * UNITS[type].cost); sum += rate[type]; nn++; }
+      if (nn >= 2 && sum > 0) { c.eff = {}; for (const type in rate) c.eff[type] = rate[type] / (sum / nn); }
     }
     return c;
   }
   trainer(c, type) {
     const d = UNITS[type]; if (d.promo && !this.T.promos.has(d.promo)) return null;
+    if (d.needs && !hasBldg(this.sim, this.team, d.needs)) return null;
     let best = null;
     for (const b of c.prod) {
       if (!trainsOf(this.sim.teams[this.team], b.type).includes(type) || b.queue.length >= 2) continue;
@@ -221,7 +306,7 @@ export class AIController {
     for (const e of sim.ents) if (e.kind === 'bldg' && e.team === this.team && !e.dead) rects.push([e.cx, e.cz, e.w, e.h]);
     for (const k of this.aiMemoryMap.values()) if (k.rect) rects.push(k.rect);
     for (const k of m.docks) rects.push([k.x, k.z, 8, 6]);
-    for (const k of m.derricks) rects.push([k[0], k[1], 4, 4]);
+    for (const k of m.derricks.concat(m.sites || [])) rects.push([k[0], k[1], 4, 4]);
     for (const k of m.civs) rects.push([k[0], k[1], 6, 6]);
     const bc = builder ? nav.comp[builder.cls][nav.cellOf(builder.x, builder.z)] : -1;
     let best = null, bs = 1e9;
@@ -272,7 +357,7 @@ export class AIController {
     this.spendPoints();
     const n = (r) => (c.bl[r] || []).length, nd = (r) => (c.bl[r] || []).filter(b => b.done).length, q = (t) => c.queued[t] || 0;
     const builder = c.builders.find(b => !b.order || b.order.t !== 'construct');
-    const add = (name, score, cost, run, ok = true, build = false) => { if (score > 0) cand.push({ name, score, cost, run, ok, build }); };
+    const add = (name, score, cost, run, ok = true, build = false) => { if (score > 0) cand.push({ name, score, cost, run, ok, build, unit: UNITS[name] ? name : null }); };
     const bld = (name, type, score, anchor) => {
       if (!type || score <= 0) return;
       const pre = !BLDGS[type].needs || hasBldg(sim, team, BLDGS[type].needs);
@@ -321,15 +406,18 @@ export class AIController {
     if (attacked && defs < 2 && n('barracks')) ds = 72;
     if (sh && sh.airValue >= 900 && defs < 3 && n('supply')) ds = Math.max(ds, 82);    // combat aircraft spotted: anti-air site first
     if (!ds && core && defs < 1 && c.strength >= 2500) ds = 36;
+    if (cfg.counters && cfg.earlyDef !== false && n('barracks') && n('supply') && defs < 1 && tick >= 1500) ds = Math.max(ds, 75);   // one defense early, whatever happens: a base with none falls to the first rush
+    if (this.expectRaid && defs < 1 && n('barracks') && tick >= this.expectRaid - 1500) ds = Math.max(ds, 74);   // the notebook: this opponent's first raid came about now last time
     if (!ds && core && defs < 4 && T.money > 5000) ds = 30;
     bld('defense', R.defense, ds, 'front');
     let bestType = null, bestS = 0; const scores = {};
     for (const type of this.combat) { const s = this.unitScore(type, sh, c); scores[type] = s; if (s > bestS && !(UNITS[type].promo && !T.promos.has(UNITS[type].promo))) { bestS = s; bestType = type; } }
     const wantsAir = bestType && R.airfield && BLDGS[R.airfield].trains.includes(bestType);
-    const airGen = !!(generalOf(T) || {}).aiAir;   // the Air Force General builds its airfields as a matter of course
-    if (R.airfield && !n('airfield') && nd('factory')) bld('airfield', R.airfield, wantsAir ? 66 : airGen && c.strength >= 2000 ? 71 : c.strength >= 3000 ? 44 : 0, 'base');
+    const airGen = !!(generalOf(T) || {}).aiAir || (!!this.mix && (this.mix.air || 0) + (this.mix.heli || 0) + (this.mix.lift || 0) >= 0.15);   // the Air Force General, and any AI whose doctrine flies, builds an airfield as a matter of course
+    if (R.airfield && !n('airfield') && nd('factory')) bld('airfield', R.airfield, airGen && c.strength >= 2000 ? 73 : c.strength >= 6000 ? 71 : wantsAir ? 66 : c.strength >= 3000 ? 44 : 0, 'base');   // 70 and over is saved up for: a plan that flies must not spend the airfield's price on riflemen
     if (R.strategic && BLDGS[R.strategic].general === T.general && !n('strategic') && nd('airfield') && c.strength >= 3000 && this.strat.tries < 3 && builder && tick >= this.buildHold && !c.undone.length)
-      add('strategic airfield', airGen ? 68 : 47, bldgCost(T, R.strategic), () => { if (this.build(builder, R.strategic, 'base')) return true; this.strat.tries++; return false; }, true, true);   // a big footprint: give up after three failed searches for room
+      add('strategic airfield', (generalOf(T) || {}).aiAir ? 71 : 47, bldgCost(T, R.strategic), () => { if (this.build(builder, R.strategic, 'base')) return true; this.strat.tries++; return false; }, true, true);   // a big footprint: give up after three failed searches for room
+    if (R.tech && !n('tech') && nd('factory') && c.strength >= 2000) bld('tech', R.tech, this.mix && this.combat.some(k => UNITS[k].needs === R.tech && (this.mix[ROLE[k]] || 0) >= 0.2) ? (c.strength >= 3000 ? 84 : 72) : c.strength >= 5000 ? 84 : 58, 'base');   // the command building: sooner when the doctrine's main arm needs it
     if (R.income && n('income') < 1 && nd('factory') && c.strength >= 3000) bld('income', R.income, 46, 'base');
     if (R.super && cfg.superweapon && !sim.noSuper && n('super') < 1 && nd('factory') && c.strength >= 3500) bld('super', R.super, 45, 'base');
     if (R.tunnel && cfg.retreat && n('tunnel') < 1 && nd('barracks') && c.strength >= 1500) bld('tunnel', R.tunnel, 42, 'front');
@@ -342,11 +430,11 @@ export class AIController {
       if (!n('shipyard')) {
         if (builder && tick >= this.buildHold && tick - this.yardTry > 400) { this.yardTry = tick; this.yardSite = this.shoreSite(R.shipyard); }
         const s = this.yardSite;
-        add('shipyard', s ? 60 : 0, bldgCost(T, R.shipyard), () => { if (!this.act({ t: 'build', id: builder.id, type: R.shipyard, cx: s[0], cz: s[1] })) return false; this.lastBuild = { key: R.shipyard + s[0] + ',' + s[1], tick, id: builder.id }; this.buildHold = tick + 60; this.stats.builds++; this.yardSite = null; return true; }, !!builder && !!s && tick >= this.buildHold && !c.undone.some(b => b.type === R.shipyard), true);
+        add('shipyard', s ? (c.strength >= 4000 ? 74 : 60) : 0, bldgCost(T, R.shipyard), () => { if (!this.act({ t: 'build', id: builder.id, type: R.shipyard, cx: s[0], cz: s[1] })) return false; this.lastBuild = { key: R.shipyard + s[0] + ',' + s[1], tick, id: builder.id }; this.buildHold = tick + 60; this.stats.builds++; this.yardSite = null; return true; }, !!builder && !!s && tick >= this.buildHold && !c.undone.some(b => b.type === R.shipyard), true);
       } else if (nd('shipyard')) {
         let queued = 0, afloat = 0; for (const type of this.navy) { queued += q(type); afloat += q(type) * UNITS[type].cost; } for (const u of c.fleet) afloat += UNITS[u.type].cost;
         // the fleet never outgrows the army: at most 60% of the land force's value, so a lost fleet is not rebuilt at the army's expense
-        if (c.fleet.length + queued < cfg.fleet && afloat < 1000 + c.strength * 0.6 && tick - (this.fleet.lastLoss || -1e9) > 600) { const type = this.navy[this.navRot % this.navy.length], b = this.trainer(c, type); add('ship ' + type, 57, unitCost(T, type), () => { if (this.act({ t: 'train', id: b.id, type })) { this.navRot++; this.stats.trained++; return true; } return false; }, !!b); }
+        if (c.fleet.length + queued < cfg.fleet && afloat < 1000 + c.strength * 0.6 && tick - (this.fleet.lastLoss || -1e9) > 600) { const type = this.navy[this.navRot % this.navy.length], b = this.trainer(c, type); add('ship ' + type, 64, unitCost(T, type), () => { if (this.act({ t: 'train', id: b.id, type })) { this.navRot++; this.stats.trained++; return true; } return false; }, !!b); }
       }
     }
     if (this.heroType && !c.hero && !q(this.heroType) && nd('factory') && c.strength >= 3500 && tick >= 3600) train('hero', this.heroType, 72);   // worth saving up for once there is an army
@@ -355,6 +443,10 @@ export class AIController {
     if (c.army.length + queuedArmy < cfg.armyCap) {
       const noInf = !c.army.some(u => UNITS[u.type].canCapture) && !q(R.squad);
       for (const type of this.combat) train(type, type, scores[type] + (noInf && type === R.squad ? 14 : 0));
+      if (this.mix && c.army.length >= 6 && !attacked) { // what the plan is shortest of is worth waiting for: without this it only ever buys what it can afford this second
+        let top = null; for (const k of cand) if (k.unit && k.ok && (!top || k.score > top.score)) top = k;
+        if (top && tick - (this.savedAt || -1e9) > 400 && (this.mix[ROLE[top.unit]] || 0) - (c.roleVal[ROLE[top.unit]] || 0) / (c.strength || 1) >= 0.06) { top.save = true; const go = top.run; top.run = () => { if (!go()) return false; this.savedAt = tick; return true; }; }   // one thing saved for at a time, then 20 s of ordinary spending, so ships, upgrades and the rest still get their turn
+      }
     }
 
     if (this.swarmType && c.swarm.length + q(this.swarmType) < this.swarmSize && c.strength >= 2500 && T.money >= 500 && tick - (this.swarm.last || -1e9) > 1500) train('swarm', this.swarmType, 52);   // once there is an army to go with it, never with the army's last dollar, and not straight after a wave has gone in
@@ -365,13 +457,14 @@ export class AIController {
     for (const k of cand) {
       if (ran >= 3 || this.budget < 1) break;
       if (!k.ok) { if (k.build && k.score >= 80) reserve += k.cost; continue; }    // a core building is waiting on a prerequisite: keep the money for it
-      if (money - (k.score >= 80 ? 0 : reserve) < k.cost) { if (k.score >= 70) break; continue; }   // save up for something important
+      if (money - (k.score >= 80 ? 0 : reserve) < k.cost) { if (k.score >= 70 || k.save) break; continue; }   // save up for something important, or for the unit the doctrine is short of
       if (k.run()) { money -= k.cost; ran++; }
     }
     this.scouting(c);
     this.operations(c);
     this.heroPlay(c);
     if (this.swarmType && c.swarm.length) this.sendSwarm(c);
+    if (cfg.learn >= 2) this.harass(c);
     if (c.fleet.length) this.navalOps(c);
   }
   // ---- tunnels as transport (ISIS). `ends`: this side's finished tunnels, the one nearest home and the one nearest the enemy start.
@@ -524,7 +617,13 @@ export class AIController {
   pickTarget() {
     const tick = this.sim.tick, k = this.sim.koth; let best = null, bs = 1e9;
     if (k && k.owner !== this.team) return { id: -1, x: k.x, z: k.z, hill: true };   // King of the Hill: the hill's position is a public match rule
-    for (const m of this.aiMemoryMap.values()) if (m.kind === 'bldg') { const s = dist(m, this.rally) - (m.weapon ? 0 : 20) - (BLDGS[m.type] && BLDGS[m.type].superPower ? 150 : 0); if (s < bs) { bs = s; best = m; } }
+    const wary = this.cfg.learn >= 2 && !this.hasArty, guns = wary ? [...this.aiMemoryMap.values()].filter(m => m.kind === 'bldg' && m.weapon) : null;
+    for (const m of this.aiMemoryMap.values()) if (m.kind === 'bldg') {
+      let s = dist(m, this.rally) - (m.weapon ? 0 : 20) - (BLDGS[m.type] && BLDGS[m.type].superPower ? 150 : 0);
+      if (wary) { for (const g of guns) if (g !== m && dist(g, m) < 60) s += 45; if (BLDGS[m.type] && BLDGS[m.type].role === 'supply') s -= 40; }   // an undefended target first, and the supply line above all; with artillery along it goes where it likes
+      for (const g of this.graves) if (tick - g.tick < 6000 && dist(g, m) < 80) s += 60;                                             // not straight back to where the last attack died
+      if (s < bs) { bs = s; best = m; }
+    }
     if (!best) for (const m of this.aiMemoryMap.values()) if (tick - m.tick < 900 && (!best || m.tick > best.tick)) best = m;
     return best && { id: best.id, x: best.x, z: best.z };
   }
@@ -544,6 +643,8 @@ export class AIController {
     const homeGroup = pool.filter(u => !op.ids.includes(u.id) && !(UNITS[u.type].based && u.ammo < UNITS[u.type].ammo));
     // defend: intruders the AI can see near its base (after its reaction delay)
     const threat = this.visible.find(m => m.kind === 'unit' && tick - m.tick <= 40 && tick - m.first >= cfg.react && dist(m, this.homeW) < 120);
+    if (threat && (!this.raids.length || tick - this.raids[this.raids.length - 1].tick > 900)) { this.raids.push({ a: Math.atan2(threat.z - this.homeW.z, threat.x - this.homeW.x), tick }); if (!this.firstRaid) this.firstRaid = tick; if (this.raids.length > 8) this.raids.shift();
+      if (cfg.learn >= 2 && this.raids.length >= 2) { let sx = 0, sz = 0; for (const r of this.raids) { sx += Math.cos(r.a); sz += Math.sin(r.a); } const l = Math.hypot(sx, sz); if (l > 0.5) this.front = { x: sx / l, z: sz / l }; } }   // defenses go up on the side the raids come from
     if (threat && tick - this.lastDefend >= 100) {
       const ids = homeGroup.filter(u => !u.order && !u.target).map(u => u.id);
       if (ids.length && this.act({ t: 'move', ids, x: threat.x, z: threat.z, attack: true })) { this.lastDefend = tick; this.stats.defended++; }
@@ -551,15 +652,21 @@ export class AIController {
     if (op.mode === 'gather') {
       if (threat) return;
       if (op.wave === 0 && tick < Math.max(cfg.firstAttack, this.sim.treatyUntil)) return; // treaty length is a public match rule, not scouted information
-      const need = Math.min(9000, cfg.attackAt + 900 * op.wave), str = cost(homeGroup);
+      const fails = cfg.learn >= 2 ? this.graves.filter(g => tick - g.tick < 6000).length : 0;                      // attacks wiped out in the last five minutes
+      const need = Math.min(10500, cfg.attackAt + 900 * op.wave + 1200 * Math.min(3, fails)), str = cost(homeGroup);         // after a defeat the next one goes in bigger
       if (homeGroup.length < 4 || str < need) return;
+      this.hasArty = homeGroup.some(u => ROLE[u.type] === 'arty');
       const tg = this.pickTarget();
       if (!tg) {                                                                      // nothing known to attack: scout, and after a while sweep the map in force
         this.needIntel = true;
         if (tick - this.lastFoeSeen > 900 && tick - op.lastPush >= 500) { const p = this.hunt[op.hunt++ % this.hunt.length]; if (this.act({ t: 'move', ids: homeGroup.map(u => u.id), x: p.x, z: p.z, attack: true })) op.lastPush = tick; }
         return;
       }
-      const ids = homeGroup.map(u => u.id);
+      // habit memory: once it has been raided twice it leaves a guard at home (its cheapest units, up to three)
+      const guard = cfg.learn >= 2 && this.raids.length >= 2 ? Math.min(3, Math.floor(homeGroup.length * 0.15)) : 0;
+      if (guard) { const stay = new Set(homeGroup.slice().sort((a, b) => UNITS[a.type].cost - UNITS[b.type].cost || a.id - b.id).slice(0, guard).map(u => u.id)); for (let i = homeGroup.length - 1; i >= 0; i--) if (stay.has(homeGroup[i].id)) homeGroup.splice(i, 1); }
+      let ids = homeGroup.map(u => u.id);
+      if (cfg.carriers) ids = this.board(homeGroup, ids);                                                                   // squads climb into the troop carriers; they are left out of the march order
       const ends = this.F.roles.tunnel && cfg.retreat ? this.tunnelEnds(c) : null, walkers = homeGroup.filter(u => !u.air);
       if (ends && N >= 1024 && walkers.length >= 3 && dist(ends.fwd, tg) + 60 < dist(ends.home, tg)) { // on the 2 km maps the whole army goes underground and comes up at the forward exit (on a 1 km map it marches together: a column coming out of a hole a few at a time was being beaten in detail)
         if (this.budget < 2) return;
@@ -567,7 +674,7 @@ export class AIController {
         op.mode = 'tunnel'; op.via = ends.fwd.id; op.ids = ids; op.target = tg; op.since = op.lastPush = tick; op.strength0 = str; op.wave++; this.stats.attacks++; this.tun.trips++;
         return;
       }
-      const wps = cfg.flank && ids.length >= 6 ? this.flankPoints(tg) : null;
+      const wps = cfg.flank && ids.length >= (fails ? 4 : 6) ? this.flankPoints(tg) : null; if (wps && fails % 2) wps.reverse();   // route memory: after a failed attack it flanks sooner, and by the other side
       if (wps) {
         const A = [], B = []; homeGroup.forEach((u, i) => (u.air || i % 2 === 0 ? A : B).push(u.id));
         if (this.budget < 2 || !B.length) return;
@@ -585,7 +692,12 @@ export class AIController {
       else if (alive.length) this.act({ t: 'move', ids: op.ids, x: this.rally.x, z: this.rally.z });
       op.mode = 'gather'; op.ids = [];
     };
-    if (!alive.length || (cfg.retreat && cost(alive) < 0.3 * op.strength0)) { fallBack(); return; }
+    if (!alive.length || (cfg.retreat && cost(alive) < 0.3 * op.strength0)) {
+      if (cfg.learn >= 2 && op.target && !op.target.hill) { this.graves.push({ x: op.target.x, z: op.target.z, tick }); if (this.graves.length > 6) this.graves.shift();   // remember where it happened
+        if (this.mix && this.mix.arty !== undefined && this.mix.arty < 0.4) { this.mix.arty += 0.08; let t = 0; for (const r in this.mix) t += this.mix[r]; for (const r in this.mix) this.mix[r] /= t; } }   // and bring more artillery next time
+      fallBack(); return;
+    }
+    if (cfg.carriers) for (const u of alive) if (u.garrison && u.garrison.length && UNITS[u.type].transport && (dist(u, op.target) < 75 || tick - u.lastHit < 60) && this.budget >= 1) this.act({ t: 'evacuate', id: u.id });   // carriers unload at the fight, or as soon as they are shot at
     if (op.target.hill ? !this.sim.koth || (this.sim.koth.owner === this.team && tick - op.lastPush > 600 && !!this.pickTarget()) : !this.aiMemoryMap.has(op.target.id)) { // target confirmed gone (or the hill is ours and a base is known): next known target, or go home and scout
       const tg = this.pickTarget();
       if (!tg) { fallBack(); this.needIntel = true; return; }
@@ -614,6 +726,23 @@ export class AIController {
     }
   }
 
+  // Troop carriers: each empty carrier in the group takes the nearest squad that fits. Returns the ids to march
+  // (the boarding squads are told to climb in instead; they ride along inside).
+  board(group, ids) {
+    const taken = new Set(), carriers = group.filter(u => UNITS[u.type].transport && u.garrison && !u.garrison.length);
+    for (const cu of carriers) { let room = UNITS[cu.type].transport.squads; const near = group.filter(u => UNITS[u.type].infantry && !taken.has(u.id) && dist(u, cu) < 45).sort((a, b) => dist(a, cu) - dist(b, cu) || a.id - b.id);
+      const riders = near.slice(0, room).map(u => u.id); if (!riders.length || this.budget < 2) continue;
+      if (this.act({ t: 'garrison', ids: riders, target: cu.id })) { for (const id of riders) taken.add(id); this.stats.boarded = (this.stats.boarded || 0) + riders.length; } }
+    return taken.size ? ids.filter(id => !taken.has(id)) : ids;
+  }
+  // Raids on the supply line (learn 2): two or three fast units that are not in an attack go after a harvester it has seen lately.
+  harass(c) {
+    const tick = this.sim.tick; if (tick - (this.lastRaid || -1e9) < 1200) return;
+    let prey = null; for (const m of this.aiMemoryMap.values()) if (m.kind === 'unit' && TAG[m.type] && TAG[m.type].harvester && tick - m.tick < 400 && (!prey || m.tick > prey.tick)) prey = m;
+    if (!prey) return;
+    const fast = c.army.filter(u => !this.op.ids.includes(u.id) && !this.retreating.has(u.id) && !u.order && (ROLE[u.type] === 'heli' || (ROLE[u.type] === 'light' && UNITS[u.type].speed >= 13))).slice(0, 3);
+    if (fast.length >= 2 && this.act({ t: 'move', ids: fast.map(u => u.id), x: prey.x, z: prey.z, attack: true })) { this.lastRaid = tick; this.stats.raids = (this.stats.raids || 0) + 1; }
+  }
   // The quadcopter swarm. FPV drones are for infantry, light vehicles and helicopters, so they are never thrown at
   // buildings or tanks: once an attack is under way (or the base is threatened) the idle drones go for the freshest
   // such enemy this side has seen, and being much faster than the army they get there first.

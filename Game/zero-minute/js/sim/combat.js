@@ -324,7 +324,7 @@ export function stepCombat(sim) {
       for (let i = 0; i < slots.length; i++) if (e.cds[i] > 0) e.cds[i]--;
       if (e.inert || e.landed && e.as !== 'out') continue;
       if (e.inB) garrisonCombat(sim, e, d, slots); else unitCombat(sim, e, d, slots);
-    } else if (slots.length && e.done) {
+    } else if (slots.length && e.done && e.team < 2) {   // (an armed site nobody holds does nothing)
       const d = BLDGS[e.type], w = WEAPONS[slots[0]];
       e.pturret = e.turret;
       if (e.cds[0] > 0) e.cds[0]--;

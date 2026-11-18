@@ -84,7 +84,7 @@ for (const [type, fac] of [['v_frigate', 'vanguard'], ['r_corvette', 'redhammer'
     ok(F.build.every(b => BLDGS[b] && BLDGS[b].faction === f) && ['cc', 'power', 'supply', 'barracks', 'factory', 'airfield', 'shipyard', 'defense', 'super', 'builder', 'truck', 'squad'].every(r => R[r] && (BLDGS[R[r]] || UNITS[R[r]])) && bl.length === 9, `${F.name}: a full base of nine buildings, every role filled`);
     ok(F.tree.length === 7 && F.tree.every(n => (!n.req || F.tree.some(k => k.id === n.req)) && (!n.power || POWERS[n.power]) && (!n.unlock || UNITS[n.unlock])) && F.tree.filter(n => n.power).length >= 3, `${F.name}: seven promotions, three of them support powers`);
     const trained = new Set(); for (const b of bl) for (const g of [null, ...generalsOf(f)]) for (const t of trainsOf({ general: g }, b)) trained.add(t);
-    ok(units.every(u => trained.has(u)) && units.filter(u => !UNITS[u].hero).every(u => UNITS[u].placeholder) && units.length >= 13, `${F.name}: ${units.length} unit types, every one buildable somewhere and marked as a placeholder line-up`);
+    ok(units.every(u => trained.has(u)) && units.filter(u => UNITS[u].placeholder).length >= 11 && units.length >= 13, `${F.name}: ${units.length} unit types, every one buildable somewhere; the batch 12 line-up is still marked as a placeholder (batch 14 added units of its own)`);
     ok(units.every(u => !UNITS[u].weapon || WEAPONS[UNITS[u].weapon]) && units.every(u => ['weapon2', 'weapon3'].every(k => !UNITS[u][k] || WEAPONS[UNITS[u][k]])), `${F.name}: every weapon named by a unit exists`);
     const hero = units.find(u => UNITS[u].hero);
     ok(hero && UNITS[hero].cost === 2500 && UNITS[hero].stealth === 'always' && BLDGS[R.barracks].trains.includes(hero) && UNITS[hero].needs === R.factory, `${F.name}: its hero (${UNITS[hero].name}) follows the hero rules: Barracks, $2,500, needs the War Factory, cloaked`);
@@ -157,17 +157,16 @@ for (const [type, fac] of [['v_frigate', 'vanguard'], ['r_corvette', 'redhammer'
 // ---------------------------------------------------------------- powers of the new factions reuse older strikes with their own numbers
 {
   const s = bare({ factions: ['ursa', 'aegis'] }), T = s.teams[0]; for (const n of FACTIONS.ursa.tree) { T.promos.add(n.id); if (n.power) T.powerReady[n.power] = 0; }
-  makeBldg(s, 'u_cc', PLAYER, 20, 220); for (let i = 0; i < 3; i++) makeBldg(s, 'u_power', PLAYER, 20 + i * 8, 20); const bat = makeBldg(s, 'u_iskander', PLAYER, 60, 60); bat.superReady = 0; s.nav.rebuild(); run(s, 2);
-  ok(usePower(s, PLAYER, 'iskander', 300, 200) && s.strikes.filter(p => p.kind === 'scud' && p.pid === 'iskander').length === POWERS.iskander.n, 'Iskander Battery: six missiles (the Scud Storm fires nine)');
+  makeBldg(s, 'u_cc', PLAYER, 20, 220); for (let i = 0; i < 3; i++) makeBldg(s, 'u_power', PLAYER, 20 + i * 8, 20); s.nav.rebuild(); run(s, 2);
+  ok(!POWERS.iskander.super && usePower(s, PLAYER, 'iskander', 300, 200) && s.strikes.filter(p => p.kind === 'scud' && p.pid === 'iskander').length === POWERS.iskander.n, 'Iskander Strike (a promotion power since batch 14): three missiles, fired from the Command Center');
   let hits = 0, fires = 0, toxin = 0; run(s, 400, (ev) => { for (const e of ev) { if (e.t === 'scudhit') { hits++; if (e.fire) fires++; } if (e.t === 'hazard' && e.kind === 'toxin') toxin++; } });
-  ok(hits === 6 && fires === 6 && !toxin && bat.superReady > s.tick, 'they leave fire, not toxin, and the battery starts its countdown again');
+  ok(hits === POWERS.iskander.n && fires === hits && !toxin && T.powerReady.iskander > s.tick, 'they leave fire, not toxin, and the power recharges');
   ok(usePower(s, PLAYER, 'vdv', 300, 200), 'VDV Airdrop called'); run(s, 400);
   ok(s.ents.filter(e => e.type === 'u_rifle' && e.team === PLAYER).length === POWERS.vdv.n && !s.ents.some(e => e.type === 'v_ranger'), 'it drops five Motor Rifle squads (not US Rangers)');
   ok(usePower(s, PLAYER, 'odab', 300, 200) && s.strikes.some(p => p.pid === 'odab' && p.model === 'bomber'), 'ODAB Fuel-Air Bomb: the same bomb as China’s, from Russia’s own bomber');
   const e = bare({ factions: ['aegis', 'ursa'] }), E = e.teams[0]; for (const n of FACTIONS.aegis.tree) { E.promos.add(n.id); if (n.power) E.powerReady[n.power] = 0; }
-  makeBldg(e, 'e_cc', PLAYER, 20, 220); for (let i = 0; i < 3; i++) makeBldg(e, 'e_power', PLAYER, 20 + i * 8, 20); const ln = makeBldg(e, 'e_lance', PLAYER, 60, 60); ln.superReady = 0; e.nav.rebuild(); run(e, 2);
-  const tgt = hold(makeUnit(e, 'u_tank', ENEMY, 300, 200, 0));
-  ok(usePower(e, PLAYER, 'lance', 300, 200) && e.strikes.some(p => p.kind === 'pbeam' && p.pid === 'lance'), 'Orbital Lance fires a beam strike'); run(e, 140); ok(tgt.dead, 'which burns through a tank under it');
+  makeBldg(e, 'e_cc', PLAYER, 20, 220); for (let i = 0; i < 3; i++) makeBldg(e, 'e_power', PLAYER, 20 + i * 8, 20); e.nav.rebuild(); run(e, 2);
+  ok(!POWERS.lance && BLDGS.e_shield.superPower === 'skyshield' && BLDGS.u_kinzhal.superPower === 'kinzhal', 'the Orbital Lance and the Iskander Battery are gone: Europe has the Sky Shield and Russia the Kinzhal Strike (test/batch14.mjs)');
   ok(usePower(e, PLAYER, 'storm', 300, 240), 'Storm Shadow Strike called'); let bombs = 0; run(e, 500, (ev) => { for (const x of ev) if (x.t === 'shellhit') bombs++; }); ok(bombs === POWERS.storm.n, 'ten warheads along the line');
 }
 

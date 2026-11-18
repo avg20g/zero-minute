@@ -97,7 +97,7 @@ function fire(sim, s, i, wname, ox, oz, t) {
   const w = WEAPONS[wname], M = mountOf(s, i), my = M ? M.y : undefined;   // my: height of the mount, for the effects
   s.cds[i] = Math.max(1, Math.round(w.cd / rateOf(sim, s)));
   s.lastFire = sim.tick;
-  if (s.kind === 'unit') { s.revealUntil = sim.tick + 40; if (UNITS[s.type].ammo && !w.free) s.ammo--; }   // a `free` weapon (an aircraft's gun) does not use up the sortie's ammunition
+  if (s.kind === 'unit') { s.revealUntil = sim.tick + 40; if (UNITS[s.type].ammo && !w.free) s.ammo--; if (w.rounds) { if (!s.rounds) s.rounds = [-1, -1, -1]; if (s.rounds[i] < 0) s.rounds[i] = w.rounds; s.rounds[i]--; } }   // `rounds`: a weapon with its own small magazine for the sortie   // a `free` weapon (an aircraft's gun) does not use up the sortie's ammunition
   const dmg = dmgOf(sim, s, w), a = Math.atan2(t.z - oz, t.x - ox), vet = s.vet || 0;
   const ff = s.kind === 'unit' && !!s.order && s.order.t === 'fattack';   // force attack: the shot hurts whatever it lands on, friend or foe
   if (w.kind === 'hack') { const cd = heroHack(sim, s, wname, t); if (cd) s.cds[i] = cd; return; }   // Fook Mie's phone
@@ -137,6 +137,7 @@ function fireSlots(sim, s, slots, ox, oz, t, dist, lead, bonus) {
     const w = WEAPONS[slots[i]];
     if (!canUse(w, t) || dist > w.range + bonus || (w.minRange && dist < w.minRange)) continue;
     if (usesAmmo && s.ammo <= 0 && !w.free) continue;
+    if (w.rounds && s.rounds && s.rounds[i] === 0) continue;   // this weapon's own ammunition for the sortie is spent (A-10 cannon)
     const M = mountOf(s, i); let mx = ox, mz = oz;
     if (M) { if (!bears(s, M, Math.atan2(t.z - s.z, t.x - s.x))) { s.bursts[i] = 0; continue; } [mx, mz] = mountPos(s, M); }   // the ship's own structure is in the way: this weapon waits
     if (s.bursts[i] > 0) {
@@ -194,6 +195,7 @@ function unitCombat(sim, u, d, slots) {
     let aimed;
     const LM = mountOf(u, lead >= 100 ? lead - 100 : lead);
     if (d.based && d.mounts) aimed = true;   // a gunship's side-firing guns: each fires only while the target is inside its own arc (see fireSlots)
+    else if (LM && !d.turret) { aimed = !u.path && turn(u, 'facing', a - (LM.dir || 0), d.turn) < 0.12; u.turret = u.facing; }   // a fixed launcher (Shahed truck): the whole vehicle turns until its mount points at the target
     else if (LM && LM.arc < Math.PI) { // a deck gun with a blind arc: the turret trains as far as it can; a ship that is not under way turns the rest
       const off = offAxis(u, LM, a), lim = Math.max(-LM.arc, Math.min(LM.arc, off));
       aimed = turn(u, 'turret', u.facing + (LM.dir || 0) + lim, d.turret) < 0.2;

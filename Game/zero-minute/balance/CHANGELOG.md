@@ -1,5 +1,50 @@
 # Balance changelog
 
+## Batch 14, drop A (2026-11-17): new units for every faction, two new superweapons
+
+Hard v Hard, 2,250 matches (15 sides, five 1 km maps, two seeds), friendly fire on, 40-minute limit. Full table:
+`report.md`; the batch 13 table is kept as `report-batch13.md`. Medium and the two sea maps are re-run with drop B.
+
+| Side | Batch 13 (Hard) | Batch 14 drop A (Hard) |
+|---|---|---|
+| Russia: Vacation Command Group | 40% | 59% |
+| China: Mass Assault General | 61% | 58% |
+| Russia: Wagner Group | 43% | 58% |
+| China: Cyber General | 58% | 56% |
+| United States: Marine Corps General | 46% | 54% |
+| China (no general) | 52% | 52% |
+| Europe: Panzer General | 56% | 50% |
+| United States (no general) | 52% | 49% |
+| Europe (no general) | 53% | 48% |
+| ISIS: Stealth General | 50% | 47% |
+| Europe: Laser General | 52% | 47% |
+| United States: Air Force General | 53% | 45% |
+| ISIS (no general) | 48% | 44% |
+| ISIS: WMD General | 49% | 43% |
+| Russia (no general) | 36% | 40% |
+
+Every side is between 40% and 59% on the first sweep, so nothing was retuned for this drop.
+
+What moved, and why:
+- **Russia's two generals rose from 40-43% to 58-59%**; Russia without a general from 36% to 40%. The AI builds 13
+  BTR-82As, 4 Spetsnaz Teams and 2.5 Su-25s a match on top of its BMP-3s; its tanks now shrug off the first rocket
+  (Reactive Armour) and BMP-3s swim. It still builds very few T-90s (1.2 a match) and almost no Msta-S: the AI
+  picks units by damage for the money, and that is what drop B's doctrines are for.
+- **China fell back into range** (Mass Assault General 61% to 58%) as the others gained units. Its AI took to the
+  ZBD-04A at once (18 a match) and builds 3 PGZ-09s.
+- **ISIS: 43-47%** (was 48-50%). Its AI builds 17 Mortar Teams a match and hardly any T-55s.
+- **United States: Air Force General 53% to 45%.** The stealth F-22 and the one-burst A-10 cannon did not help its AI,
+  which flies its A-10s at targets one pass at a time; the Bradley (6 a match) and HIMARS (3) are in use.
+- The A-10's cannon does 1,200 damage to armour in 1.5 s and is then empty; with the AC-130 at 84 m these are the
+  two changes most likely to feel different in a person's hands than in the AI's.
+
+Start positions (Hard): Desert Canyon 58 / 42, Forest River 45 / 55, Urban Megacity 51 / 49, Arctic Refinery
+44 / 56, Open Desert 58 / 43. Two maps are now outside 55 / 45; drop B's tempo pass has that as a target.
+
+Still open (for drop B): the AI's unit variety (see above); start positions; Medium and the sea maps not yet re-run;
+the Kinzhal Strike and Sky Shield are tuned only by AI matches (the Russian AI fires a Kinzhal in about half its
+matches; the European AI raises the Sky Shield in one match in twenty, because it waits for an enemy launch).
+
 ## Batch 13 (2026-11-17): US aircraft as units, new ISIS units, the AI's promotions
 
 Hard v Hard, 2,250 matches (15 sides, five 1 km maps, two seeds), friendly fire on, 40-minute limit. Medium v

@@ -58,14 +58,14 @@ export const WEAPONS = {
   seal_gl:     { range: 34, dmg: 34, cd: 40, kind: 'lob', grenade: true, speed: 28, arc: 3.5, splash: 4.5, vs: { inf: 0.9, light: 1, heavy: 0.5, bldg: 0.7 } },     // SEAL Team: grenade launcher
   // ---- batch 13: United States aircraft that used to be support powers, the two new gunships, and ISIS's new trucks.
   // free: this weapon does not use up the aircraft's ammunition (its `ammo` counts the other weapon's rounds).
-  gau8:        { range: 40, dmg: 22, cd: 3,  kind: 'hitscan', free: true, vs: { inf: 0.5, light: 1, heavy: 0.7, bldg: 0.3 } },                           // A-10: 30 mm GAU-8, fired on the pass
+  gau8:        { range: 40, dmg: 120, cd: 3, kind: 'hitscan', free: true, rounds: 10, vs: { inf: 0.6, light: 1.2, heavy: 1, bldg: 0.35 } },             // A-10: 30 mm GAU-8. Ten bursts (1.5 s of fire) a sortie: it wrecks what it is pointed at, then it is empty
   maverick:    { range: 46, dmg: 150, cd: 24, kind: 'missile', speed: 85, intercept: true, splash: 4, vs: { inf: 0.3, light: 1.1, heavy: 1.6, bldg: 0.9 } },   // A-10: four AGM-65 a sortie
-  ac_gun:      { range: 64, dmg: 16, cd: 2,  kind: 'hitscan', free: true, vs: { inf: 1, light: 0.7, heavy: 0.15, bldg: 0.1 } },                           // AC-130: 25 mm rotary cannon, port side
-  ac_105:      { range: 64, dmg: 170, cd: 26, kind: 'shell', speed: 120, splash: 6, vs: { inf: 0.8, light: 1, heavy: 0.9, bldg: 1 } },                    // AC-130: 105 mm howitzer, port side; its rounds are the ammunition
+  ac_gun:      { range: 84, dmg: 16, cd: 2,  kind: 'hitscan', free: true, vs: { inf: 1, light: 0.7, heavy: 0.15, bldg: 0.1 } },                           // AC-130: 25 mm rotary cannon, port side
+  ac_105:      { range: 84, dmg: 170, cd: 26, kind: 'shell', speed: 120, splash: 6, vs: { inf: 0.8, light: 1, heavy: 0.9, bldg: 1 } },                    // AC-130: 105 mm howitzer, port side; its rounds are the ammunition
   // carpet: one pass lays `n` bombs along a `line` metres long, `r` metres blast each (the strike code in powers.js)
   b2_bombs:    { range: 26, dmg: 190, cd: 60, kind: 'carpet', n: 10, line: 60, r: 8, vs: { inf: 1, light: 1, heavy: 1, bldg: 1 } },                      // B-2 Spirit
   m230:        { range: 34, dmg: 8,  cd: 3,  kind: 'hitscan', vs: { inf: 1, light: 0.85, heavy: 0.25, bldg: 0.15, air: 0.7 } },                           // Apache: 30 mm chain gun
-  hellfire_lb: { range: 66, dmg: 150, cd: 120, kind: 'missile', speed: 78, intercept: true, vs: { inf: 0.2, light: 1, heavy: 1.8, bldg: 1 } },            // Apache with Longbow: the same missile, further
+  hellfire_lb: { range: 72, dmg: 150, cd: 120, kind: 'missile', speed: 78, intercept: true, vs: { inf: 0.2, light: 1, heavy: 1.8, bldg: 1 } },            // Apache with Longbow: the same missile, further
   viper_gun:   { range: 32, dmg: 5,  cd: 2,  kind: 'hitscan', vs: { inf: 1, light: 0.8, heavy: 0.2, bldg: 0.15, air: 0.7 } },                             // AH-1Z: 20 mm three-barrel gun, fast
   viper_rocket:{ range: 40, dmg: 30, cd: 50, kind: 'rocket', speed: 60, burst: 2, burstGap: 4, intercept: true, vs: { inf: 0.3, light: 1, heavy: 1.4, bldg: 1 } },   // AH-1Z: quicker salvos than the other gunships
   zu23:        { range: 44, dmg: 7,  cd: 2,  kind: 'hitscan', vs: { air: 1.2, inf: 0.7, light: 0.6, heavy: 0.1, bldg: 0.08 } },                           // Quad Cannon: four 23 mm barrels
@@ -86,6 +86,22 @@ export const WEAPONS = {
   pantsir:     { range: 50, dmg: 8,  cd: 2,  kind: 'hitscan', vs: { air: 1.3, inf: 1, light: 0.7, heavy: 0.15, bldg: 0.1 } },                             // Pantsir site: twin 30 mm
   bear_minigun:{ range: 34, dmg: 11, cd: 2,  kind: 'hitscan', noJets: true, vs: { inf: 1, light: 0.85, heavy: 0.25, bldg: 0.2, air: 0.9 } },              // IT'S HIM!: the minigun
   bear_laser:  { range: 36, dmg: 62, cd: 24, kind: 'laser', beam: [1, 0.12, 0.08], noJets: true, vs: { inf: 0.5, light: 1, heavy: 1.4, bldg: 1.2 } },      // IT'S HIM!: red lasers from the bear's eyes
+  // ---- batch 14: Russia built out
+  spetsnaz_rifle: { range: 30, dmg: 13, cd: 5, kind: 'hitscan', vs: { inf: 1, light: 0.5, heavy: 0.15, bldg: 0.2, air: 0.4 } },                          // Spetsnaz: suppressed AS Val rifles
+  demo_charge: { range: 4, dmg: 420, cd: 240, kind: 'melee', vs: { bldg: 1 } },                                                                           // Spetsnaz: a charge set against a wall; buildings only
+  msta152:     { range: 84, minRange: 20, dmg: 110, cd: 125, kind: 'lob', speed: 46, arc: 18, splash: 6.5, vs: { inf: 0.9, light: 1, heavy: 0.6, bldg: 1.1 } },   // 2S19 Msta-S: 152 mm
+  s8_rockets:  { range: 40, dmg: 38, cd: 16, kind: 'rocket', speed: 70, burst: 4, burstGap: 3, splash: 4, intercept: true, vs: { inf: 0.8, light: 1, heavy: 0.9, bldg: 0.9 } },   // Su-25: S-8 rocket pods, four salvos a sortie
+  gsh30:       { range: 36, dmg: 16, cd: 3, kind: 'hitscan', free: true, rounds: 14, vs: { inf: 0.8, light: 1, heavy: 0.5, bldg: 0.25 } },                // Su-25: twin-barrel 30 mm, a short burst each sortie
+  mi8_rockets: { range: 36, dmg: 30, cd: 80, kind: 'rocket', speed: 55, burst: 2, burstGap: 5, intercept: true, vs: { inf: 0.5, light: 1, heavy: 0.9, bldg: 0.9 } },   // Mi-8: rocket pods on the outriggers
+  // ---- batch 14: two new units for each of the other factions
+  gmlrs:       { range: 96, minRange: 22, dmg: 85, cd: 300, kind: 'lob', speed: 60, arc: 20, splash: 6, burst: 6, burstGap: 6, windup: 20, intercept: true, vs: { inf: 0.9, light: 1, heavy: 0.7, bldg: 1.1 } },   // M142 HIMARS: six guided rockets, then a long reload
+  tow2:        { range: 46, dmg: 130, cd: 130, kind: 'missile', speed: 60, intercept: true, vs: { inf: 0.2, light: 1, heavy: 1.8, bldg: 0.9 } },           // M2A3 Bradley: twin TOW launcher
+  pgz35:       { range: 44, dmg: 8,  cd: 2,  kind: 'hitscan', vs: { air: 1.2, inf: 0.7, light: 0.7, heavy: 0.15, bldg: 0.1 } },                            // PGZ-09: twin 35 mm
+  zbd100:      { range: 34, dmg: 40, cd: 70, kind: 'shell', speed: 80, splash: 3, vs: { inf: 0.8, light: 1, heavy: 0.6, bldg: 1 } },                       // ZBD-04A: 100 mm gun (the BMP-3's turret, built under licence)
+  zbd30:       { range: 30, dmg: 8,  cd: 3,  kind: 'hitscan', vs: { inf: 1, light: 0.9, heavy: 0.25, bldg: 0.2, air: 0.5 } },                              // ZBD-04A: 30 mm beside it
+  gun100:      { range: 34, dmg: 52, cd: 50, kind: 'shell', speed: 100, vs: { inf: 0.35, light: 1, heavy: 0.9, bldg: 1 } },                                // T-55: 100 mm D-10T
+  mortar82:    { range: 58, minRange: 12, dmg: 55, cd: 70, kind: 'lob', speed: 34, arc: 18, splash: 5, windup: 10, vs: { inf: 1, light: 0.7, heavy: 0.25, bldg: 0.6 } },   // Mortar Team: 82 mm, over walls and cliffs
+  door_mg:     { range: 30, dmg: 7,  cd: 4,  kind: 'hitscan', vs: { inf: 1, light: 0.6, heavy: 0.12, bldg: 0.12, air: 0.5 } },                             // NH90: door machine gun
   // ---- Europe
   gun120:      { range: 40, dmg: 66, cd: 44, kind: 'shell', speed: 125, vs: { inf: 0.35, light: 1, heavy: 1.05, bldg: 1 } },                              // Leopard 2A6: 120 mm L/55
   gun130:      { range: 42, dmg: 98, cd: 52, kind: 'shell', speed: 125, vs: { inf: 0.35, light: 1, heavy: 1.15, bldg: 1.1 } },                            // KF51 Panther: 130 mm
@@ -110,6 +126,8 @@ export const WEAPONS = {
   nuke:      { vs: { inf: 1, light: 1, heavy: 0.9, bldg: 1.1 } },
   particle:  { vs: { inf: 1, light: 1, heavy: 1, bldg: 1.3 } },
   scud:      { vs: { inf: 1, light: 1, heavy: 0.6, bldg: 0.9 } },
+  kinzhal:   { vs: { inf: 0.2, light: 0.35, heavy: 0.35, bldg: 1 } },   // Kinzhal Strike: a building-killer
+  interceptor: { vs: { air: 1.6 } },                                    // Sky Shield against aircraft and drones
   fire:      { vs: { inf: 1, light: 0.5, heavy: 0.15 } },
   thermal:   { vs: { inf: 1, light: 0.6, heavy: 0.25, bldg: 0.15 } },
   toxin:     { vs: { inf: 1.3, light: 0.45 } },                          // gas: fast against infantry, a decent amount against light armor
@@ -143,7 +161,7 @@ export const UNITS = {
   v_comanche:   { model: 'comanche', name: 'Comanche Gunship', faction: 'vanguard', cost: 1500, secs: 14, hp: 260, speed: 16, turn: 2.6, radius: 2.2, cls: 1, sight: 44, armor: 'air',
                   weapon: 'chaingun', weapon2: 'heli_rocket', turret: 5, air: true, alt: 13, fireMoving: true, heli: true },
   v_raptor:     { model: 'raptor', name: 'F-22 Raptor', faction: 'vanguard', cost: 1400, secs: 12, hp: 220, speed: 36, turn: 2.3, radius: 2.4, cls: 1, sight: 40, armor: 'air',
-                  weapon: 'raptor_missile', air: true, alt: 20, fireMoving: true, based: true, ammo: 4, reload: 140 },
+                  weapon: 'raptor_missile', air: true, alt: 20, fireMoving: true, based: true, ammo: 4, reload: 140, stealth: 'always' },   // a stealth fighter: hidden unless it has just fired or a detector is near
   // ---- batch 13: aircraft that were support powers are now built. `big`: needs a Strategic Airfield hangar.
   // orbit: instead of flying at its target it circles it at this radius, anti-clockwise, so its left side faces in.
   // jink: metres per second of random sideways movement while it is firing. dodge: chance that a rocket, missile or shell aimed at it misses (bullets and beams never miss).
@@ -151,14 +169,14 @@ export const UNITS = {
   v_a10:        { model: 'a10', name: 'A-10 Thunderbolt', faction: 'vanguard', cost: 1500, secs: 13, hp: 320, speed: 28, turn: 2.0, radius: 2.6, cls: 1, sight: 40, armor: 'air',
                   weapon: 'gau8', weapon2: 'maverick', air: true, alt: 18, fireMoving: true, based: true, ammo: 4, reload: 140 },
   v_ac130:      { model: 'ac130', name: 'AC-130 Gunship', faction: 'vanguard', cost: 2800, secs: 22, hp: 700, speed: 22, turn: 1.0, radius: 5.5, cls: 1, sight: 50, armor: 'air',
-                  weapon: 'ac_gun', weapon2: 'ac_105', air: true, alt: 30, fireMoving: true, based: true, big: true, orbit: 44, ammo: 12, reload: 400,
+                  weapon: 'ac_gun', weapon2: 'ac_105', air: true, alt: 30, fireMoving: true, based: true, big: true, orbit: 68, ammo: 12, reload: 400,
                   mounts: [{ x: 3.85, y: -0.4, len: 1, arc: 0.7, dir: -Math.PI / 2 }, { x: -1.75, y: -0.4, len: 1, arc: 0.7, dir: -Math.PI / 2 }] },   // both guns point out of the left side; y is measured from the aircraft
   v_b2:         { model: 'b2', name: 'B-2 Spirit', faction: 'vanguard', cost: 3000, secs: 24, hp: 520, speed: 32, turn: 1.4, radius: 5.5, cls: 1, sight: 40, armor: 'air',
-                  weapon: 'b2_bombs', air: true, alt: 26, fireMoving: true, based: true, big: true, ammo: 1, reload: 500 },
+                  weapon: 'b2_bombs', air: true, alt: 26, fireMoving: true, based: true, big: true, ammo: 1, reload: 500, stealth: 'always' },
   v_apache:     { model: 'apache', name: 'AH-64 Apache', faction: 'vanguard', cost: 1600, secs: 14, hp: 320, speed: 15, turn: 2.4, radius: 2.4, cls: 1, sight: 44, armor: 'air',
                   weapon: 'm230', weapon2: 'hellfire', turret: 5, air: true, alt: 13, fireMoving: true, heli: true, up: { id: 'v_longbow', sight: 16, detector: 30, weapon: { hellfire: 'hellfire_lb' } } },
   v_viper:      { model: 'viper', name: 'AH-1Z Viper', faction: 'vanguard', cost: 1300, secs: 12, hp: 190, speed: 17, turn: 3.0, radius: 2.1, cls: 1, sight: 44, armor: 'air',
-                  weapon: 'viper_gun', weapon2: 'viper_rocket', turret: 6, air: true, alt: 12, fireMoving: true, heli: true, jink: 7, dodge: 0.4 },
+                  weapon: 'viper_gun', weapon2: 'viper_rocket', turret: 6, air: true, alt: 12, fireMoving: true, heli: true, dodge: 0.4 },
   // ---- Red Hammer Pact
   r_dozer:      { ...DOZER, name: 'Dozer', faction: 'redhammer' },
   r_truck:      { ...TRUCK, name: 'Supply Truck', faction: 'redhammer' },
@@ -168,6 +186,10 @@ export const UNITS = {
   r_scout:      { model: 'scoutcar', name: 'Scout Car', faction: 'redhammer', cost: 450, secs: 6, hp: 170, speed: 18, turn: 3.0, radius: 1.6, cls: 1, sight: 42, armor: 'light',
                   weapon: 'tech_mg', turret: 4.5, fireMoving: true, scout: true },
   r_tank:       { ...TANK, model: 'battlemaster', name: 'Battlemaster Tank', faction: 'redhammer', cost: 750, hp: 470, nuke: true },
+  r_pgz:        { model: 'pgz09', name: 'PGZ-09', faction: 'redhammer', cost: 900, secs: 10, hp: 340, speed: 10, turn: 2.0, radius: 2.0, cls: 1, sight: 44, armor: 'light',
+                  weapon: 'pgz35', turret: 4.8, fireMoving: true, detector: 22 },                                                                            // China's mobile anti-aircraft gun
+  r_zbd:        { model: 'zbd04', name: 'ZBD-04A', faction: 'redhammer', cost: 900, secs: 9, hp: 360, speed: 12, turn: 2.6, radius: 2.0, cls: 1, sight: 34, armor: 'light',
+                  weapon: 'zbd100', weapon2: 'zbd30', turret: 4, fireMoving: true, swims: true, transport: { squads: 1, vehicles: 0 } },
   r_overlord:   { model: 'overlord', name: 'Overlord Heavy Tank', faction: 'redhammer', cost: 2000, secs: 18, hp: 1100, speed: 6, turn: 1.2, radius: 2.7, cls: 1, sight: 36, armor: 'heavy',
                   weapon: 'dual_cannon', turret: 2.2, fireMoving: true, dirArmor: true, tank: true, nuke: true,
                   hardpoints: { gatling: { name: 'Gatling Cannon', cost: 500, secs: 8, weapon: 'gatling' }, bunker: { name: 'Battle Bunker', cost: 400, secs: 8, capacity: 1 } } },
@@ -179,6 +201,9 @@ export const UNITS = {
   // ---- general-only units (see GENERALS)
   v_f15:        { model: 'f15e', name: 'F-15E Strike Eagle', faction: 'vanguard', cost: 1600, secs: 13, hp: 240, speed: 34, turn: 2.1, radius: 2.5, cls: 1, sight: 40, armor: 'air',
                   weapon: 'bunker_bomb', air: true, alt: 20, fireMoving: true, based: true, ammo: 2, reload: 130 },
+  v_himars:     { model: 'himars', name: 'M142 HIMARS', faction: 'vanguard', cost: 1300, secs: 13, hp: 260, speed: 11, turn: 2.2, radius: 2.1, cls: 1, sight: 30, armor: 'light', weapon: 'gmlrs' },   // rocket artillery: six rockets, long reload
+  v_bradley:    { model: 'bradley', name: 'M2A3 Bradley', faction: 'vanguard', cost: 1000, secs: 10, hp: 420, speed: 11, turn: 2.4, radius: 2.0, cls: 1, sight: 36, armor: 'light',
+                  weapon: 'lav_gun', weapon2: 'tow2', turret: 4, fireMoving: true, transport: { squads: 1, vehicles: 0 } },
   v_lav:        { model: 'lav25', name: 'LAV-25', faction: 'vanguard', cost: 800, secs: 9, hp: 380, speed: 13, turn: 2.8, radius: 2.0, cls: 1, sight: 34, armor: 'light',
                   weapon: 'lav_gun', upWeapon: { v_tow: 'tow' }, turret: 4, fireMoving: true, amph: true },
   s_bomber:     { model: 'bomber', name: 'Suicide Bomber', faction: 'sandstorm', cost: 300, secs: 5, hp: 70, speed: 9.5, turn: 9, radius: 0.8, cls: 0, sight: 26, armor: 'inf',
@@ -226,12 +251,12 @@ export const UNITS = {
   u_rifle:      { ...SQUAD, model: 'motorrifle', name: 'Motor Rifle Squad', faction: 'ursa', cost: 280, hp: 270, placeholder: true },
   u_rpg:        { model: 'rpg7', name: 'RPG Team', faction: 'ursa', cost: 320, secs: 6, hp: 170, speed: 6, turn: 9, radius: 0.9, cls: 0, sight: 36, armor: 'inf', weapon: 'rpg', infantry: true, canGarrison: true, canCapture: true, placeholder: true },
   u_convict:    { ...SQUAD, model: 'convict', name: 'Convict Squad', faction: 'ursa', cost: 160, hp: 170, secs: 4, placeholder: true },                              // Wagner Group only
-  u_tank:       { ...TANK, model: 't90', name: 'T-90', faction: 'ursa', cost: 800, hp: 500, weapon: 'gun125', placeholder: true },
+  u_tank:       { ...TANK, model: 't90', name: 'T-90', faction: 'ursa', cost: 800, hp: 500, weapon: 'gun125', era: 300, placeholder: true },
   u_bmp:        { model: 'bmp3', name: 'BMP-3', faction: 'ursa', cost: 900, secs: 9, hp: 360, speed: 12, turn: 2.6, radius: 2.0, cls: 1, sight: 34, armor: 'light',
-                  weapon: 'bmp100', weapon2: 'bmp30', turret: 4, fireMoving: true, placeholder: true },
+                  weapon: 'bmp100', weapon2: 'bmp30', turret: 4, fireMoving: true, swims: true, placeholder: true },
   u_tunguska:   { model: 'tunguska', name: '2K22 Tunguska', faction: 'ursa', cost: 1000, secs: 11, hp: 340, speed: 10, turn: 2.0, radius: 2.0, cls: 1, sight: 44, armor: 'light',
                   weapon: 'tung_gun', weapon2: 'tung_missile', turret: 4.5, fireMoving: true, detector: 22, placeholder: true },
-  u_tos:        { model: 'tos1', name: 'TOS-1A', faction: 'ursa', cost: 1100, secs: 13, hp: 420, speed: 7, turn: 1.5, radius: 2.1, cls: 1, sight: 30, armor: 'heavy', weapon: 'tos_rockets', dirArmor: true, placeholder: true },
+  u_tos:        { model: 'tos1', name: 'TOS-1A', faction: 'ursa', cost: 1100, secs: 13, hp: 420, speed: 7, turn: 1.5, radius: 2.1, cls: 1, sight: 30, armor: 'heavy', weapon: 'tos_rockets', dirArmor: true, era: 300, placeholder: true },
   u_su27:       { model: 'su27', name: 'Su-27', faction: 'ursa', cost: 1300, secs: 12, hp: 210, speed: 34, turn: 2.2, radius: 2.4, cls: 1, sight: 40, armor: 'air',
                   weapon: 'su_missile', air: true, alt: 20, fireMoving: true, based: true, ammo: 2, reload: 120, placeholder: true },
   u_ka52:       { model: 'ka52', name: 'Ka-52', faction: 'ursa', cost: 1500, secs: 14, hp: 330, speed: 15, turn: 2.3, radius: 2.4, cls: 1, sight: 42, armor: 'air',
@@ -239,9 +264,19 @@ export const UNITS = {
   u_corvette:   { model: 'stereg', name: 'Steregushchiy Corvette', faction: 'ursa', cost: 1900, secs: 18, hp: 900, speed: 13, turn: 1.1, radius: 7, cls: 1, sight: 50, armor: 'heavy',
                   weapon: 'corvette_gun', weapon2: 'ciws', turret: 2.6, fireMoving: true, ship: true, warship: true, pdl: 18, pdlR: 24, pdlGun: true,
                   mounts: [{ x: 8.2, y: 2.2, len: 2.8, arc: 2.3 }, { x: -3.4, y: 3.6, len: 1.0, arc: 2.5, dir: Math.PI }], pdlAt: 1, placeholder: true },
-  u_armata:     { ...TANK, model: 't14', name: 'T-14 Armata', faction: 'ursa', cost: 1650, secs: 14, hp: 640, speed: 9.5, radius: 2.2, weapon: 'gun125a', pdl: 44, placeholder: true },   // Vacation Command Group; pdl: its active protection
+  u_armata:     { ...TANK, model: 't14', name: 'T-14 Armata', faction: 'ursa', cost: 1650, secs: 14, hp: 640, speed: 9.5, radius: 2.2, weapon: 'gun125a', pdl: 44, era: 300, placeholder: true },   // Vacation Command Group; pdl: its active protection
   u_su57:       { model: 'su57', name: 'Su-57', faction: 'ursa', cost: 1600, secs: 13, hp: 230, speed: 37, turn: 2.3, radius: 2.5, cls: 1, sight: 40, armor: 'air',
                   weapon: 'su57_missile', air: true, alt: 20, fireMoving: true, based: true, ammo: 4, reload: 140, placeholder: true },                               // Vacation Command Group
+  // batch 14 (proposed line-up, approved in the batch 14 plan). `transport`: carries squads like a Landing Craft. `swims`: crosses water.
+  // `era`: reactive armour: the first rocket or missile to hit it in that many ticks does half damage.
+  u_spetsnaz:   { ...SQUAD, model: 'spetsnaz', name: 'Spetsnaz Team', faction: 'ursa', cost: 700, secs: 9, hp: 250, sight: 40, weapon: 'spetsnaz_rifle', weapon2: 'demo_charge', stealth: 'still', detector: 26 },
+  u_btr:        { model: 'btr82', name: 'BTR-82A', faction: 'ursa', cost: 650, secs: 8, hp: 300, speed: 15, turn: 2.8, radius: 2.0, cls: 1, sight: 40, armor: 'light',
+                  weapon: 'bmp30', turret: 4, fireMoving: true, swims: true, transport: { squads: 1, vehicles: 0 } },
+  u_msta:       { model: 'msta', name: '2S19 Msta-S', faction: 'ursa', cost: 1100, secs: 13, hp: 380, speed: 8, turn: 1.5, radius: 2.2, cls: 1, sight: 30, armor: 'light', weapon: 'msta152', turret: 1.6 },
+  u_su25:       { model: 'su25', name: 'Su-25 Frogfoot', faction: 'ursa', cost: 1350, secs: 13, hp: 300, speed: 28, turn: 2.0, radius: 2.5, cls: 1, sight: 40, armor: 'air',
+                  weapon: 'gsh30', weapon2: 's8_rockets', air: true, alt: 18, fireMoving: true, based: true, ammo: 16, reload: 150 },
+  u_mi8:        { model: 'mi8', name: 'Mi-8', faction: 'ursa', cost: 900, secs: 10, hp: 380, speed: 14, turn: 2.2, radius: 2.6, cls: 1, sight: 40, armor: 'air',
+                  weapon: 'mi8_rockets', air: true, alt: 13, fireMoving: true, heli: true, transport: { squads: 2, vehicles: 0 } },
   u_hero:       { model: 'bearrider', name: 'IT’S HIM!', faction: 'ursa', cost: 2500, secs: 20, hp: 650, speed: 10, turn: 6, radius: 1.3, cls: 0, sight: 42, armor: 'inf',
                   weapon: 'bear_minigun', weapon2: 'bear_laser', infantry: true, hero: true, stealth: 'always', needs: 'u_factory' },
   // ---- Europe (placeholders in the same sense)
@@ -262,6 +297,10 @@ export const UNITS = {
   e_fremm:      { model: 'fremm', name: 'FREMM Frigate', faction: 'aegis', cost: 2100, secs: 20, hp: 950, speed: 12, turn: 1.0, radius: 8, cls: 1, sight: 52, armor: 'heavy',
                   weapon: 'corvette_gun', weapon2: 'aster', turret: 2.6, fireMoving: true, ship: true, warship: true, pdl: 14, pdlR: 26, detector: 30,
                   mounts: [{ x: 10.4, y: 2.4, len: 2.8, arc: 2.3 }, { x: 6.2, y: 2.2, len: 0.4, arc: Math.PI }], pdlAt: 1, placeholder: true },
+  e_boxer:      { model: 'boxer', name: 'Boxer', faction: 'aegis', cost: 800, secs: 9, hp: 400, speed: 13, turn: 2.6, radius: 2.0, cls: 1, sight: 38, armor: 'light',
+                  weapon: 'mk30', turret: 4, fireMoving: true, transport: { squads: 1, vehicles: 0 } },
+  e_nh90:       { model: 'nh90', name: 'NH90', faction: 'aegis', cost: 850, secs: 10, hp: 360, speed: 15, turn: 2.3, radius: 2.6, cls: 1, sight: 40, armor: 'air',
+                  weapon: 'door_mg', air: true, alt: 13, fireMoving: true, heli: true, transport: { squads: 2, vehicles: 0 } },
   e_laserleo:   { model: 'laserleo', name: 'Laser Leopard', faction: 'aegis', cost: 1300, secs: 12, hp: 440, speed: 10, turn: 1.9, radius: 2.0, cls: 1, sight: 40, armor: 'heavy',
                   weapon: 'hel', turret: 4.5, fireMoving: true, dirArmor: true, pdl: 18, detector: 22, placeholder: true },                                         // Laser general
   e_panther:    { ...TANK, model: 'kf51', name: 'KF51 Panther', faction: 'aegis', cost: 1700, secs: 16, hp: 820, speed: 8.5, radius: 2.3, weapon: 'gun130', pdlUpgrade: 'e_aps', placeholder: true },   // Panzer general
@@ -269,9 +308,12 @@ export const UNITS = {
   e_hero:       { model: 'leonidas', name: 'Leonidas', faction: 'aegis', cost: 2500, secs: 20, hp: 1300, speed: 9, turn: 9, radius: 1.0, cls: 0, sight: 44, armor: 'inf',
                   weapon: 'spear', infantry: true, hero: true, berserk: true, stealth: 'always', needs: 'e_factory' },
   // ---- batch 13: ISIS, every general
+  s_t55:        { ...TANK, model: 't55', name: 'Captured T-55', faction: 'sandstorm', cost: 650, secs: 9, hp: 400, speed: 8.5, weapon: 'gun100', salvage: false },   // an old tank, cheap
+  s_mortar:     { model: 'mortar', name: 'Mortar Team', faction: 'sandstorm', cost: 400, secs: 7, hp: 150, speed: 6, turn: 9, radius: 0.9, cls: 0, sight: 34, armor: 'inf', weapon: 'mortar82', infantry: true, canCapture: true },
   s_quad:       { model: 'zu23', name: 'Quad Cannon', faction: 'sandstorm', cost: 500, secs: 6, hp: 150, speed: 16, turn: 3.0, radius: 1.7, cls: 1, sight: 44, armor: 'light',
                   weapon: 'zu23', turret: 5, fireMoving: true, salvage: false },                                                              // a ZSU-23-4 turret on a pickup
-  s_shahedtruck:{ model: 'shahedtruck', name: 'Shahed Launcher', faction: 'sandstorm', cost: 1200, secs: 15, hp: 240, speed: 8, turn: 1.5, radius: 2.8, cls: 1, sight: 30, armor: 'light', weapon: 'shahed' },
+  s_shahedtruck:{ model: 'shahedtruck', name: 'Shahed Launcher', faction: 'sandstorm', cost: 1200, secs: 15, hp: 240, speed: 8, turn: 1.5, radius: 2.8, cls: 1, sight: 30, armor: 'light', weapon: 'shahed',
+                  mounts: [{ x: -2.4, y: 2.9, len: 0, arc: 0.3, dir: Math.PI }] },   // the rack fires off the back: the truck has to turn its tail to the target
   s_shahed:     { model: 'shahed', name: 'Shahed Drone', faction: 'sandstorm', cost: 300, secs: 1, hp: 60, speed: 26, turn: 2.2, radius: 1.4, cls: 1, sight: 20, armor: 'air',
                   weapon: 'shahed_dive', air: true, alt: 14, fireMoving: true, drone: true, suicide: { r: 7, dmg: 170, w: 'shahedblast', dive: true } },   // only ever launched by the truck; flies to its target and dives
   // ---- Sandstorm Front
@@ -321,7 +363,7 @@ export const BLDGS = {
   v_power:    { ...POWER, name: 'Cold Fusion Reactor', faction: 'vanguard' },
   v_supply:   { ...SUPPLY, name: 'Supply Center', faction: 'vanguard', trains: ['v_chinook'], needs: 'v_power' },
   v_barracks: { ...BARRACKS, name: 'Barracks', faction: 'vanguard', trains: ['v_ranger', 'v_pathfinder', 'v_hero'] },
-  v_factory:  { ...FACTORY, name: 'War Factory', faction: 'vanguard', trains: ['v_tank', 'v_avenger'], upgrades: ['v_pdl'], needs: 'v_supply' },
+  v_factory:  { ...FACTORY, name: 'War Factory', faction: 'vanguard', trains: ['v_tank', 'v_avenger', 'v_bradley', 'v_himars'], upgrades: ['v_pdl'], needs: 'v_supply' },
   v_airfield: { ...AIRFIELD, layout: US_FIELD, name: 'Air Field', faction: 'vanguard', trains: ['v_raptor', 'v_a10', 'v_comanche'], needs: 'v_factory' },
   v_stratfield: { model: 'airfield', role: 'strategic', name: 'Strategic Airfield', faction: 'vanguard', cost: 3200, secs: 22, hp: 2600, w: 32, h: 18, power: -2, sight: 32, pads: 2, runway: true, big: true,
                 general: 'airforce', layout: STRAT_FIELD, trains: ['v_ac130', 'v_b2', 'v_apache'], upgrades: ['v_longbow'], needs: 'v_airfield' },   // general: only that general may build it
@@ -333,15 +375,15 @@ export const BLDGS = {
   r_power:    { ...POWER, name: 'Nuclear Reactor', faction: 'redhammer' },
   r_supply:   { ...SUPPLY, name: 'Supply Center', faction: 'redhammer', trains: ['r_truck'], needs: 'r_power' },
   r_barracks: { ...BARRACKS, name: 'Barracks', faction: 'redhammer', trains: ['r_conscript', 'r_hacker', 'r_hero'] },
-  r_factory:  { ...FACTORY, name: 'War Factory', faction: 'redhammer', trains: ['r_tank', 'r_inferno', 'r_overlord'], upgrades: ['r_nuke', 'r_thermo'], needs: 'r_supply' },
+  r_factory:  { ...FACTORY, name: 'War Factory', faction: 'redhammer', trains: ['r_tank', 'r_zbd', 'r_pgz', 'r_inferno', 'r_overlord'], upgrades: ['r_nuke', 'r_thermo'], needs: 'r_supply' },
   r_airfield: { ...AIRFIELD, layout: CN_FIELD, name: 'Airfield', faction: 'redhammer', trains: ['r_mig', 'r_hind'], needs: 'r_factory' },
   r_shipyard: { ...SHIPYARD, name: 'Shipyard', faction: 'redhammer', trains: ['r_lcraft', 'r_corvette'], needs: 'r_factory' },
   r_gatling:  { model: 'gatling', role: 'defense', name: 'Gatling Tower', faction: 'redhammer', cost: 900, secs: 8, hp: 1100, w: 4, h: 4, power: -2, sight: 46, weapon: 'gatling', turret: 4.0, detector: 28, needs: 'r_power' },
 
   s_cc:       { ...CC, name: 'Command Hideout', faction: 'sandstorm', trains: ['s_worker'] },
   s_supply:   { ...SUPPLY, name: 'Supply Stash', faction: 'sandstorm', power: 0, trains: ['s_truck'] },
-  s_barracks: { ...BARRACKS, name: 'Barracks', faction: 'sandstorm', trains: ['s_guerrilla', 's_rpg', 's_saboteur', 's_hero'] },
-  s_factory:  { ...FACTORY, name: 'Arms Dealer', faction: 'sandstorm', power: 0, cost: 1500, trains: ['s_technical', 's_quad', 's_scorpion', 's_tractor', 's_buggy', 's_shahedtruck'], needs: 's_supply' },
+  s_barracks: { ...BARRACKS, name: 'Barracks', faction: 'sandstorm', trains: ['s_guerrilla', 's_rpg', 's_mortar', 's_saboteur', 's_hero'] },
+  s_factory:  { ...FACTORY, name: 'Arms Dealer', faction: 'sandstorm', power: 0, cost: 1500, trains: ['s_technical', 's_quad', 's_scorpion', 's_t55', 's_tractor', 's_buggy', 's_shahedtruck'], needs: 's_supply' },
   s_shipyard: { ...SHIPYARD, name: 'Smuggler’s Dock', faction: 'sandstorm', power: 0, cost: 1700, trains: ['s_dboat', 's_mboat'], needs: 's_factory' },
   s_stinger:  { model: 'stinger', role: 'defense', name: 'Stinger Site', faction: 'sandstorm', cost: 900, secs: 8, hp: 900, w: 4, h: 4, power: 0, sight: 48, weapon: 'stinger', turret: 3.2, detector: 28, needs: 's_barracks' },
   s_tunnel:   { model: 'tunnel', role: 'tunnel', name: 'Tunnel Network', faction: 'sandstorm', cost: 800, secs: 5, hp: 1000, w: 4, h: 4, power: 0, sight: 32, tunnel: true, repair: 10, needs: 's_barracks' },
@@ -355,21 +397,21 @@ export const BLDGS = {
   u_cc:       { ...CC, name: 'Command Center', faction: 'ursa', trains: ['u_dozer'] },
   u_power:    { ...POWER, name: 'Reactor', faction: 'ursa' },
   u_supply:   { ...SUPPLY, name: 'Supply Center', faction: 'ursa', trains: ['u_truck'], needs: 'u_power' },
-  u_barracks: { ...BARRACKS, name: 'Barracks', faction: 'ursa', trains: ['u_rifle', 'u_rpg', 'u_hero'] },
-  u_factory:  { ...FACTORY, name: 'War Factory', faction: 'ursa', trains: ['u_tank', 'u_bmp', 'u_tunguska', 'u_tos'], needs: 'u_supply' },
-  u_airfield: { ...AIRFIELD, layout: CN_FIELD, name: 'Airfield', faction: 'ursa', trains: ['u_su27', 'u_ka52'], needs: 'u_factory' },
+  u_barracks: { ...BARRACKS, name: 'Barracks', faction: 'ursa', trains: ['u_rifle', 'u_rpg', 'u_spetsnaz', 'u_hero'] },
+  u_factory:  { ...FACTORY, name: 'War Factory', faction: 'ursa', trains: ['u_btr', 'u_tank', 'u_bmp', 'u_tunguska', 'u_msta', 'u_tos'], needs: 'u_supply' },
+  u_airfield: { ...AIRFIELD, layout: CN_FIELD, name: 'Airfield', faction: 'ursa', trains: ['u_su27', 'u_su25', 'u_ka52', 'u_mi8'], needs: 'u_factory' },
   u_shipyard: { ...SHIPYARD, name: 'Naval Base', faction: 'ursa', trains: ['u_corvette'], needs: 'u_factory' },
-  u_pantsir:  { model: 'gatling', role: 'defense', name: 'Pantsir Site', faction: 'ursa', cost: 950, secs: 8, hp: 1050, w: 4, h: 4, power: -2, sight: 48, weapon: 'pantsir', turret: 4.0, detector: 28, needs: 'u_power' },
-  u_iskander: { model: 'scud', role: 'super', name: 'Iskander Battery', faction: 'ursa', cost: 5000, secs: 45, hp: 2400, w: 8, h: 8, power: -10, sight: 30, needs: 'u_factory', superPower: 'iskander' },
+  u_pantsir:  { model: 'pantsir', role: 'defense', name: 'Pantsir Site', faction: 'ursa', cost: 950, secs: 8, hp: 1050, w: 4, h: 4, power: -2, sight: 48, weapon: 'pantsir', turret: 4.0, detector: 28, needs: 'u_power' },
+  u_kinzhal:  { model: 'kinzhal', role: 'super', name: 'Kinzhal Shelter', faction: 'ursa', cost: 5000, secs: 45, hp: 2400, w: 8, h: 8, power: -10, sight: 30, needs: 'u_factory', superPower: 'kinzhal' },   // a hardened shelter with a MiG-31 on alert
   e_cc:       { ...CC, name: 'Command Center', faction: 'aegis', trains: ['e_dozer'] },
   e_power:    { ...POWER, name: 'Fusion Plant', faction: 'aegis' },
   e_supply:   { ...SUPPLY, name: 'Supply Center', faction: 'aegis', trains: ['e_truck'], needs: 'e_power' },
   e_barracks: { ...BARRACKS, name: 'Barracks', faction: 'aegis', trains: ['e_rifle', 'e_milan', 'e_hero'] },
-  e_factory:  { ...FACTORY, name: 'War Factory', faction: 'aegis', trains: ['e_tank', 'e_puma', 'e_gepard', 'e_pzh'], needs: 'e_supply' },
-  e_airfield: { ...AIRFIELD, layout: US_FIELD, name: 'Air Base', faction: 'aegis', trains: ['e_typhoon', 'e_tiger'], needs: 'e_factory' },
+  e_factory:  { ...FACTORY, name: 'War Factory', faction: 'aegis', trains: ['e_boxer', 'e_tank', 'e_puma', 'e_gepard', 'e_pzh'], needs: 'e_supply' },
+  e_airfield: { ...AIRFIELD, layout: US_FIELD, name: 'Air Base', faction: 'aegis', trains: ['e_typhoon', 'e_tiger', 'e_nh90'], needs: 'e_factory' },
   e_shipyard: { ...SHIPYARD, name: 'Dockyard', faction: 'aegis', trains: ['e_fremm'], needs: 'e_factory' },
-  e_iris:     { model: 'patriot', role: 'defense', name: 'IRIS-T Battery', faction: 'aegis', cost: 1050, secs: 8, hp: 1000, w: 4, h: 4, power: -3, sight: 50, weapon: 'iris', turret: 3.0, detector: 30, needs: 'e_power' },
-  e_lance:    { model: 'particle', role: 'super', name: 'Orbital Lance', faction: 'aegis', cost: 5000, secs: 45, hp: 2400, w: 8, h: 8, power: -10, sight: 30, needs: 'e_factory', superPower: 'lance' },
+  e_iris:     { model: 'irist', role: 'defense', name: 'IRIS-T Battery', faction: 'aegis', cost: 1050, secs: 8, hp: 1000, w: 4, h: 4, power: -3, sight: 50, weapon: 'iris', turret: 3.0, detector: 30, needs: 'e_power' },
+  e_shield:   { model: 'skyshield', role: 'super', name: 'Sky Shield Battery', faction: 'aegis', cost: 5000, secs: 45, hp: 2400, w: 8, h: 8, power: -10, sight: 30, needs: 'e_factory', superPower: 'skyshield' },   // a SAMP/T battery: the only defensive superweapon
 
   // neutral map objects
   // caps: infantry squads each building type holds (same order as CIV_KINDS in map.js: apartment, market hall, office tower, mosque,
@@ -407,8 +449,13 @@ export const POWERS = {
   nuke:     { name: 'Nuclear Missile', cd: 210, radius: 34, super: 'r_silo', flight: 120, dmg: 1400, fallout: { r: 20, secs: 12, dps: 40 }, desc: 'One warhead. Levels everything within 34 m and leaves fallout.' },
   scud:     { name: 'Scud Storm', cd: 210, radius: 24, super: 's_scud', n: 9, dmg: 280, r: 9, toxin: { r: 7, secs: 10, dps: 18 }, desc: 'Nine toxin-tipped missiles rain over a 24 m zone.' },
   // Powers of the two newer factions reuse the strike code of an existing power: `as` names it; the numbers here are their own.
-  iskander: { name: 'Iskander Strike', cd: 210, radius: 22, super: 'u_iskander', as: 'scud', n: 6, dmg: 400, r: 9, fire: { r: 7, secs: 8, dps: 18 }, desc: 'Six ballistic missiles fall on a 22 m zone and leave it burning.' },
-  lance:    { name: 'Orbital Lance', cd: 210, radius: 12, super: 'e_lance', as: 'particle', beam: { ticks: 100, every: 2, dmg: 55, r: 6, sweep: 24 }, desc: 'A beam from orbit burns along a 24 m line for 5 s.' },
+  iskander: { name: 'Iskander Strike', cd: 240, radius: 16, as: 'scud', n: 3, dmg: 320, r: 9, fire: { r: 7, secs: 8, dps: 18 }, desc: 'Three ballistic missiles fall on a 16 m zone and leave it burning.' },   // a promotion power since batch 14 (it was Russia's superweapon)
+  // Kinzhal Strike (Russia's superweapon): `n` hypersonic missiles arrive `flight` ticks after launch, each on one of the most valuable
+  // buildings in the zone (`r`: its tiny blast). Sky Shield (Europe's): for `secs` seconds a zone of `radius` is defended: `stop` is the
+  // chance that each enemy superweapon warhead or off-map aircraft is shot down; guided and lobbed projectiles always are; `air` is the
+  // damage an interceptor does to an enemy aircraft in the zone, one every `every` ticks.
+  kinzhal:  { name: 'Kinzhal Strike', cd: 210, radius: 30, super: 'u_kinzhal', n: 3, dmg: 1900, r: 4, flight: 60, desc: 'Three hypersonic missiles hit the three most valuable buildings in a 30 m zone, 3 s after launch. Almost no blast.' },
+  skyshield: { name: 'Sky Shield', cd: 180, radius: 70, super: 'e_shield', shield: true, secs: 40, stop: 0.75, air: 90, every: 8, desc: 'For 40 s a 70 m zone is defended: missiles, rockets, artillery, bombs, drones and aircraft entering it are shot down, and enemy superweapon warheads usually are.' },
   vdv:      { name: 'VDV Airdrop', cd: 240, radius: 9, as: 'paradrop', n: 5, unit: 'u_rifle', desc: 'A transport drops 5 Motor Rifle squads at the target.' },
   eupara:   { name: 'Airborne Drop', cd: 240, radius: 9, as: 'paradrop', n: 5, unit: 'e_rifle', desc: 'A transport drops 5 Legion squads at the target.' },
   odab:     { name: 'ODAB Fuel-Air Bomb', cd: 240, radius: 24, as: 'fab', plane: 'bomber', desc: 'Massive shockwave, then lingering heat that burns infantry, including garrisons.' },
@@ -438,7 +485,7 @@ export const FACTIONS = {
     hull: 0xc4b79a, dark: 0x8a8067, usesPower: true, radarNeedsPower: true,
     build: ['v_power', 'v_barracks', 'v_supply', 'v_factory', 'v_airfield', 'v_stratfield', 'v_shipyard', 'v_patriot', 'v_uplink', 'v_particle', 'v_cc'],
     roles: { cc: 'v_cc', power: 'v_power', supply: 'v_supply', barracks: 'v_barracks', factory: 'v_factory', airfield: 'v_airfield', strategic: 'v_stratfield', shipyard: 'v_shipyard', defense: 'v_patriot', income: 'v_uplink', super: 'v_particle', builder: 'v_dozer', truck: 'v_chinook', squad: 'v_ranger', scout: 'v_drone' },
-    aiArmy: ['v_ranger', 'v_tank', 'v_ranger', 'v_avenger', 'v_tank', 'v_comanche'], aiNavy: ['v_rhib', 'v_frigate', 'v_frigate'],
+    aiArmy: ['v_ranger', 'v_tank', 'v_bradley', 'v_ranger', 'v_avenger', 'v_tank', 'v_himars', 'v_comanche'], aiNavy: ['v_rhib', 'v_frigate', 'v_frigate'],
     tree: [
       { id: 'v_pathfinder', tier: 1, name: 'Pathfinder Training', desc: 'Unlocks the Pathfinder Sniper at the Barracks.', unlock: 'v_pathfinder' },
       { id: 'v_vet', tier: 1, name: 'Armor Veterancy', desc: 'Tanks leave the War Factory as Veterans.', vetBuild: 'tank' },
@@ -455,7 +502,7 @@ export const FACTIONS = {
     hull: 0x5d6a48, dark: 0x3d4631, usesPower: true, horde: true,
     build: ['r_power', 'r_barracks', 'r_supply', 'r_factory', 'r_airfield', 'r_shipyard', 'r_gatling', 'r_silo', 'r_cc'],
     roles: { cc: 'r_cc', power: 'r_power', supply: 'r_supply', barracks: 'r_barracks', factory: 'r_factory', airfield: 'r_airfield', shipyard: 'r_shipyard', defense: 'r_gatling', super: 'r_silo', builder: 'r_dozer', truck: 'r_truck', squad: 'r_conscript', scout: 'r_scout' },
-    aiArmy: ['r_conscript', 'r_tank', 'r_conscript', 'r_tank', 'r_inferno', 'r_overlord', 'r_mig'], aiNavy: ['r_corvette'],
+    aiArmy: ['r_conscript', 'r_tank', 'r_zbd', 'r_conscript', 'r_tank', 'r_inferno', 'r_pgz', 'r_overlord', 'r_mig'], aiNavy: ['r_corvette'],
     tree: [
       { id: 'r_redguard', tier: 1, name: 'Red Guard Training', desc: 'Infantry leave the Barracks as Veterans.', vetBuild: 'infantry' },
       { id: 'r_artyvet', tier: 1, name: 'Artillery Training', desc: 'Inferno Cannons are built as Veterans.', vetBuild: 'r_inferno' },
@@ -472,7 +519,7 @@ export const FACTIONS = {
     hull: 0x9a7848, dark: 0x5e4a30, usesPower: false, salvage: true, ambush: ['s_rpg', 's_rpg', 's_guerrilla'],
     build: ['s_barracks', 's_supply', 's_factory', 's_shipyard', 's_stinger', 's_tunnel', 's_market', 's_scud', 's_cc'],
     roles: { cc: 's_cc', supply: 's_supply', barracks: 's_barracks', factory: 's_factory', shipyard: 's_shipyard', defense: 's_stinger', tunnel: 's_tunnel', income: 's_market', super: 's_scud', builder: 's_worker', truck: 's_truck', squad: 's_guerrilla', scout: 's_technical' },
-    aiArmy: ['s_guerrilla', 's_technical', 's_rpg', 's_scorpion', 's_technical', 's_buggy', 's_tractor'], aiNavy: ['s_mboat', 's_dboat', 's_dboat'],
+    aiArmy: ['s_guerrilla', 's_technical', 's_rpg', 's_t55', 's_scorpion', 's_mortar', 's_technical', 's_buggy', 's_tractor'], aiNavy: ['s_mboat', 's_dboat', 's_dboat'],
     tree: [
       { id: 's_scrap', tier: 1, name: 'Scrap Mastery', desc: 'New vehicles start with one salvage upgrade.', flag: 'scrap' },
       { id: 's_saboteur', tier: 1, name: 'Saboteur Cell', desc: 'Unlocks the Saboteur at the Barracks.', unlock: 's_saboteur' },
@@ -486,11 +533,11 @@ export const FACTIONS = {
   // Russia and Europe: full playable armies whose line-up is a placeholder until the player's own unit lists arrive.
   ursa: {
     id: 'ursa', name: 'Russia', doctrine: 'Massed armor and rocket artillery',
-    blurb: 'T-90s, BMP-3s, TOS-1A thermobaric rockets, Su-27s and Ka-52 gunships. Hero: IT’S HIM!, on his bear.',
+    blurb: 'T-90s with reactive armour, BMP-3s and BTRs that swim, Msta and TOS-1A artillery, Su-25s, Ka-52s and Spetsnaz. Hero: IT’S HIM!, on his bear.',
     hull: 0x6f7668, dark: 0x454b41, usesPower: true,
-    build: ['u_power', 'u_barracks', 'u_supply', 'u_factory', 'u_airfield', 'u_shipyard', 'u_pantsir', 'u_iskander', 'u_cc'],
-    roles: { cc: 'u_cc', power: 'u_power', supply: 'u_supply', barracks: 'u_barracks', factory: 'u_factory', airfield: 'u_airfield', shipyard: 'u_shipyard', defense: 'u_pantsir', super: 'u_iskander', builder: 'u_dozer', truck: 'u_truck', squad: 'u_rifle', scout: 'u_bmp' },
-    aiArmy: ['u_rifle', 'u_tank', 'u_rpg', 'u_bmp', 'u_tank', 'u_tos', 'u_tunguska', 'u_ka52'], aiNavy: ['u_corvette'],
+    build: ['u_power', 'u_barracks', 'u_supply', 'u_factory', 'u_airfield', 'u_shipyard', 'u_pantsir', 'u_kinzhal', 'u_cc'],
+    roles: { cc: 'u_cc', power: 'u_power', supply: 'u_supply', barracks: 'u_barracks', factory: 'u_factory', airfield: 'u_airfield', shipyard: 'u_shipyard', defense: 'u_pantsir', super: 'u_kinzhal', builder: 'u_dozer', truck: 'u_truck', squad: 'u_rifle', scout: 'u_btr' },
+    aiArmy: ['u_rifle', 'u_tank', 'u_rpg', 'u_btr', 'u_tank', 'u_msta', 'u_bmp', 'u_tank', 'u_tos', 'u_tunguska', 'u_su25', 'u_ka52'], aiNavy: ['u_corvette'],
     tree: [
       { id: 'u_guards', tier: 1, name: 'Guards Training', desc: 'Infantry leave the Barracks as Veterans.', vetBuild: 'infantry' },
       { id: 'u_armorvet', tier: 1, name: 'Tank Academy', desc: 'Tanks leave the War Factory as Veterans.', vetBuild: 'tank' },
@@ -498,16 +545,16 @@ export const FACTIONS = {
       { id: 'u_vdv', tier: 3, req: 'u_guards', name: 'VDV Airdrop', desc: POWERS.vdv.desc, power: 'vdv' },
       { id: 'u_trophy', tier: 3, req: 'u_armorvet', name: 'War Trophies', desc: 'Earn 20% of the cost of every enemy unit you destroy.', flag: 'bounty' },
       { id: 'u_odab', tier: 5, req: 'u_barrage', name: 'ODAB Fuel-Air Bomb', desc: POWERS.odab.desc, power: 'odab' },
-      { id: 'u_barrage2', tier: 5, req: 'u_barrage', name: 'Barrage II', desc: 'Artillery Barrage fires 20 shells.', flag: 'barrage2' },
+      { id: 'u_iskander', tier: 5, req: 'u_barrage', name: 'Iskander Strike', desc: POWERS.iskander.desc, power: 'iskander' },
     ],
   },
   aegis: {
     id: 'aegis', name: 'Europe', doctrine: 'Few, expensive, well-protected units',
     blurb: 'Leopard 2s, Pumas, Gepards, PzH 2000 artillery, Eurofighters and Tiger gunships. Hero: Leonidas and his spear.',
     hull: 0x6c7b84, dark: 0x444f57, usesPower: true,
-    build: ['e_power', 'e_barracks', 'e_supply', 'e_factory', 'e_airfield', 'e_shipyard', 'e_iris', 'e_lance', 'e_cc'],
-    roles: { cc: 'e_cc', power: 'e_power', supply: 'e_supply', barracks: 'e_barracks', factory: 'e_factory', airfield: 'e_airfield', shipyard: 'e_shipyard', defense: 'e_iris', super: 'e_lance', builder: 'e_dozer', truck: 'e_truck', squad: 'e_rifle', scout: 'e_puma' },
-    aiArmy: ['e_rifle', 'e_tank', 'e_milan', 'e_puma', 'e_tank', 'e_gepard', 'e_pzh', 'e_tiger'], aiNavy: ['e_fremm'],
+    build: ['e_power', 'e_barracks', 'e_supply', 'e_factory', 'e_airfield', 'e_shipyard', 'e_iris', 'e_shield', 'e_cc'],
+    roles: { cc: 'e_cc', power: 'e_power', supply: 'e_supply', barracks: 'e_barracks', factory: 'e_factory', airfield: 'e_airfield', shipyard: 'e_shipyard', defense: 'e_iris', super: 'e_shield', builder: 'e_dozer', truck: 'e_truck', squad: 'e_rifle', scout: 'e_puma' },
+    aiArmy: ['e_rifle', 'e_tank', 'e_milan', 'e_boxer', 'e_puma', 'e_tank', 'e_gepard', 'e_pzh', 'e_tiger'], aiNavy: ['e_fremm'],
     tree: [
       { id: 'e_crew', tier: 1, name: 'Crew Training', desc: 'Tanks leave the War Factory as Veterans.', vetBuild: 'tank' },
       { id: 'e_infvet', tier: 1, name: 'Professional Army', desc: 'Infantry leave the Barracks as Veterans.', vetBuild: 'infantry' },

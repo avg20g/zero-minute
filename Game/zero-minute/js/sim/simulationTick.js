@@ -29,7 +29,7 @@ export class Sim {
     this.fog = new Fog();
     this.ents = []; this.byId = new Map(); this.nextId = 1;
     this.projs = []; this.events = []; this.cmds = []; this.pathQ = [];
-    this.strikes = []; this.hazards = []; this.crates = []; this.pdlUnits = []; this.reveals = [];
+    this.strikes = []; this.hazards = []; this.crates = []; this.pdlUnits = []; this.reveals = []; this.lastSuper = [-1e9, -1e9];
     const f = opts.factions || ['vanguard', 'redhammer'];
     const money = opts.money ?? 8000;
     this.teams = [mkTeam(f[0], money), mkTeam(f[1], money)]; // equal starting cash; the AI never receives a bonus
@@ -344,7 +344,7 @@ function applyCommand(sim, c) {
     }
     case 'evacuate': { // empty a garrison: all squads, or `count` of them; with x,z they walk to that point once outside
       const b = sim.byId.get(c.id); if (!b || b.team !== team || !b.garrison || !b.garrison.length) break;
-      if (isTransport(b) && landingCell(sim, b, 0) < 0) { msg(sim, team, 'Move to the shore to unload'); break; }
+      if (isTransport(b) && landingCell(sim, b, 0) < 0) { msg(sim, team, UNITS[b.type].ship ? 'Move to the shore to unload' : 'No ground to unload onto here'); break; }
       const out = ejectGarrison(sim, b, 1, c.count > 0 ? c.count | 0 : 1e9);
       if (out.length && c.x >= 0 && c.z >= 0) {
         if (sim.nav.dirty) sim.nav.rebuild();

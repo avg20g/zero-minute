@@ -58,7 +58,7 @@ export class View {
     this.ringMatP = new THREE.MeshBasicMaterial({ color: 0xf2a93b, transparent: true, opacity: 0.95, depthWrite: false, fog: false });
     this.ghost = buildGhost(); scene.add(this.ghost);
     this.vis = 0; this.shown = { units: 0, hiddenEnemies: 0 };
-    this._v = new THREE.Vector3();
+    this._v = new THREE.Vector3(); this.takeoffs = [];   // Kinzhal carriers climbing away (drawn only; nothing in the simulation)
     this.w = 1; this.h = 1; this.time = 0;
   }
 
@@ -186,6 +186,8 @@ export class View {
           const y = fx.h(e.bx, e.bz);
           const kind = POWERS[e.id].as || e.id;   // a newer faction's superweapon looks like the one whose strike it reuses
           if (kind === 'particle') { this.skyBeams.push({ x: e.bx, y: y + 14, z: e.bz, until: this.time + POWERS[e.id].beam.ticks / 20 }); fx.flash(e.bx, y + 15, e.bz, 120, 0.5); }
+          else if (kind === 'kinzhal') { this.takeoffs.push({ id: 'to' + e.bid + ':' + this.vis, x: e.bx + 4, z: e.bz, a: 0, t: 0, team: e.team }); fx.dust(e.bx + 6, y, e.bz, 16, 6, 2.4, 0.4); }   // the MiG-31 rolls out of the shelter door (the door faces +X) and climbs away
+          else if (kind === 'skyshield') { fx.flash(e.bx, y + 6, e.bz, 60, 0.4); fx.shock(e.bx, y + 0.4, e.bz, 14, 0.8, 0x9fd0ff); }
           else { fx.dust(e.bx, y, e.bz, 26, 9, 3, 0.45); fx.flash(e.bx, y + 4, e.bz, kind === 'nuke' ? 160 : 70, 0.6); fx.shake(e.bx, e.bz, kind === 'nuke' ? 0.9 : 0.4); }
           break;
         }
@@ -194,6 +196,9 @@ export class View {
         case 'fab': if (see(e)) fx.megaBlast(e.x, e.z, e.r); break;
         case 'nuke': if (see(e)) { fx.megaBlast(e.x, e.z, e.r); fx.megaBlast(e.x, e.z, e.r * 0.55); fx.mushroom(e.x, e.z, e.r); fx.smokeColumn(e.x, e.z, 12); fx.shake(e.x, e.z, 2.2); } else fx.shake(e.x, e.z, 0.5); break; // the ground shakes for everyone
         case 'scudhit': if (see(e)) { const y = fx.h(e.x, e.z); fx.streak(e.x - 14, y + 70, e.z - 6, e.x, y + 1, e.z); fx.explosion(e.x, y, e.z, 2.2); fx.crater(e.x, e.z, 9); if (!e.fire) fx.toxinBurst(e.x, e.z, e.r); fx.shake(e.x, e.z, 0.7); } break;
+        case 'kinzhal': if (see(e)) { const y = fx.h(e.x, e.z); fx.streak(e.x - 46, y + 150, e.z - 18, e.x, y + 1, e.z); fx.flash(e.x, y + 3, e.z, 90, 0.2); fx.explosion(e.x, y + 1, e.z, 2.4); fx.shock(e.x, y + 0.4, e.z, 9, 0.3, 0xffffff); fx.crater(e.x, e.z, 7); fx.shake(e.x, e.z, 0.8); } else fx.shake(e.x, e.z, 0.2); break;   // no warning: a white streak and the hit
+        case 'intercept': if (see(e)) { const y = fx.h(e.x, e.z) + (e.unit ? altOf(e.id) : e.air ? AIR_Y + 6 : 26), by = fx.h(e.bx, e.bz) + 5; if (this.reveal || e.team === PLAYER || fog.visAt(PLAYER, e.bx, e.bz)) fx.streak(e.bx, by, e.bz, e.x, y, e.z); fx.explosion(e.x, y, e.z, e.big ? 1.6 : 0.6); fx.flash(e.x, y, e.z, e.big ? 60 : 20, 0.15); } break;   // an interceptor from the Sky Shield battery meets it in the air
+        case 'era': if (see(e)) { const y = fx.h(e.x, e.z) + 1.3; fx.flash(e.x, y, e.z, 16, 0.08); for (let i = 0; i < 3; i++) fx.spark(e.x + (fx.rnd() - 0.5) * 1.6, y, e.z + (fx.rnd() - 0.5) * 1.6, [1, 0.8, 0.4]); } break;   // a reactive-armour brick goes off
         case 'pbeam': if (see(e)) { const y = fx.h(e.x, e.z); fx.beam(e.x + 6, y + 150, e.z - 10, e.x, y + 0.2, e.z, PBEAM, 0.16); fx.spark(e.x, y + 0.5, e.z); if (e.k % 6 === 0) { fx.explosion(e.x, y, e.z, 0.8); fx.crater(e.x, e.z, 5); } if (e.k % 10 === 0) fx.shake(e.x, e.z, 0.35); } break;
         case 'paradrop': if (see(e)) fx.dust(e.x, fx.h(e.x, e.z), e.z, 22, 7, 2.2, 0.36); break;
         case 'sneak': if (see(e)) { const y = fx.h(e.x, e.z); fx.dust(e.x, y, e.z, 30, 9, 3, 0.45); fx.shock(e.x, y + 0.4, e.z, 10, 0.6, 0xd9b27a); fx.shake(e.x, e.z, 0.5); } break;
@@ -294,20 +299,14 @@ export class View {
           // height comes from the simulation (take-off roll, climb, glide slope): wheels on the tarmac at 0, cruise at 1
           const ak = e.paltK + (e.altK - e.paltK) * alpha, g0 = v.ground || 1.1; v.alt = g0 + (d.alt - g0) * ak; y = gy + v.alt;
           if (v.gear) v.gear.visible = ak < 0.4;                                                 // gear retracts on the way up
-          v.body.rotation.x = ak > 0.03 ? Math.max(-0.5, Math.min(0.5, angDiff(e.facing, e.pfacing) * 9)) : 0;
+          { const want = ak > 0.03 ? Math.max(-0.45, Math.min(0.45, angDiff(e.facing, e.pfacing) * 9)) : 0; v.bank = (v.bank || 0) + (want - (v.bank || 0)) * Math.min(1, dt * 3.5); v.body.rotation.x = v.bank; }   // bank into a turn, eased in and out so it never snaps from side to side
           v.body.rotation.z = d.based ? (e.altK > e.paltK ? 0.26 : e.altK < e.paltK ? 0.09 : 0) * Math.min(1, ak * 6 + 0.25) : e.landed ? 0 : -Math.min(0.16, e.spd * 0.008); // nose up to climb, flare to land
           if (v.rotor) v.rotor.rotation.y += dt * (e.landed ? (e.as === 'spool' ? 3 + e.reloadT * 0.9 : 3) : 30);                    // rotors spool up on the helipad
           if (v.rotorTail) v.rotorTail.rotation.z += dt * 55;
           if (v.rotor2) v.rotor2.rotation.y -= dt * (e.landed ? (e.as === 'spool' ? 3 + e.reloadT * 0.9 : 3) : 30);                  // tandem rotors turn opposite ways
           if (v.prop) v.prop.rotation.x += dt * 60;
           if (v.props) for (const pr of v.props) pr.rotation.x += dt * (e.landed && e.as !== 'spool' ? 6 : 45);                  // AC-130: four propellers, idling on the ground
-          if (d.jink || v.jinkRoll) { // a gunship that jinks leans into each sidestep; a dodge is a sharp roll
-            const lat = (-(e.x - e.px) * s + (e.z - e.pz) * c) * 20, want = e.landed ? 0 : Math.max(-0.45, Math.min(0.45, lat * 0.05));
-            v.lean = (v.lean || 0) + (want - (v.lean || 0)) * Math.min(1, dt * 6); v.jinkRoll = Math.max(0, (v.jinkRoll || 0) - dt * 2.2);
-            v.body.rotation.x += v.lean + Math.sin(v.jinkRoll * Math.PI) * 0.7;
-          }
-          if (e.dive) v.body.rotation.z = -Math.min(1.0, e.dive * 0.2);                                  // FPV drone tips its nose at the target
-          if (ak > 0.5 && d.based && fx.rnd() < dt * 40) { const g = 0.85; fx.smoke.spawn(x - c * 3, y, z - s * 3, 0, 0, 0, 0.5, 0.6, 1.4, g, g, g, 0.25, 0, 0.5); }
+          if (v.jinkRoll > 0) { v.jinkRoll = Math.max(0, v.jinkRoll - dt * 1.6); const k = v.jinkRoll, ease = k * k * (3 - 2 * k); v.body.rotation.x += Math.sin(ease * Math.PI) * 0.32; }   // a dodge: one smooth roll away and back
         } else if (d.ship) { // afloat: level on the water, with a slow roll and pitch; a bow wave and wake when under way
           const ph = this.time * 1.1 + e.id * 1.7, k = d.warship ? 0.5 : 1;
           y = WATER_Y + Math.sin(ph) * 0.05 * k; v.body.rotation.x = Math.sin(ph * 0.83) * 0.035 * k; v.body.rotation.z = Math.sin(ph * 0.61 + 1) * 0.014 * k + Math.min(0.05, e.spd * 0.0022) * (d.warship ? 0.4 : 1);
@@ -342,12 +341,12 @@ export class View {
         if (v.tiers) for (let i = 0; i < 3; i++) v.tiers[i].visible = i === e.tier;
         if (v.stores) for (let i = 0; i < v.stores.length; i++) v.stores[i].visible = i < e.ammo;      // missiles and bombs come off the aircraft as they are fired
         if (v.longbow) v.longbow.visible = !!e.up;                                                     // Apache: the radar dome appears with the Longbow upgrade
-        if (v.doors) { // Shahed Launcher: the container doors swing open while it sets up and fires, and close during the reload; the rack empties drone by drone
+        if (v.bed) { // Shahed Launcher: while it sets up and fires, the container tips up at the front and its roof leaves swing open; both close again for the reload. The rack empties drone by drone, rearmost first
           const W = WEAPONS[d.weapon], cd = e.cds[0], firing = e.bursts[0] > 0 || cd > W.cd - 50, want = e.windup > 0 ? Math.min(1, e.windup / (W.windup * 0.7)) : firing ? 1 : 0;
-          v.open = (v.open || 0) + (want - (v.open || 0)) * Math.min(1, dt * 4);
-          for (let i = 0; i < 2; i++) v.doors[i].rotation.y = (i ? 1 : -1) * v.open * 1.95;
+          v.open = (v.open || 0) + (want - (v.open || 0)) * Math.min(1, dt * 3);
+          v.bed.rotation.z = v.open * 0.42; for (let i = 0; i < 2; i++) v.roof[i].rotation.x = (i ? 1 : -1) * v.open * 1.9;
           const left = cd <= 0 || e.windup > 0 ? W.burst : e.bursts[0] > 0 ? e.bursts[0] : cd < W.cd * 0.45 ? W.burst : 0;
-          for (let i = 0; i < v.rack.length; i++) v.rack[i].visible = i < left;   // rack[0] is the bottom tier: the top drone goes first
+          for (let i = 0; i < v.rack.length; i++) v.rack[i].visible = v.rack.length - 1 - i < left;
         }
         if (v.arm) { // Scud Launcher: the erector lifts the missile upright before a launch, drops afterwards, and a new missile slides on during the reload
           const W = WEAPONS[d.weapon], cd = e.cds[0], up = Math.max(e.windup / W.windup, cd > W.cd - 30 ? (cd - (W.cd - 30)) / 30 : 0), k = up * up * (3 - 2 * up);
@@ -370,6 +369,7 @@ export class View {
         if (v.turret) { const tf = e.pturret + angDiff(e.turret, e.pturret) * alpha; v.turret.rotation.y = -tf; }
         if (d.weapon && e.done && !sim.teams[e.team]?.low) env.searchlight(e.x, v.g.position.y + 5.5, e.z, this.time * 0.45 + e.id * 1.7 + Math.sin(this.time * 0.31 + e.id) * 0.8);
         if (v.spin && !e.offline) v.spin.rotation.y += dt * 1.2;
+        if (v.jet && d.superPower && e.done) v.jet.visible = !e.superCd || (e.superReady - sim.tick) / e.superCd < 0.7;   // Kinzhal Shelter: the next MiG-31 is towed in part-way through the countdown
         if (d.superPower && e.done && (v.missile || v.missiles)) { // superweapon reload you can watch: 0 = ready, 1 = just fired
           const left = e.superCd ? Math.max(0, Math.min(1, (e.superReady - sim.tick) / e.superCd)) : 0;
           if (v.missile) { v.missile.visible = left < 0.6; v.missile.position.y = -11 * Math.min(1, left / 0.6); }               // the next missile rises out of the shaft as the countdown runs down
@@ -423,6 +423,9 @@ export class View {
           const a = i * 2.399963, cx = p.x + Math.cos(a) * (2 + i * 1.2), cz = p.z + Math.sin(a) * (2 + i * 1.2), m = this.prop(p.id + ':' + i, () => createChute().g, stamp);
           m.position.set(cx + Math.sin(this.time * 1.3 + i) * 0.5, fx.h(cx, cz) + up * (1 + i * 0.04), cz); m.rotation.z = Math.sin(this.time * 1.7 + i * 2) * 0.12; m.rotation.y = i * 1.3;
         }
+      } else if (p.kind === 'shield') { // Sky Shield: the edge of the defended zone on the ground, in its owner's colour, breathing slowly
+        const k = 1 + Math.sin(this.time * 2.5) * 0.012, mat = p.team === PLAYER ? this.ringMat : this.ringMatE, y = fx.h(p.x, p.z) + 0.45;
+        this.ring(ringN++, p.x, y, p.z, p.r * k, p.r * k, this.thinGeo, mat); this.ring(ringN++, p.x, y, p.z, p.r * 0.985, p.r * 0.985, this.thinGeo, mat);
       } else if (p.kind === 'shell') {
         if (p.t > 16) continue;
         const y = fx.h(p.x, p.z) + (p.t - alpha) * 5.5;
@@ -431,6 +434,14 @@ export class View {
         const m = this.prop(p.id, buildBomb, stamp); m.position.set(p.x, fx.h(p.x, p.z) + (p.t - alpha) * 2.8, p.z); m.rotation.z = Math.PI;
       }
     }
+    for (const t of this.takeoffs) { // a MiG-31 leaving the Kinzhal Shelter: a short roll, then a steep climb with reheat
+      t.t += dt; const run = Math.min(t.t, 1.6), d = 6 + 14 * run * run + Math.max(0, t.t - 1.6) * 62, hgt = Math.max(0, t.t - 1.4) ** 2 * 16;
+      if (!(this.reveal || t.team === PLAYER || fog.visAt(PLAYER, t.x, t.z))) continue;
+      const m = this.prop(t.id, () => { const r = createPlane('mig31', sim.teams[t.team].faction, t.team); r.g.userData.rig = r; return r.g; }, stamp), x = t.x + Math.cos(t.a) * d, z = t.z + Math.sin(t.a) * d, y = fx.h(t.x, t.z) + 1.5 + hgt;
+      m.position.set(x, y, z); m.rotation.y = -t.a; m.userData.rig.body.rotation.z = Math.min(0.7, hgt * 0.03);
+      if (fx.rnd() < dt * 60) fx.exhaust(x - Math.cos(t.a) * 4, y, z - Math.sin(t.a) * 4, 1.2);
+    }
+    if (this.takeoffs.length && this.takeoffs[0].t > 4.5) this.takeoffs = this.takeoffs.filter(t => t.t <= 4.5);
     // Particle Cannon: the building itself fires a beam straight up for as long as the orbital beam burns
     if (this.skyBeams.length) {
       for (const b of this.skyBeams) if (fx.rnd() < dt * 30) {

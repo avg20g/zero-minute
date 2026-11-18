@@ -388,8 +388,50 @@ tactics (counters, retreat, focus fire, flanking, power combos) are switched on.
   `node balance/run.mjs --only side,side` runs just those sides' matches.
 - Tests: `node test/batch13.mjs` (107 checks); `test/a10.mjs` is rewritten for the A-10 unit.
 
+## Batch 14 (drop A): play notes, real-looking defenses, Russia built out, two superweapons, new units
+- **Play notes from batch 13**
+  - AH-1Z: no more random darting while it fires (`jink` is gone); the 40% dodge stays. Every aircraft now banks into
+    and out of a turn smoothly (`v.bank` in `js/render/view.js`), and a dodge is one gentle roll.
+  - A-10 cannon: ten bursts of 120 damage in 1.5 s, then empty until the aircraft re-arms. A weapon may carry its own
+    magazine for the sortie: `rounds` on the weapon, `u.rounds` on the unit, refilled on the pad (`js/sim/air.js`).
+  - F-22 and B-2 are stealth (`stealth: 'always'`): hidden unless they have just fired or a detector is near
+    (defense buildings are detectors).
+  - AC-130: guns reach 84 m and it circles 68 m out (it keeps that wide circle after its target dies as well).
+  - Longbow Hellfire 72 m.
+  - Warships: the deck is the hull's own outline (`shipDeck`), so no corner shows through the bow under the gun.
+  - Shahed Launcher: the rack is a fixed mount facing backward (`mounts` with `dir: Math.PI`; a unit with a mount
+    and no turret turns its whole body to bring it to bear). The container tips up on a hinge at the tail, its roof
+    opens in two leaves, and the drones leave from the top over the tail.
+  - Su-27 and J-11: a long, sharp, slightly drooped radome (`radome`, `noseR`, `droop`, `chineFrom`, `foreFrom` in the
+    fighter spec). B-2: rebuilt from its real outline (`SPIRIT.plan`: the double-W trailing edge). T-14: long hull,
+    crew capsule, small unmanned turret set back, bar armour round the engine.
+- **Defense buildings are the real systems** (`js/render/models.js`): Patriot M903 launcher with its radar set,
+  LD-2000 gun (Gatling Tower), a Stinger pit with two fighters, Pantsir-S1 on its truck, IRIS-T SLM launcher with its
+  radar mast. Names, prices and behaviour are unchanged; Russia and Europe no longer borrow other factions' models.
+- **Russia built out**: Spetsnaz Team (cloaked when still, spots cloaked units, a demolition charge for buildings),
+  BTR-82A (fast, swims, carries one squad; the scout), 2S19 Msta-S (84 m artillery), Su-25 Frogfoot (rockets and a
+  short cannon burst, ground targets), Mi-8 (carries two squads). **Reactive Armour** (`era` on T-90, T-14, TOS-1A):
+  the first rocket or missile to hit every 15 s does half damage. BMP-3 and BTR-82A swim (`swims`).
+- **Troop carriers**: any unit with `transport: { squads, vehicles }` carries passengers by the Landing Craft rules
+  (`isTransport`, `canRide`, `roomFor`); right-click it to board, Unload to get out. New: BTR-82A, M2A3 Bradley,
+  ZBD-04A, Boxer (one squad each), Mi-8 and NH90 (two squads). Passengers are lost with the vehicle.
+- **Superweapons**
+  - Russia, **Kinzhal Strike** (`u_kinzhal`): three hypersonic missiles 3 s after launch, each on one of the three
+    most valuable buildings in a 30 m zone (1,900 damage, 4 m blast: a War Factory is left with 100 health, an army
+    is barely touched). A MiG-31 is seen leaving the shelter. The Iskander Strike is now a Rank 5 promotion power.
+  - Europe, **Sky Shield** (`e_shield`): for 40 s a 70 m zone is defended. Guided weapons, rockets and lobbed shells
+    entering it are shot down, an interceptor hits one enemy aircraft or drone every 0.4 s, and each warhead of an
+    enemy superweapon (or off-map bomber) has a 75% chance of being stopped. Flat-firing tank guns, bullets and beams
+    are not stopped. The AI raises it over its base when it hears the enemy's launch klaxon (`sim.lastSuper`).
+- **Two new units for the other factions**: United States M142 HIMARS (six rockets to 96 m) and M2A3 Bradley; China
+  PGZ-09 (mobile anti-aircraft) and ZBD-04A; ISIS Captured T-55 and Mortar Team; Europe Boxer and NH90.
+- Tests: `node test/batch14.mjs` (71 checks).
+
 ## Tests
 Node (simulation only):
+
+    node test/batch14.mjs     batch 13 play notes, defense models, Russia's new units and Reactive Armour, troop
+                              carriers, Kinzhal Strike, Sky Shield, the eight other new units
 
     node test/batch13.mjs     US aircraft as units, Strategic Airfield, Longbow, AH-1Z, new promotions, Quad Cannon,
                               Shahed Launcher, tunnels, the AI's swarm and airfields, team marks, detailed figures

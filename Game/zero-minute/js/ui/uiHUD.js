@@ -131,7 +131,7 @@ export class Hud {
         case 'upgrade': if (e.team === PLAYER) this.toast(UPGRADES[e.id].name + ' researched'); break;
         case 'addon': if (e.team === PLAYER) this.toast(UNITS.r_overlord.hardpoints[e.type].name + ' fitted'); break;
         case 'dockEmpty': if (fog.exp[PLAYER][sim.nav.cellOf(e.x, e.z)]) this.toast('Supply Dock depleted. Collectors will move to another dock.', 'warn'); break;
-        case 'garrison': if (e.team === PLAYER) { const c = this.sim.byId.get(e.id); this.toast(c && isTransport(c) ? 'Aboard. Take the Landing Craft to a beach, then select it and use Unload.' : 'Squad garrisoned. Select the building and press U to take it out.'); } break;
+        case 'garrison': if (e.team === PLAYER) { const c = this.sim.byId.get(e.id); this.toast(c && isTransport(c) ? (UNITS[c.type].ship ? 'Aboard. Take the Landing Craft to a beach, then select it and use Unload.' : 'Aboard the ' + UNITS[c.type].name + '. Select it and use Unload to get out.') : 'Squad garrisoned. Select the building and press U to take it out.'); } break;
         case 'hit': {
           const t = sim.byId.get(e.id);
           if (t && this.shows(t)) this.float(e.x, e.z, 3.5, ZONE_NAME[e.zone] + ' HIT ×' + ZONE_MULT[e.zone], e.zone === 2 ? '#ff5a4d' : '#f2a93b');
@@ -148,7 +148,7 @@ export class Hud {
         case 'salvage': if (e.team === PLAYER) this.float(e.x, e.z, 3.5, 'SALVAGE TIER ' + e.tier, '#f2a93b'); break;
         case 'capture': if (e.team === PLAYER) this.toast(BLDGS[e.type].name + ' captured'); else if (fog.visAt(PLAYER, e.x, e.z) || fog.exp[PLAYER][sim.nav.cellOf(e.x, e.z)] && sim.byId.get(e.id)?.capXp[PLAYER]) this.toast('The enemy took an Oil Derrick', 'bad'); break;
         case 'sabotage': if (e.team === PLAYER) this.toast('Saboteur: ' + e.text); else if (e.victim === PLAYER) { this.toast('Enemy saboteur hit us: ' + e.text, 'bad'); this.alert(e.x, e.z); } break;
-        case 'power': if (e.team === PLAYER) this.toast(POWERS[e.id].name + ' inbound'); break; // enemy strikes are not announced: you see them only where you have vision
+        case 'power': if (e.team === PLAYER) this.toast(POWERS[e.id].name + (POWERS[e.id].shield ? ' raised' : ' inbound')); break; // enemy strikes are not announced: you see them only where you have vision
         case 'cleared': if (fog.visAt(PLAYER, e.x, e.z)) this.float(e.x, e.z, 9, 'GARRISON CLEARED', '#f2a93b'); break;
         case 'tunnel': break;
       }
@@ -283,7 +283,7 @@ export class Hud {
       if (dep.length) out.push({ act: 'deploy', icon: ICON.income, name: dep.every(u => u.deployed) ? 'Pack up' : 'Deploy hack', key: '+$6/s', on: dep.every(u => u.deployed) });
       const ov = units.filter(u => UNITS[u.type].hardpoints && !u.addon && !u.addonQ);
       if (ov.length) for (const [k, hp] of Object.entries(UNITS[ov[0].type].hardpoints)) out.push({ act: 'addon:' + k, icon: k === 'gatling' ? ICON.defense : ICON.barracks, name: hp.name, cost: hp.cost, why: T.money < hp.cost ? 'Insufficient funds' : '' });
-      if (units.some(u => u.garrison && u.garrison.length)) out.push({ act: 'evac', icon: ICON.evac, name: units.some(u => isTransport(u)) ? 'Unload at the beach' : 'Unload bunker', key: 'U', tip: units.some(u => isTransport(u)) ? 'Everything aboard gets out onto the nearest shore. The craft must be at a beach.' : '' });
+      if (units.some(u => u.garrison && u.garrison.length)) out.push({ act: 'evac', icon: ICON.evac, name: units.some(u => isTransport(u)) ? (units.some(u => UNITS[u.type].ship) ? 'Unload at the beach' : 'Unload') : 'Unload bunker', key: 'U', tip: units.some(u => isTransport(u)) ? (units.some(u => UNITS[u.type].ship) ? 'Everything aboard gets out onto the nearest shore. The craft must be at a beach.' : 'Everyone aboard gets out beside the vehicle (a helicopter sets them down on the ground below).') : '' });
     } else if (bldgs.length) {
       // a civilian building you hold counts as yours while the garrison is inside: this is where its exit buttons go
       for (const id of this.ui.selection) { const e = sim.byId.get(id); if (e && e.type === 'civ' && e.team === PLAYER && e.garrison.length) { out.push({ act: 'evac', icon: ICON.evac, name: 'Evacuate all', key: 'U', tip: 'Every squad leaves the building. Or right-click the ground to send them straight there.' }); out.push({ act: 'evac1', icon: ICON.evac, name: 'Take out one squad', key: 'Shift+U', tip: 'Only the last squad that went in comes out.' }); break; } }
@@ -333,7 +333,7 @@ export class Hud {
       if (d.based) out.push({ parked: e.ammo < d.ammo ? 'Rearming' : 'Ready on pad', out: 'On sortie', return: 'Returning to base' }[e.as] + ' · ' + e.ammo + '/' + d.ammo + ' missiles');
       if (e.addonQ) out.push('Fitting ' + d.hardpoints[e.addonQ.type].name + ' ' + Math.floor(e.addonQ.t / (d.hardpoints[e.addonQ.type].secs * 20) * 100) + '%');
       else if (e.addon) out.push(d.hardpoints[e.addon].name + (e.garrison ? ' ' + e.garrison.length + '/' + capacityOf(e) : ''));
-      if (d.transport) out.push(e.garrison.length ? 'Aboard: ' + e.garrison.length + (e.garrison.some(id => { const g = sim.byId.get(id); return g && !UNITS[g.type].infantry; }) ? ' vehicle' : ' of ' + d.transport.squads + ' squads') : 'Empty: right-click it with up to ' + d.transport.squads + ' infantry squads or one vehicle');
+      if (d.transport) out.push(e.garrison.length ? 'Aboard: ' + e.garrison.length + (e.garrison.some(id => { const g = sim.byId.get(id); return g && !UNITS[g.type].infantry; }) ? ' vehicle' : ' of ' + d.transport.squads + (d.transport.squads === 1 ? ' squad' : ' squads')) : 'Empty: right-click it with ' + (d.transport.squads === 1 ? 'an infantry squad' : 'up to ' + d.transport.squads + ' infantry squads') + (d.transport.vehicles ? ' or one vehicle' : ''));
       if (d.ship && !d.beach) out.push('Keeps off the shore');
       if (d.deploy) out.push(e.deployed ? 'Hacking: +$' + d.deploy.income + '/s' : 'Deploy to earn cash');
       if (e.order && e.order.t === 'capture' && e.capT) out.push('Capturing ' + Math.floor(e.capT / 100 * 100) + '%');

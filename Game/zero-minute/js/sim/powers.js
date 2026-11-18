@@ -7,7 +7,7 @@
 //   3. Whether the other side sees a strike is decided by strikeVisible().
 import { N, CELL, WORLD } from './defs.js';
 import { FACTIONS, POWERS, UNITS, BLDGS, WEAPONS, generalOf, nodePower } from './factionRegistry.js';
-import { strikeDamage, kill, makeUnit, makeBldg, freeSpot, canPlace, spawnNear } from './entities.js';
+import { strikeDamage, applyDamage, kill, makeUnit, makeBldg, freeSpot, canPlace, spawnNear } from './entities.js';
 import { addHazard } from './abilities.js';
 import { stepAirliner } from './heroes.js';
 
@@ -104,7 +104,7 @@ export function usePower(sim, team, id, x, z) {
   sim.events.push({ t: 'power', id, team, x, z });
   // Using a power lights up its target area for that team: you see what you hit (and what you missed).
   sim.reveals.push({ team, x, z, r: Math.max(P.radius, (P.line || 0) / 2, P.beam ? P.beam.sweep : 0) + REVEAL_PAD, until: sim.tick + (P.reveal || REVEAL_SECS) * 20 });
-  if (P.super) sim.events.push({ t: 'superlaunch', id, team, bid: from.id, bx: from.x, bz: from.z });   // public warning: both sides hear the klaxon, nobody is told where it will land
+  if (P.super) { sim.events.push({ t: 'superlaunch', id, team, bid: from.id, bx: from.x, bz: from.z }); if (!P.shield) sim.lastSuper[team] = sim.tick; }   // lastSuper: when each side last launched one (the klaxon is public, so the AI may act on it)   // public warning: both sides hear the klaxon, nobody is told where it will land
   const n0 = sim.strikes.length;
   switch (P.as || id) {   // a newer faction's power may reuse the strike of an older one (`as`), with its own numbers
     case 'paradrop': plane(sim, team, 'c130', 'paradrop', x, z); break;
@@ -117,13 +117,21 @@ export function usePower(sim, team, id, x, z) {
     }
     case 'sneaktunnel': sim.strikes.push({ id: sim.nextId++, kind: 'sneak', team, x, z, px: x, pz: z, t: P.delay * 20, dead: false }); break;
     case 'nuke': sim.strikes.push({ id: sim.nextId++, kind: 'nuke', team, x, z, px: x, pz: z, sx: from.x, sz: from.z, t: P.flight, T: P.flight, dead: false }); break;   // sx, sz: the silo it rises from
-    case 'scud':
+    case 'scud': {
+      const src = from || baseOf(sim, team) || { x, z };   // a superweapon fires from its building; the Iskander promotion power from the Command Center
       for (let i = 0; i < P.n; i++) {
         const a = sim.rand() * 6.2831853, r = i ? Math.sqrt(sim.rand()) * (P.radius - 6) : 0;
         sim.strikes.push({ id: sim.nextId++, kind: 'scud', team, x: x + Math.cos(a) * r, z: z + Math.sin(a) * r, px: 0, pz: 0, t: 70 + i * 9, T: 70 + i * 9, dead: false,
-          sx: from.x + (i % 3 - 1) * 2.6, sz: from.z + (((i / 3) | 0) - 1) * 2.6, i, lift: i * SCUD_GAP });   // rail i of the launcher, and the tick after firing at which it leaves
+          sx: src.x + (i % 3 - 1) * 2.6, sz: src.z + (((i / 3) | 0) - 1) * 2.6, i, lift: i * SCUD_GAP });   // rail i of the launcher, and the tick after firing at which it leaves
       }
       break;
+    }
+    case 'kinzhal': { // each missile takes one of the costliest buildings standing in the zone; any left over fall round the aim point
+      const tg = sim.ents.filter(e => e.kind === 'bldg' && !e.dead && !e.ruined && e.team !== team && e.team < 2 && Math.hypot(e.x - x, e.z - z) <= P.radius).sort((a, b) => (BLDGS[b.type].cost || 0) - (BLDGS[a.type].cost || 0) || a.id - b.id);
+      for (let i = 0; i < P.n; i++) { const b = tg[i], a = i * 2.0944, px = b ? b.x : x + (i ? Math.cos(a) * 8 : 0), pz = b ? b.z : z + (i ? Math.sin(a) * 8 : 0); sim.strikes.push({ id: sim.nextId++, kind: 'kinzhal', team, x: px, z: pz, px, pz, sx: from.x, sz: from.z, t: P.flight + i * 4, T: P.flight + i * 4, dead: false }); }
+      break;
+    }
+    case 'skyshield': sim.strikes.push({ id: sim.nextId++, kind: 'shield', team, x, z, px: x, pz: z, r: P.radius, t: P.secs * 20, T: P.secs * 20, bx: from.x, bz: from.z, dead: false }); break;
     case 'particle': { const [dx, dz] = approach(sim, team, x, z); sim.strikes.push({ id: sim.nextId++, kind: 'pbeam', team, x, z, px: x, pz: z, sx: x, sz: z, dx, dz, n: 0, bx: from.x, bz: from.z, dead: false }); break; }
     case 'tomahawk': sim.strikes.push({ id: sim.nextId++, kind: 'cruise', team, x, z, px: x, pz: z, t: P.flight, T: P.flight, dead: false }); break;   // one cruise missile: it arrives after its flight time
     case 'fab': plane(sim, team, P.plane || 'h6', 'fab', x, z); break;   // China's Fuel-Air Bomb comes from an H-6 bomber
@@ -142,6 +150,21 @@ export function usePower(sim, team, id, x, z) {
   return true;
 }
 
+function baseOf(sim, team) { for (const e of sim.ents) if (e.kind === 'bldg' && e.team === team && !e.dead && BLDGS[e.type].role === 'cc') return e; return null; }
+// Sky Shield. `shieldOver`: an enemy shield whose zone covers (x, z), if any.
+const STOPPABLE = { cruise: 1, nuke: 1, scud: 1, kinzhal: 1, shell: 1, bomb: 1, carpet: 1, bomblet: 1 };
+function shieldOver(sim, team, x, z) { for (const q of sim.strikes) if (q.kind === 'shield' && !q.dead && q.team !== team && Math.hypot(q.x - x, q.z - z) <= q.r) return q; return null; }
+function stepShield(sim, sh) {
+  const P = POWERS[sh.pid] || POWERS.skyshield;
+  for (const p of sim.projs) { // guided weapons, rockets and lobbed shells entering the zone are knocked down; flat-fire tank shells, bullets and beams are not
+    if (p.dead || p.team === sh.team || Math.hypot(p.x - sh.x, p.z - sh.z) > sh.r) continue; const W = WEAPONS[p.w];
+    if (W.intercept || p.kind === 'lob') { p.dead = true; sim.events.push({ t: 'intercept', x: p.x, z: p.z, team: sh.team, bx: sh.bx, bz: sh.bz, air: true }); }
+  }
+  if (sh.t % P.every === 0) { // one interceptor at a time for aircraft and drones: the nearest to the middle first
+    let best = null, bd = 1e9; for (const e of sim.ents) { if (e.kind !== 'unit' || e.dead || !e.air || e.landed || e.team === sh.team) continue; const d = Math.hypot(e.x - sh.x, e.z - sh.z); if (d <= sh.r && d < bd) { bd = d; best = e; } }
+    if (best) { sim.events.push({ t: 'intercept', x: best.x, z: best.z, team: sh.team, bx: sh.bx, bz: sh.bz, air: true, unit: true }); applyDamage(sim, best, P.air, 'interceptor', sh.bx, sh.bz, { team: sh.team }); }
+  }
+}
 function detonate(sim, p, x, z) {
   const src = { team: p.team };
   if (p.payload === 'fab') {
@@ -165,14 +188,18 @@ export function stepPowers(sim) {
         sim.strikes.push({ id: sim.nextId++, kind: p.payload === 'paradrop' ? 'para' : p.payload === 'carpet' ? 'carpet' : 'bomb', pid: p.pid, dx: p.dx, dz: p.dz, payload: p.payload, team: p.team, x: p.tx, z: p.tz, px: p.tx, pz: p.tz, t: p.payload === 'paradrop' ? 60 : 12, dead: false });
       }
       if (p.s > 260) p.dead = true;
+      if (!p.dead && !p.shieldRoll) { const sh = shieldOver(sim, p.team, p.x, p.z); if (sh) { p.shieldRoll = true; if (sim.rand() < (POWERS[sh.pid] || POWERS.skyshield).stop) { p.dead = true; sim.events.push({ t: 'intercept', x: p.x, z: p.z, team: sh.team, bx: sh.bx, bz: sh.bz, air: true, big: true }); } } }   // an off-map aircraft flying into a Sky Shield: one roll
     } else if (p.kind === 'airliner') { stepAirliner(sim, p);
     } else if (p.kind === 'pbeam') { // the beam walks along its line, burning whatever it crosses
       const B = (POWERS[p.pid] || POWERS.particle).beam, u = p.n / B.ticks;
       p.x = Math.min(WORLD - 3, Math.max(3, p.sx + p.dx * B.sweep * (u - 0.5))); p.z = Math.min(WORLD - 3, Math.max(3, p.sz + p.dz * B.sweep * (u - 0.5)));
       if (p.n % B.every === 0) { strikeDamage(sim, p.x, p.z, B.r, B.dmg, 'particle', { team: p.team }); sim.events.push({ t: 'pbeam', x: p.x, z: p.z, team: p.team, k: p.n, bx: p.bx, bz: p.bz }); }
       if (++p.n >= B.ticks) p.dead = true;
+    } else if (p.kind === 'shield') { stepShield(sim, p); if (--p.t <= 0) p.dead = true;
     } else if (--p.t <= 0) {
       p.dead = true;
+      if (STOPPABLE[p.kind]) { const sh = shieldOver(sim, p.team, p.x, p.z); if (sh && sim.rand() < (POWERS[sh.pid] || POWERS.skyshield).stop) { sim.events.push({ t: 'intercept', x: p.x, z: p.z, team: sh.team, bx: sh.bx, bz: sh.bz, big: p.kind !== 'bomblet' && p.kind !== 'shell' }); continue; } }   // a warhead coming down inside a Sky Shield is usually stopped
+      if (p.kind === 'kinzhal') { const P = POWERS[p.pid] || POWERS.kinzhal; strikeDamage(sim, p.x, p.z, P.r, P.dmg, 'kinzhal', { team: p.team }); sim.events.push({ t: 'kinzhal', x: p.x, z: p.z, r: P.r, team: p.team }); continue; }
       if (p.kind === 'cruise') { const P = POWERS[p.pid] || POWERS.tomahawk; strikeDamage(sim, p.x, p.z, P.radius, P.dmg, 'cruise', { team: p.team }); sim.events.push({ t: 'scudhit', x: p.x, z: p.z, r: P.radius, team: p.team, fire: true, big: true }); }
       else if (p.kind === 'nuke') {
         const P = POWERS.nuke;

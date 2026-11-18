@@ -235,6 +235,8 @@ function weapon(m, kind) {
       P(M.dark, 0.1, 0.04, 0.035, 0.02, 0.055); P(M.gun, 0.05, 0.15, 0.03, 0.05, -0.105, 0, 0.15); P(M.gun, 0.04, 0.09, 0.03, -0.07, -0.075, 0, -0.2); tube(M.gun, 0.014, 0.16, -0.2, 0.005); P(M.gun, 0.05, 0.11, 0.035, -0.28, -0.015); break;
     case 'm4s': // the same carbine with a suppressor
       weapon(m, 'm4'); tube(M.dark, 0.022, 0.2, 0.6, 0.005); break;
+    case 'aks': // suppressed assault rifle (AS Val): the AK shape with a fat suppressor for a barrel
+      weapon(m, 'ak'); tube(M.dark, 0.026, 0.3, 0.42, 0.0); break;
     case 'm203': // carbine with a grenade launcher under the barrel
       weapon(m, 'm4'); tube(M.gun, 0.028, 0.24, 0.26, -0.045); break;
     case 'qbz': // QBZ-95: a bullpup. Magazine behind the grip, long carrying handle over the top, short barrel
@@ -257,7 +259,7 @@ function weapon(m, kind) {
   return g;
 }
 function man(parent, T, x, z, o) {
-  const m = grp(parent, x, 0, z), cloth = o.cloth || M.khaki, trousers = o.legs || cloth, boots = o.boots || M.black, skin = o.skin || M.skin, pose = o.pose || (o.gun === 'rpg' ? 'shoulder' : o.gun === 'laptop' || o.gun === 'milan' ? 'type' : o.gun === 'tool' || o.gun === 'satchel' || o.gun === 'none' ? 'down' : 'rifle');
+  const m = grp(parent, x, 0, z), cloth = o.cloth || M.khaki, trousers = o.legs || cloth, boots = o.boots || M.black, skin = o.skin || M.skin, pose = o.pose || (o.gun === 'rpg' ? 'shoulder' : o.gun === 'laptop' || o.gun === 'milan' || o.gun === 'mortar' ? 'type' : o.gun === 'tool' || o.gun === 'satchel' || o.gun === 'none' ? 'down' : 'rifle');
   m.userData.legs = [-1, 1].map(s => leg(m, s, trousers, boots, o));
   box(m, trousers, 0.2, 0.14, 0.3, 0, 0.78, 0); box(m, o.belt || M.dark, 0.215, 0.05, 0.31, 0, 0.865, 0);          // hips, belt
   box(m, cloth, 0.2, 0.4, 0.33, 0, 1.07, 0); box(m, cloth, 0.18, 0.1, 0.44, 0, 1.24, 0);                            // torso, shoulders
@@ -279,6 +281,11 @@ function man(parent, T, x, z, o) {
     case 'laptop': box(m, M.dark, 0.3, 0.025, 0.36, 0.36, 1.03, 0); box(m, M.laser, 0.025, 0.24, 0.34, 0.5, 1.15, 0).rotation.z = -0.25; cyl(m, M.gun, 0.008, 0.5, -0.2, 1.45, 0.1); break;   // open laptop on his forearms, aerial on the pack
     case 'tool': box(m, M.red, 0.3, 0.17, 0.14, 0.04, 0.62, 0.235); box(m, M.gun, 0.16, 0.025, 0.03, 0.04, 0.72, 0.235); cyl(m, M.wood, 0.018, 0.9, -0.14, 1.1, 0, 'y', G.cyl8).rotation.x = 0.5; box(m, M.steel, 0.02, 0.2, 0.16, -0.14, 1.52, -0.22).rotation.x = 0.5; break;   // toolbox in hand, shovel across his back
     case 'satchel': box(m, M.olive, 0.16, 0.24, 0.26, 0.03, 0.6, 0.235); box(m, M.olive, 0.03, 0.14, 0.03, 0.03, 0.76, 0.235); box(m, M.olive, 0.16, 0.26, 0.28, -0.19, 1.05, 0); cyl(m, M.gun, 0.012, 0.1, -0.19, 1.22, 0.08); break;   // a satchel charge in hand and another on his back
+    case 'mortar': { // 82 mm mortar in front of the gunner: tube on a round baseplate, steadied by a two-legged stand; a shell in his hands
+      cyl(m, M.gun, 0.22, 0.04, 0.5, 0.03, 0); const tube = cyl(m, M.olive, 0.055, 1.05, 0.66, 0.5, 0, 'y', G.cyl8); tube.rotation.z = -0.38; cyl(m, M.gun, 0.065, 0.06, 0.85, 0.98, 0, 'y', G.cyl8).rotation.z = -0.38;
+      for (const sz of [-1, 1]) { const l = cyl(m, M.gun, 0.016, 0.8, 0.9, 0.38, sz * 0.16, 'y', G.cyl8); l.rotation.x = sz * 0.36; l.rotation.z = 0.2; }
+      cyl(m, M.olive, 0.04, 0.2, 0.3, 1.02, 0, 'y', G.cyl8); add(m, G.cone, M.gun, 0.04, 0.1, 0.04, 0.3, 1.17, 0);
+      break; }
     case 'milan': { // MILAN on its tripod in front of the gunner: launch tube, the sight unit on its left, three splayed legs
       for (const a of [0, 2.1, 4.2]) { const l = cyl(m, M.gun, 0.02, 0.92, 0.62 + Math.cos(a) * 0.17, 0.44, Math.sin(a) * 0.17, 'y', G.cyl8); l.rotation.z = Math.cos(a) * 0.36; l.rotation.x = -Math.sin(a) * 0.36; }
       cyl(m, M.olive, 0.085, 1.1, 0.66, 0.96, 0, 'x'); cyl(m, M.gun, 0.1, 0.06, 1.22, 0.96, 0, 'x'); box(m, M.dark, 0.22, 0.2, 0.15, 0.48, 1.04, 0.17); cyl(m, M.gun, 0.03, 0.08, 0.6, 1.04, 0.17, 'x', G.cyl8);
@@ -454,33 +461,94 @@ function airfield(T, d) {
   cyl(g, M.steel, 0.06, 2.4, SW / 2 - 1.4, 1.5, -1.2); box(g, M.red, 1.0, 0.45, 0.05, SW / 2 - 0.8, 2.5, -1.2);     // windsock
   return { g, spin, top: Math.max(9, H + rise + 2) };
 }
+// ---------------- defense sites: each is the real system, emplaced ----------------
+// The part that turns to face a target is `turret`; `spin` is a search radar that turns all the time.
+// Patriot (US): the M903 launching station: four missile canisters in a square, raised about 38 degrees on a trailer
+// with outriggers; beside it the flat-faced phased-array radar on its own trailer, and a generator.
 function patriot(T) {
   const g = new THREE.Group();
-  cyl(g, M.slab, 3.7, 0.5, 0, 0.2, 0, 'y', G.cyl8); cyl(g, T.wall, 1.5, 1.3, 0, 1.05, 0, 'y', G.cyl8);
-  for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + 0.78; add(g, G.sph, M.sandbag, 0.9, 0.42, 0.5, Math.cos(a) * 2.8, 0.75, Math.sin(a) * 2.8).rotation.y = -a + 1.57; }
-  const t = grp(g, 0, 1.75, 0);
-  cyl(t, M.steel, 0.9, 0.3, 0, 0.1, 0);
-  const arm = grp(t, 0, 0.9, 0); arm.rotation.z = 0.45;
-  box(arm, T.hull, 3.0, 1.25, 2.3, 0.2, 0, 0); box(arm, T.accent, 3.02, 0.2, 2.32, 0.2, 0.66, 0);
-  for (const y of [-0.3, 0.3]) for (const z of [-0.58, 0.58]) cyl(arm, M.gun, 0.24, 0.12, 1.74, y, z, 'x');
-  box(t, M.gun, 0.5, 0.9, 0.5, -1.1, 0.5, 0); add(t, G.dome, M.white, 0.5, 0.5, 0.5, -1.1, 1.0, 0);
-  return { g, turret: t, muzzle: 2.2, muzzleY: 3.4 };
+  cyl(g, M.slab, 3.8, 0.3, 0, 0.1, 0, 'y', G.cyl8);
+  const tr = grp(g, 0.2, 0, 0.2); box(tr, M.dark, 4.4, 0.3, 2.0, 0, 0.55, 0); wheels(tr, [-1.2, -0.3], 1.0, 0.36, 0.3);                    // launcher trailer
+  for (const [x, z] of [[2.1, 1.5], [2.1, -1.1], [-1.7, 1.5], [-1.7, -1.1]]) { box(g, M.steel, 0.14, 0.14, 0.9, x, 0.5, z + (z > 0 ? -0.2 : 0.2)); cyl(g, M.steel, 0.2, 0.3, x, 0.3, z); }   // outriggers and jacks
+  const t = grp(g, 0.2, 0.75, 0.2); cyl(t, M.steel, 0.9, 0.18, 0, 0.05, 0);
+  const arm = grp(t, -0.6, 0.35, 0); arm.rotation.z = 0.66;
+  box(arm, M.gun, 3.4, 0.14, 1.9, 1.5, 0, 0);                                                                                           // launcher frame
+  for (const y of [0.5, 1.42]) for (const z of [-0.47, 0.47]) { box(arm, T.hull, 3.5, 0.86, 0.88, 1.55, y, z); box(arm, M.dark, 0.05, 0.7, 0.72, 3.31, y, z); box(arm, M.dark, 0.06, 0.9, 0.92, 0.6, y, z); box(arm, M.dark, 0.06, 0.9, 0.92, 2.5, y, z); }   // four canisters with their end caps and bands
+  box(arm, T.accent, 0.5, 1.82, 0.05, 1.5, 0.96, 0.94); box(arm, T.accent, 0.5, 1.82, 0.05, 1.5, 0.96, -0.94);
+  box(t, M.gun, 0.8, 0.9, 1.2, -1.3, 0.55, 0);                                                                                           // power and electronics unit behind the canisters
+  const r = grp(g, -2.3, 0.3, -2.4); r.rotation.y = 0.5;                                                                                 // radar set
+  box(r, M.dark, 2.4, 0.3, 1.5, 0, 0.35, 0); wheels(r, [-0.6, 0.3], 0.75, 0.3, 0.25); box(r, T.hull, 1.2, 0.9, 1.4, -0.5, 0.95, 0);
+  const face = box(r, T.hull, 0.22, 2.0, 1.7, 0.55, 1.5, 0); face.rotation.z = -0.3; box(r, M.dark, 0.05, 1.5, 1.3, 0.7, 1.55, 0).rotation.z = -0.3; cyl(r, M.dark, 0.2, 0.06, 0.62, 0.72, 0.5, 'x'); cyl(r, M.dark, 0.2, 0.06, 0.62, 0.72, -0.5, 'x');
+  box(g, T.dark, 1.5, 1.1, 1.0, 2.5, 0.85, -2.6); box(g, M.gun, 0.3, 0.5, 0.3, 2.5, 1.6, -2.6); cyl(g, M.gun, 0.04, 3.0, 3.0, 1.8, -2.2);       // generator and its mast
+  return { g, turret: t, muzzle: 2.6, muzzleY: 3.3 };
 }
+// Gatling Tower (China): the LD-2000 close-in gun: a seven-barrel 30 mm rotary cannon in an enclosed mount with
+// its ammunition drums, a tracking dish and an optical head on top, set on a concrete base; the search radar turns
+// on its own mast beside it.
 function gatling(T) {
   const g = new THREE.Group();
-  cyl(g, M.slab, 3.6, 0.5, 0, 0.2, 0, 'y', G.cyl8); add(g, G.tower, T.wall, 1.9, 4.2, 1.9, 0, 2.5, 0); cyl(g, T.roof, 1.6, 0.3, 0, 4.7, 0); box(g, T.accent, 2.9, 0.3, 2.9, 0, 3.9, 0);
-  const t = grp(g, 0, 4.9, 0); box(t, T.dark, 1.6, 0.9, 1.6, 0, 0.45, 0);
-  for (const s of [-1, 1]) { cyl(t, M.gun, 0.2, 2.4, 1.6, 0.5, s * 0.45, 'x'); cyl(t, M.steel, 0.25, 0.3, 2.7, 0.5, s * 0.45, 'x'); }
-  return { g, turret: t, muzzle: 2.9, muzzleY: 5.4, top: 7 };
+  cyl(g, M.slab, 3.6, 0.5, 0, 0.2, 0, 'y', G.cyl8); cyl(g, M.concrete, 2.3, 2.6, 0, 1.7, 0, 'y', G.cyl8); cyl(g, T.roof, 2.45, 0.2, 0, 3.05, 0, 'y', G.cyl8); box(g, T.accent, 3.3, 0.3, 3.3, 0, 2.6, 0);
+  for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; add(g, G.sph, M.sandbag, 0.8, 0.4, 0.45, Math.cos(a) * 3.0, 0.62, Math.sin(a) * 3.0).rotation.y = -a + 1.57; }
+  const t = grp(g, 0, 3.15, 0); cyl(t, M.steel, 1.1, 0.2, 0, 0.1, 0);
+  box(t, T.hull, 1.5, 1.3, 1.2, -0.2, 0.9, 0); box(t, T.dark, 1.1, 0.5, 1.22, -0.3, 1.7, 0);                                              // gun house
+  for (const s of [-1, 1]) { cyl(t, T.dark, 0.5, 0.5, -0.1, 0.8, s * 0.85, 'z'); box(t, M.gun, 0.5, 0.1, 0.3, 0.3, 1.05, s * 0.75); }       // ammunition drums and feed chutes
+  const gun = grp(t, 0.55, 1.0, 0); cyl(gun, M.gun, 0.26, 0.5, 0, 0, 0, 'x');
+  for (let i = 0; i < 7; i++) { const a = i * Math.PI * 2 / 7; cyl(gun, M.gun, 0.045, 2.5, 1.35, Math.cos(a) * 0.13, Math.sin(a) * 0.13, 'x', G.cyl8); }
+  for (const x of [1.0, 1.8, 2.55]) cyl(gun, M.steel, 0.2, 0.06, x, 0, 0, 'x');                                                           // barrel clamps
+  cyl(t, M.steel, 0.07, 0.5, -0.5, 2.1, 0.3); const dish = add(t, G.dome, M.white, 0.55, 0.3, 0.55, -0.42, 2.45, 0.3); dish.rotation.z = -1.57; // tracking dish
+  add(t, G.sph, M.laser, 0.2, 0.2, 0.2, -0.3, 2.15, -0.35); box(t, M.gun, 0.3, 0.3, 0.3, -0.5, 2.1, -0.35);                                 // optical head
+  cyl(g, M.steel, 0.1, 3.4, -2.6, 2.0, -2.6); const spin = grp(g, -2.6, 3.8, -2.6); box(spin, M.steel, 1.9, 0.5, 0.12, 0, 0.3, 0); cyl(spin, M.steel, 0.07, 0.3, 0, 0, 0);
+  return { g, turret: t, spin, muzzle: 3.2, muzzleY: 4.15, top: 6.4 };
 }
+// Stinger Site (ISIS): a sandbagged pit under a camouflage net. Two fighters stand in it, each with a Stinger tube
+// on his shoulder; spare tubes are racked against the wall beside an ammunition crate.
 function stinger(T) {
   const g = new THREE.Group();
   cyl(g, M.slab, 3.6, 0.3, 0, 0.1, 0, 'y', G.cyl8);
   for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5; add(g, G.sph, M.sandbag, 0.85, 0.42, 0.5, Math.cos(a) * 3.0, 0.55, Math.sin(a) * 3.0).rotation.y = -a + 1.57; if (i % 2) add(g, G.sph, M.sandbag, 0.8, 0.38, 0.48, Math.cos(a + 0.3) * 3.0, 1.1, Math.sin(a + 0.3) * 3.0).rotation.y = -a + 1.27; }
-  box(g, M.cloth, 2.6, 0.08, 2.6, -0.6, 2.6, -0.6); for (const [x, z] of [[-1.8, -1.8], [0.6, -1.8], [-1.8, 0.6], [0.6, 0.6]]) cyl(g, M.wood, 0.06, 2.4, x, 1.4, z);
-  const t = grp(g, 0.6, 0.4, 0.6); cyl(t, M.steel, 0.1, 1.4, 0, 0.7, 0);
-  const arm = grp(t, 0, 1.5, 0); arm.rotation.z = 0.4; box(arm, T.dark, 1.8, 0.5, 0.9, 0.2, 0, 0); for (const z of [-0.25, 0.25]) cyl(arm, M.olive, 0.14, 0.2, 1.2, 0, z, 'x'); box(arm, T.accent, 0.3, 0.52, 0.92, -0.6, 0, 0);
-  return { g, turret: t, muzzle: 1.6, muzzleY: 2.4 };
+  box(g, M.ghillie, 3.0, 0.06, 3.0, -1.2, 2.9, -1.2).rotation.z = 0.08; for (const [x, z] of [[-2.6, -2.6], [0.2, -2.6], [-2.6, 0.2], [0.2, 0.2]]) cyl(g, M.wood, 0.06, 2.7, x, 1.5, z);   // camouflage net on four poles
+  for (let i = 0; i < 3; i++) { const tube = cyl(g, M.olive, 0.09, 1.5, -2.1, 1.0, -1.6 + i * 0.3); tube.rotation.x = 0.2; } box(g, M.crateB, 1.0, 0.6, 0.7, -1.9, 0.6, 0.6); box(g, M.crateA, 0.8, 0.5, 0.6, -1.0, 0.55, -2.0);
+  const t = grp(g, 0.7, 0.3, 0.7), o = { ...kit('sandstorm'), gun: 'none', pose: 'shoulder' };
+  for (const z of [-0.45, 0.45]) { const m = man(t, T, z < 0 ? 0.15 : -0.15, z, o); m.scale.setScalar(1.25);
+    cyl(m, M.olive, 0.05, 1.3, 0.15, 1.34, 0.2, 'x', G.cyl8); box(m, M.gun, 0.16, 0.2, 0.05, 0.62, 1.42, 0.2); cyl(m, M.gun, 0.06, 0.12, 0.84, 1.34, 0.2, 'x', G.cyl8); cyl(m, M.gun, 0.035, 0.16, 0.3, 1.24, 0.2); box(m, M.gun, 0.05, 0.12, 0.04, 0.2, 1.24, 0.2); }   // the tube, its folding aerial, the seeker cover, the battery unit and grip
+  return { g, turret: t, muzzle: 1.4, muzzleY: 2.0 };
+}
+// Pantsir Site (Russia): a Pantsir-S1 on its 8x8 truck, jacked up on a pad: twelve missile tubes in two blocks of
+// six, a twin 30 mm gun on each side, the flat tracking radar on the front and the search radar turning on top.
+function pantsir(T) {
+  const g = new THREE.Group();
+  cyl(g, M.slab, 3.8, 0.3, 0, 0.1, 0, 'y', G.cyl8);
+  box(g, M.dark, 6.0, 0.35, 1.7, 0, 0.95, 0); wheels(g, [2.3, 1.2, -1.2, -2.3], 0.95, 0.5, 0.36);                                       // KamAZ chassis
+  box(g, T.hull, 1.5, 1.2, 1.9, 2.4, 1.7, 0); box(g, M.glass, 0.06, 0.5, 1.6, 3.16, 1.9, 0); box(g, T.dark, 3.6, 0.9, 1.9, -0.9, 1.55, 0);     // cab, equipment body
+  for (const [x, z] of [[0.4, 1.4], [0.4, -1.4], [-2.6, 1.4], [-2.6, -1.4]]) { box(g, M.steel, 0.14, 0.14, 0.6, x, 0.9, z * 0.8); cyl(g, M.steel, 0.17, 0.7, x, 0.55, z); }
+  const t = grp(g, -0.9, 2.0, 0); cyl(t, M.steel, 0.95, 0.2, 0, 0.1, 0);
+  box(t, T.hull, 1.5, 1.3, 1.3, 0, 0.85, 0); box(t, T.accent, 1.52, 0.2, 1.32, 0, 0.4, 0);                                                 // turret body
+  box(t, M.dark, 0.1, 0.9, 0.9, 0.82, 1.0, 0).rotation.z = -0.15;                                                                          // tracking radar face
+  for (const s of [-1, 1]) {
+    const blk = grp(t, 0.1, 1.15, s * 1.05); blk.rotation.z = 0.5;
+    for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) cyl(blk, T.dark, 0.11, 2.2, 0.5, r * 0.26, (c - 1) * 0.25 * 1, 'x', G.cyl8);     // six tubes a side
+    box(blk, M.gun, 0.3, 0.6, 0.85, -0.3, 0.13, 0);
+    for (const dz of [-0.07, 0.07]) cyl(t, M.gun, 0.035, 2.0, 1.1, 0.62, s * (0.72 + dz), 'x', G.cyl8); box(t, M.gun, 0.6, 0.26, 0.26, 0.2, 0.62, s * 0.72);   // twin 30 mm
+  }
+  const spin = grp(t, -0.3, 1.6, 0); cyl(spin, M.steel, 0.08, 0.5, 0, 0.25, 0); box(spin, M.steel, 0.14, 0.6, 1.6, 0, 0.75, 0);                 // search radar
+  return { g, turret: t, spin, muzzle: 2.3, muzzleY: 3.3, top: 5.6 };
+}
+// IRIS-T Battery (Europe): the IRIS-T SLM launcher on its 8x8 truck: eight missile canisters in two rows of four,
+// raised steeply at the back; the radar on its mast stands beside it and turns all the time.
+function irist(T) {
+  const g = new THREE.Group();
+  cyl(g, M.slab, 3.8, 0.3, 0, 0.1, 0, 'y', G.cyl8);
+  const tr = grp(g, 0, 0, 0.6);                                                                                                         // MAN truck, parked off-centre
+  box(tr, M.dark, 6.2, 0.35, 1.7, 0.3, 0.95, 0); wheels(tr, [2.6, 1.5, -0.9, -2.0], 0.95, 0.5, 0.36);
+  box(tr, T.hull, 1.6, 1.3, 1.9, 2.7, 1.75, 0); box(tr, M.glass, 0.06, 0.55, 1.6, 3.52, 1.95, 0); box(tr, T.dark, 1.4, 0.9, 1.8, 1.0, 1.55, 0);
+  const t = grp(g, -1.1, 1.15, 0.6); cyl(t, M.steel, 0.95, 0.16, 0, 0.08, 0);
+  const arm = grp(t, -0.2, 0.3, 0); arm.rotation.z = 1.2;
+  box(arm, M.gun, 3.2, 0.12, 1.9, 1.5, -0.1, 0);
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) { box(arm, T.hull, 3.2, 0.42, 0.42, 1.55, 0.2 + r * 0.46, (c - 1.5) * 0.46); box(arm, M.dark, 0.05, 0.36, 0.36, 3.16, 0.2 + r * 0.46, (c - 1.5) * 0.46); }   // eight canisters
+  box(arm, T.accent, 0.4, 0.94, 0.05, 1.5, 0.43, 0.95); box(arm, T.accent, 0.4, 0.94, 0.05, 1.5, 0.43, -0.95);
+  box(g, T.dark, 1.6, 1.2, 1.4, -2.3, 0.9, -2.3); cyl(g, M.steel, 0.12, 4.2, -2.3, 3.4, -2.3);                                              // radar cabin and mast
+  const spin = grp(g, -2.3, 5.5, -2.3); box(spin, T.hull, 0.3, 1.1, 2.1, 0, 0.55, 0); box(spin, M.dark, 0.05, 0.9, 1.9, 0.17, 0.55, 0);           // TRML-4D antenna
+  return { g, turret: t, spin, muzzle: 1.6, muzzleY: 4.2, top: 7 };
 }
 function uplink(T) {
   const g = new THREE.Group(); slab(g, 11.4, 11.4);
@@ -627,6 +695,10 @@ const UNIT = {
   // SEAL Team: four operators in black with suppressed carbines; one is a marksman with a long rifle, one a grenadier
   seal: (T) => squad(T, FOUR, (i) => ({ cloth: M.black, vest: M.dark, helmet: 'mich', hat: M.dark, skin: M.black, boots: M.black, pack: M.dark, kneepads: M.dark, gun: i === 2 ? 'long' : 'rifle', arm: i === 3 ? 'm203' : 'm4s' })),
   // Suicide Bomber: plain clothes, an explosive vest with a row of charges and a detonator in his hand; no rifle
+  // Spetsnaz: four men in dark camouflage and black kit, two masked, with suppressed rifles
+  spetsnaz: (T) => squad(T, FOUR, (i) => ({ cloth: M.camo, vest: M.black, helmet: i % 2 ? 'cap' : 'ssh', hat: M.black, skin: i % 2 ? M.black : M.skin, boots: M.black, pack: M.black, kneepads: M.black, gun: 'rifle', arm: 'aks' })),
+  // Mortar Team: the gunner behind his 82 mm mortar, a loader with a rifle and a box of shells
+  mortar: (T) => { const r = squad(T, TWO, (i) => ({ ...kit('sandstorm'), gun: i ? 'rifle' : 'mortar' })); box(r.men[1], M.crateB, 0.36, 0.22, 0.26, -0.3, 0.14, 0.3); r.muzzle = 0.85; r.muzzleY = 1.0; return r; },
   bomber: (T) => { const r = squad(T, ONE, { cloth: M.cloth, legs: M.khaki, helmet: 'shemagh', hat: M.dark, gun: 'none', boots: M.dark }), m = r.men[0];
     box(m, M.crateC, 0.27, 0.26, 0.36, 0.004, 1.06, 0); for (const z of [-0.12, -0.04, 0.04, 0.12]) cyl(m, M.yellow, 0.03, 0.2, 0.14, 1.06, z, 'y', G.cyl8); box(m, M.red, 0.012, 0.02, 0.3, 0.165, 1.17, 0); box(m, M.dark, 0.04, 0.1, 0.04, 0.03, 0.72, 0.235); return r; },
   rpg: (T) => squad(T, TWO, { ...kit('sandstorm'), hat: M.red, gun: 'rpg' }),
@@ -705,7 +777,43 @@ function shipyard(T) {
   cyl(g, M.steel, 0.12, 6.0, -9.0, 3.2, 9.0); add(g, G.sph, T.glow, 0.3, 0.3, 0.3, -9.0, 6.3, 9.0);  // signal mast
   return { g };
 }
-const BLDG = { cc, power, supply, barracks, factory, airfield, patriot, gatling, stinger, uplink, tunnel, market, particle, silo, scud, shipyard };
+// Kinzhal Shelter (Russia's superweapon): a hardened aircraft shelter, an arch of concrete banked with earth, its
+// blast doors rolled aside and a MiG-31 standing on alert inside with the missile under its belly (`jet`: gone while
+// the next one is being readied). A taxi strip leads out; a fuel bowser and a revetment wall stand beside it.
+function kinzhal(T) {
+  const g = new THREE.Group(); slab(g, 15.4, 15.4, M.tarmac, 0.4);
+  const arch = cyl(g, M.concrete, 1, 10.5, -1.6, 0.35, 0, 'x', G.cyl); arch.scale.set(4.2, 10.5, 5.6);                                  // the shelter: half a barrel on its side
+  for (const s of [-1, 1]) { const bank = box(g, M.sandbag, 10.5, 2.6, 2.2, -1.6, 1.3, s * 5.6); bank.rotation.x = -s * 0.5; }               // earth banked against its sides
+  box(g, M.dark, 0.3, 3.6, 8.4, 3.62, 2.1, 0); for (const s of [-1, 1]) { box(g, M.steel, 0.3, 4.0, 3.6, 3.9, 2.3, s * 6.3); box(g, T.accent, 0.32, 0.5, 3.6, 3.9, 3.9, s * 6.3); }   // the dark mouth; the two blast doors rolled aside
+  box(g, T.accent, 0.4, 0.5, 9.0, 3.72, 4.25, 0); box(g, M.concrete, 2.2, 0.5, 9.4, 3.2, 4.4, 0);
+  box(g, M.yellow, 5.0, 0.05, 0.16, 5.2, 0.38, 0); for (const s of [-1, 1]) box(g, M.white, 5.0, 0.05, 0.12, 5.2, 0.38, s * 3.4);              // taxi line and edge lines
+  box(g, M.concrete, 0.5, 2.2, 6.0, -6.9, 1.4, -4.2); box(g, T.dark, 2.2, 1.2, 1.2, 5.4, 1.0, 5.9); cyl(g, T.dark, 0.6, 2.4, 5.2, 1.5, 5.9, 'x'); wheels(grp(g, 5.4, 0.3, 5.9), [0.9, -0.9], 0.6, 0.34, 0.24);   // revetment wall, fuel bowser
+  const jet = grp(g, 2.2, 1.55, 0); const J = mats('ursa', 0);                                                                            // the MiG-31: long nose out of the shelter, twin fins inside
+  cyl(jet, M.jet, 0.55, 6.4, -1.6, 0, 0, 'x'); add(jet, G.cone, M.jet, 0.55, 2.4, 0.55, 2.8, 0, 0).rotation.z = -Math.PI / 2; box(jet, M.glass, 1.4, 0.34, 0.5, 0.9, 0.5, 0);
+  for (const s of [-1, 1]) { box(jet, M.jet, 3.0, 0.12, 2.6, -2.2, 0.1, s * 1.7).rotation.y = s * 0.3; box(jet, M.jet, 1.6, 1.6, 0.1, -4.2, 0.9, s * 0.8); box(jet, M.jet, 3.6, 0.7, 0.7, -1.4, -0.1, s * 0.75); }
+  cyl(jet, M.white, 0.2, 3.4, -0.6, -0.72, 0, 'x'); add(jet, G.cone, M.dark, 0.2, 0.8, 0.2, 1.5, -0.72, 0).rotation.z = -Math.PI / 2;        // the Kinzhal itself, slung on the centreline
+  for (const [x, z] of [[2.2, 0], [-2.4, 1.2], [-2.4, -1.2]]) { cyl(jet, M.steel, 0.06, 0.9, x, -0.75, z); cyl(jet, M.rubber, 0.26, 0.2, x, -1.1, z, 'z'); }
+  cyl(g, M.steel, 0.08, 5.0, -6.6, 2.9, 5.6); add(g, G.sph, T.glow, 0.3, 0.3, 0.3, -6.6, 5.5, 5.6);
+  return { g, jet, top: 7 };
+}
+// Sky Shield Battery (Europe's superweapon): a SAMP/T battery. Three launcher trucks, each with eight missile
+// canisters raised upright, stand round the multifunction radar, whose flat face turns on its tower; a command cabin
+// and a generator complete it.
+function skyshield(T) {
+  const g = new THREE.Group(); slab(g, 15.4, 15.4, M.concrete, 0.35);
+  for (const [x, z, ry] of [[-4.6, -4.4, 0.5], [4.6, -4.4, 2.6], [0.2, 5.2, -1.57]]) {
+    const tr = grp(g, x, 0.3, z); tr.rotation.y = ry;
+    box(tr, M.dark, 6.0, 0.35, 1.7, 0, 0.7, 0); wheels(tr, [2.3, 1.2, -1.0, -2.1], 0.95, 0.5, 0.36); box(tr, T.hull, 1.5, 1.3, 1.9, 2.3, 1.5, 0); box(tr, M.glass, 0.06, 0.55, 1.6, 3.07, 1.7, 0);
+    for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) { box(tr, T.hull, 0.46, 3.4, 0.46, -1.9 + r * 0.5, 2.6, (c - 1.5) * 0.48); box(tr, M.dark, 0.4, 0.05, 0.4, -1.9 + r * 0.5, 4.32, (c - 1.5) * 0.48); }   // eight canisters, upright
+    box(tr, T.accent, 1.0, 0.3, 2.0, -1.65, 1.2, 0); box(tr, M.gun, 1.2, 0.5, 1.9, -1.65, 0.95, 0);
+  }
+  cyl(g, T.wall, 1.3, 3.0, 0, 1.8, -0.6, 'y', G.cyl8); box(g, T.accent, 2.7, 0.3, 2.7, 0, 3.0, -0.6); cyl(g, M.steel, 0.3, 1.4, 0, 4.0, -0.6);          // radar tower
+  const spin = grp(g, 0, 4.7, -0.6); box(spin, T.hull, 0.5, 2.6, 2.4, 0, 1.3, 0); box(spin, M.dark, 0.06, 2.2, 2.0, 0.28, 1.3, 0); box(spin, M.gun, 0.8, 0.3, 0.8, -0.3, 0.15, 0);   // the rotating array
+  box(g, T.wall, 3.0, 2.0, 2.2, -5.4, 1.3, 3.6); box(g, T.roof, 3.2, 0.2, 2.4, -5.4, 2.4, 3.6); cyl(g, M.gun, 0.04, 2.6, -6.4, 3.7, 4.2); box(g, T.dark, 1.6, 1.1, 1.1, 5.6, 0.9, 3.4);   // command cabin with its aerial; generator
+  add(g, G.sph, T.glow, 0.3, 0.3, 0.3, 0, 7.5, -0.6);
+  return { g, spin, top: 8.5 };
+}
+const BLDG = { kinzhal, skyshield, cc, power, supply, barracks, factory, airfield, patriot, gatling, stinger, pantsir, irist, uplink, tunnel, market, particle, silo, scud, shipyard };
 
 export function buildModel(e) {
   init();

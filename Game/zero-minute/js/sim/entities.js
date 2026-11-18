@@ -20,7 +20,7 @@ export function makeUnit(sim, type, team, x, z, facing = 0) {
     lastHit: -999, lastZone: 0, lastFire: -999,
     // phase 2
     xp: 0, vet: 0, tier: 0, addon: null, addonQ: null, garrison: d.transport ? [] : null,
-    stealthMode: d.stealth || null, cloaked: false, detected: false, revealUntil: 0, stillT: 0,
+    rounds: null, stealthMode: d.stealth || null, cloaked: false, detected: false, revealUntil: 0, stillT: 0,
     up: false, sightPlus: 0, detect: 0,
     deployed: false, cashAcc: 0, horde: false, pdlCd: 0, capT: 0, windup: 0, dive: 0, charging: false,
     mode: d.modes ? d.modes[0] : null, inert: false, expires: 0, temp: false,   // hero ability mode; resigned (takes no part, about to leave); tick it vanishes; called-in unit that leaves no wreck or score
@@ -37,7 +37,7 @@ function outfit(sim, u, d) {
   const T = sim.teams[team_(u)];
   if (d.nuke && T.upgrades.has('r_nuke')) u.ms = d.speed * 1.15;
   const G = generalOf(T);
-  if (!d.air && !d.ship && (d.amph || d.infantry) && G && G.amph) u.nc = d.cls + 2;                       // Marine Corps: these units cross water
+  if (!d.air && !d.ship && (d.swims || ((d.amph || d.infantry) && G && G.amph))) u.nc = d.cls + 2;   // `swims`: the vehicle itself is amphibious (BTR, BMP-3, ZBD-04A);                       // Marine Corps: these units cross water
   if (G && G.cloak && !u.stealthMode && !d.air && !d.noCloak && (d.infantry || d.armor === 'light')) u.stealthMode = 'still'; // Stealth General: hidden when standing still
   if (u.type === 'v_comanche' && T.upgrades.has('v_stealthrotor')) u.stealthMode = 'always';
   if (d.salvage && T.flags.scrap) { u.tier = 1; }
@@ -350,6 +350,7 @@ export function applyDamage(sim, t, dmg, wname, sx, sz, src) {
   }
   let m = W.vs[armorOf(t)] || 0, zone = 0;
   if (!m) return 0;
+  if (t.kind === 'unit' && UNITS[t.type].era && (W.kind === 'rocket' || W.kind === 'missile') && sim.tick >= (t.eraAt || 0)) { m *= 0.5; t.eraAt = sim.tick + UNITS[t.type].era; sim.events.push({ t: 'era', x: t.x, z: t.z, id: t.id, team: t.team }); }   // reactive armour: a brick goes off and takes half the hit; it is ready again 15 s later
   if (t.kind === 'unit' && UNITS[t.type].dirArmor) { zone = hitZone(t, sx, sz); m *= ZONE_MULT[zone]; }
   const dealt = Math.min(t.hp, dmg * m);
   t.hp -= dmg * m; t.lastHit = sim.tick; t.lastZone = zone;

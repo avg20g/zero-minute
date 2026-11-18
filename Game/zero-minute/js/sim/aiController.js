@@ -34,7 +34,7 @@ for (const fid in FACTIONS) {
     for (const wn of [d.weapon, d.weapon2]) {
       const w = wn && WEAPONS[wn]; if (!w || w.garrisonOnly) continue;
       // sustained damage per second; pad-based aircraft are limited by their rearm cycle
-      const cycle = d.based ? d.reload + 240 : w.cd, shots = d.based ? (w.free ? 24 : d.ammo) : (w.burst || 1);   // a `free` gun fires all through the pass
+      const cycle = d.based ? d.reload + 240 : w.cd, shots = d.based ? (w.rounds || (w.free ? 24 : d.ammo)) : (w.burst || 1);   // a `free` gun fires all through the pass
       const L = w.kind === 'launch' ? UNITS[w.unit].suicide : null, vsOf = L ? WEAPONS[L.w].vs : w.vs;                 // a launcher is as good as the drone it sends
       const dps = (L ? L.dmg : w.kind === 'carpet' ? w.dmg * w.n * 0.35 : w.dmg) * shots * 20 / cycle, hz = w.hazard ? w.hazard.dps * w.hazard.secs * 20 / cycle : 0;
       // area weapons (splash, lingering hazards, sprays) hit several soft targets at once
@@ -357,7 +357,7 @@ export class AIController {
       for (const type of this.combat) train(type, type, scores[type] + (noInf && type === R.squad ? 14 : 0));
     }
 
-    if (this.swarmType && c.swarm.length + q(this.swarmType) < this.swarmSize && c.strength >= 2500 && T.money >= 900 && tick - (this.swarm.last || -1e9) > 1500) train('swarm', this.swarmType, 52);   // once there is an army to go with it, never with the army's last dollar, and not straight after a wave has gone in
+    if (this.swarmType && c.swarm.length + q(this.swarmType) < this.swarmSize && c.strength >= 2500 && T.money >= 500 && tick - (this.swarm.last || -1e9) > 1500) train('swarm', this.swarmType, 52);   // once there is an army to go with it, never with the army's last dollar, and not straight after a wave has gone in
 
     cand.sort((a, b) => b.score - a.score || (a.name < b.name ? -1 : 1));
     this.lastScores = cand.map(k => ({ name: k.name, score: +k.score.toFixed(1), ok: k.ok }));
@@ -618,13 +618,14 @@ export class AIController {
   // buildings or tanks: once an attack is under way (or the base is threatened) the idle drones go for the freshest
   // such enemy this side has seen, and being much faster than the army they get there first.
   sendSwarm(c) {
-    const tick = this.sim.tick, idle = c.swarm.filter(u => !u.order && !u.target); if (!idle.length || tick - (this.swarm.last || -1e9) < 60) return;
+    const tick = this.sim.tick, idle = c.swarm.filter(u => !u.order && !u.target); if (!idle.length || tick - (this.swarm.sentAt || -1e9) < 60) return;
     const near = this.op.mode === 'gather' ? this.homeW : this.op.target, reach = this.op.mode === 'gather' ? 140 : 220; if (!near) return;
     if (this.op.mode !== 'gather' && idle.length < Math.ceil(this.swarmSize * 0.6)) return;                    // on the attack they go as a swarm: at least six of ten
     let best = null, bs = 1e9;
     for (const m of this.aiMemoryMap.values()) { if (m.kind !== 'unit' || tick - m.tick > 200 || !(m.armor === 'inf' || m.armor === 'light' || m.armor === 'air')) continue; const d = dist(m, near); if (d < reach && d < bs) { bs = d; best = m; } }
     if (!best) return;
-    if (this.act({ t: 'move', ids: idle.map(u => u.id), x: best.x, z: best.z, attack: true })) { this.swarm.sent += idle.length; this.swarm.waves++; this.swarm.last = tick; }
+    if (this.op.mode === 'gather' && idle.length < 3 && bs > 70) return;                                        // at home a couple of drones are not thrown away one at a time: they wait for the swarm unless the enemy is at the gate
+    if (this.act({ t: 'move', ids: idle.map(u => u.id), x: best.x, z: best.z, attack: true })) { this.swarm.sent += idle.length; this.swarm.waves++; this.swarm.sentAt = tick; if (this.op.mode !== 'gather') this.swarm.last = tick; }   // only a wave sent on the attack starts the pause before the swarm is rebuilt
   }
 
   // ------------------------------------------------------------ tactics: retreat, focus fire, support powers
@@ -693,6 +694,14 @@ export class AIController {
     const sim = this.sim, tick = sim.tick, T = this.T, cfg = this.cfg, ready = [], soon = [];
     for (const n of this.F.tree) if (n.power && T.promos.has(n.id)) { const pw = nodePower(T, n), left = (T.powerReady[pw] || 0) - tick; if (left <= 0) ready.push(pw); else if (left < 300) soon.push(pw); }
     const sp = superOf(sim, this.team), superReady = sp && hasPower(sim, this.team, sp) && (T.powerReady[sp] || 0) <= tick;
+    if (superReady && POWERS[sp].shield) { // Sky Shield is defensive: raise it over the base when the enemy's superweapon klaxon sounds (both sides hear it), or over the army when aircraft or artillery have been seen near it
+      const heard = tick - sim.lastSuper[this.foe], P = POWERS[sp]; let at = null;
+      if (heard >= cfg.react && heard < 200) at = this.homeW;
+      else if (this.op.mode !== 'gather' && this.op.ids.length >= 5) { const us = this.op.ids.map(id => sim.byId.get(id)).filter(u => u && !u.dead); if (us.length >= 5) { const cx = us.reduce((a, u) => a + u.x, 0) / us.length, cz = us.reduce((a, u) => a + u.z, 0) / us.length;
+        let threat = 0; for (const m of this.aiMemoryMap.values()) if (m.kind === 'unit' && tick - m.tick < 200 && Math.hypot(m.x - cx, m.z - cz) < P.radius + 40 && (m.armor === 'air' || REACH[m.type] >= 60)) threat += m.cost; if (threat >= 2000) at = { x: cx, z: cz }; } }
+      if (at && !powerError(sim, this.team, sp, at.x, at.z) && this.act({ t: 'power', id: sp, x: at.x, z: at.z })) { this.stats.supers = (this.stats.supers || 0) + 1; this.stats.casts.push({ tick, id: sp, x: at.x, z: at.z }); }
+      if (!ready.length) return;
+    }
     if (!ready.length && !superReady) return;
     this.perceive();
     const now = this.visible.filter(m => m.tick === tick && tick - m.first >= cfg.react);
@@ -704,7 +713,7 @@ export class AIController {
       if (!this.act({ t: 'power', id, x: a.m.x, z: a.m.z })) return false;
       this.stats.casts.push({ tick, id, x: a.m.x, z: a.m.z, score: a.s, target: a.m.id, seenFor: tick - a.m.first }); return true;
     };
-    if (superReady) { const a = pick(sp); if (a.s >= 5 && cast(sp, a)) { this.stats.supers = (this.stats.supers || 0) + 1; return; } } // superweapon: only at a real concentration, and only at what is in view
+    if (superReady && !POWERS[sp].shield) { const a = pick(sp); if (a.s >= 5 && cast(sp, a)) { this.stats.supers = (this.stats.supers || 0) + 1; return; } } // superweapon: only at a real concentration, and only at what is in view
     if (cfg.combo && ready.length + soon.length >= 2) {                               // hold one power until its partner is ready, then stack them
       if (ready.length < 2 || this.budget < 2) return;
       const a = pick(ready[0]);

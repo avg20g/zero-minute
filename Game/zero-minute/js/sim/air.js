@@ -88,7 +88,7 @@ function fighter(sim, u, d) {
     case 'parked': {
       u.landed = true; u.altK = 0; u.goal = null; u.spd = 0; u.vx = u.vz = 0; u.x = pad.x; u.z = pad.z; u.onApron = false;
       { const df = angDiff(pad.f, u.facing), ma = GROUND_TURN * DT; u.facing += Math.max(-ma, Math.min(ma, df)); }   // turned round in the hangar: nose to the door
-      if (u.ammo < d.ammo && ++u.reloadT >= d.reload * (sim.teams[u.team].flags.fastRearm ? 0.6 : 1)) { u.ammo = d.ammo; u.reloadT = 0; }   // Rapid Re-arm promotion: 40% faster
+      if ((u.ammo < d.ammo || u.rounds) && ++u.reloadT >= d.reload * (sim.teams[u.team].flags.fastRearm ? 0.6 : 1)) { u.ammo = d.ammo; u.rounds = null; u.reloadT = 0; }   // Rapid Re-arm promotion: 40% faster. An emptied gun magazine is refilled with the rest
       if (u.hp < u.maxHp) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * HELI_REPAIR * DT);   // ground crew patch it up on the pad, at the helipad's rate
       const o = u.order;
       if (o && (o.t === 'attack' || o.t === 'fattack' || o.t === 'move' || o.t === 'amove')) { if (u.ammo > 0 && lockRunway(sim, home, u)) u.as = 'taxi'; } // holds on the pad while the runway is busy
@@ -138,9 +138,10 @@ function fighter(sim, u, d) {
       // On station: fly a holding circle and engage whatever comes into range. A plain order holds for
       // LOITER ticks; a guard order holds until the missiles are gone.
       const dx = u.x - o.x, dz = u.z - o.z;
-      if (Math.hypot(dx, dz) > ORBIT + 14) { u.goal = { x: o.x, z: o.z }; break; }               // still on the way
+      const R = d.orbit || ORBIT, way = d.orbit ? -0.55 : 0.55;                                  // a gunship holds its own wide circle, anti-clockwise, so whatever turns up is on its left and far off
+      if (Math.hypot(dx, dz) > R + 14) { u.goal = d.orbit ? { x: clampW(o.x + Math.cos(Math.atan2(dz, dx) + 0.9) * R), z: clampW(o.z + Math.sin(Math.atan2(dz, dx) + 0.9) * R) } : { x: o.x, z: o.z }; break; }               // still on the way
       o.t = 'amove';
-      const a = Math.atan2(dz, dx) + 0.55; u.goal = { x: clampW(o.x + Math.cos(a) * ORBIT), z: clampW(o.z + Math.sin(a) * ORBIT) };
+      const a = Math.atan2(dz, dx) + way; u.goal = { x: clampW(o.x + Math.cos(a) * R), z: clampW(o.z + Math.sin(a) * R) };
       if (!o.guard && ++u.loiterT >= LOITER) { u.as = 'return'; u.appr = 0; u.order = null; u.target = 0; u.loiterT = 0; }
       break;
     }
@@ -235,9 +236,6 @@ export function stepAir(sim) {
       const dx = g.x - u.x, dz = g.z - u.z, dist = Math.hypot(dx, dz);
       if (!d.based && dist < 1.5) { u.goal = null; u.arrived = true; }
       else { const sp = d.based ? u.ms : Math.min(u.ms, Math.max(2, dist * 1.5)); dvx = dx / (dist || 1) * sp; dvz = dz / (dist || 1) * sp; }
-    } else if (d.jink && sim.tick - u.lastFire < 30 && !u.landed && u.altK >= 1) { // an agile gunship never sits still while it shoots: every 0.6 s it darts off in a new direction
-      if (u.jinkT === undefined || sim.tick >= u.jinkT) { u.jinkT = sim.tick + 12; u.jinkA = sim.rand() * 6.2831853; }
-      dvx = Math.cos(u.jinkA) * d.jink; dvz = Math.sin(u.jinkA) * d.jink;
     } else if (d.loiter && !u.order) { // nothing to do: fly a slow circle around its station instead of hanging in the air (u.goal stays empty, so it still counts as idle)
       const a = Math.atan2(u.z - u.guardZ, u.x - u.guardX) + 0.8, tx = u.guardX + Math.cos(a) * d.loiter, tz = u.guardZ + Math.sin(a) * d.loiter, dist = Math.hypot(tx - u.x, tz - u.z) || 1;
       dvx = (tx - u.x) / dist * u.ms * LOITER_SPEED; dvz = (tz - u.z) / dist * u.ms * LOITER_SPEED;

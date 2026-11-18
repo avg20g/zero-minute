@@ -253,7 +253,7 @@ ok(!WEAPONS.scud_missile.intercept && WEAPONS.rpg.intercept && WEAPONS.hellfire.
   const count = (s, t) => ({ yards: s.ents.filter(e => e.team === t && e.kind === 'bldg' && BLDGS[e.type].shore).length, ships: s.ents.filter(e => e.team === t && e.kind === 'unit' && UNITS[e.type].ship).length });
   const a = match(STRAIT_MAP, ['vanguard', 'sandstorm']), a0 = count(a, 0), a1 = count(a, 1);
   ok(a.yardsPlaced[0] >= 1 && a.yardsPlaced[1] >= 1 && a0.yards <= 1 && a1.yards <= 1 && a0.ships + a.ais[0].fleet.shots > 0 && a1.ships + a.ais[1].fleet.shots > 0, `Strait of Sand, Hard v Hard: both sides build a shipyard (never two at once) and a fleet (US ${a0.ships} ships afloat, ISIS ${a1.ships}; ${a.ais[0].fleet.shots + a.ais[1].fleet.shots} fleet attack orders, ${a.ais[0].fleet.raids + a.ais[1].fleet.raids} sweeps)`);
-  ok(!a.ents.some(e => e.kind === 'unit' && UNITS[e.type].transport) && a.ents.filter(e => e.kind === 'unit' && UNITS[e.type].ship).every(e => a.nav.isWater(a.nav.cellOf(e.x, e.z))), 'the AI builds no Landing Craft, and every ship is on the water');
+  ok(!a.ents.some(e => e.kind === 'unit' && UNITS[e.type].transport && UNITS[e.type].ship) && a.ents.filter(e => e.kind === 'unit' && UNITS[e.type].ship).every(e => a.nav.isWater(a.nav.cellOf(e.x, e.z))), 'the AI builds no Landing Craft, and every ship is on the water');
   const again = match(STRAIT_MAP, ['vanguard', 'sandstorm']);
   ok(again.hash() === a.hash(), 'a match on a sea map plays out identically from the same seed');
   const c = match(MAPS[0].spec, ['redhammer', 'vanguard']), c0 = count(c, 0), c1 = count(c, 1);

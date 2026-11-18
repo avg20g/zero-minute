@@ -213,6 +213,8 @@ export class AudioEngine {
         case 'shellhit': if (hear(e)) this.explosion(e.x, e.z, 2); break;
         case 'launch': if (hear(e)) this.whoosh(e.x, e.z); break;
         case 'fab': if (hear(e)) this.explosion(e.x, e.z, 3.4); break;
+        case 'kinzhal': this.explosion(e.x, e.z, hear(e) ? 3.0 : 1.0); break;
+        case 'intercept': if (hear(e)) this.explosion(e.x, e.z, e.big ? 1.6 : 0.6); break;
         case 'suicide': if (hear(e)) this.explosion(e.x, e.z, 2.2); break;
         case 'airliner': this.explosion(e.x, e.z, hear(e) ? 3.6 : 1.4); break;
         case 'hack': if (hear({ team: e.team, x: e.tx, z: e.tz })) this.laser(e.tx, e.tz); break;

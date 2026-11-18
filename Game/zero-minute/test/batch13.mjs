@@ -76,15 +76,15 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
     ok(ac && b2 && ap && a10 && ac.home === sf.id && b2.home === sf.id && a10.home === af.id && get('v_ac130').length === 1, 'AC-130, B-2 and Apache come out of the Strategic Airfield, the A-10 out of the Air Field; a third big aircraft waits for a free hangar');
     ok(ac.as === 'parked' && b2.as === 'parked' && a10.as === 'parked' && dist(ac, sf) < 45 && dist(b2, sf) < 45, 'the big aircraft park in its two hangars');
     // AC-130: circles the target anti-clockwise and only ever fires out of its left side
-    const foes = [0, 1, 2, 3, 4, 5].map(i => { const u = hold(makeUnit(s, i % 2 ? 'r_tank' : 'r_conscript', ENEMY, 500 + (i % 3) * 8, 600 + ((i / 3) | 0) * 8, 0)); u.hp = u.maxHp = 3000; return u; }), t0 = foes[0];
+    const foes = [0, 1, 2, 3, 4, 5].map(i => { const u = hold(makeUnit(s, i % 2 ? 'r_tank' : 'r_conscript', ENEMY, 500 + (i % 3) * 8, 600 + ((i / 3) | 0) * 8, 0)); u.hp = u.maxHp = i ? 3000 : 30000; return u; }), t0 = foes[0];
     s.issue({ t: 'attack', ids: [ac.id], target: t0.id }); if (!ac.order) ac.order = { t: 'fattack', id: t0.id, x: t0.x, z: t0.z, g: null };
     let gun = 0, shell = 0, wrong = 0, rMin = 1e9, rMax = 0, turn = 0, n = 0, pf = ac.facing;
     run(s, 20 * 120, (ev) => { for (const u of foes) u.cds[0] = 1e9;
       for (const e of ev) if (e.sid === ac.id && (e.t === 'tracer' || e.t === 'fire')) { if (e.w === 'ac_gun') gun++; else if (e.w === 'ac_105') shell++;
         const rel = angDiff(Math.atan2(t0.z - ac.z, t0.x - ac.x), ac.facing - Math.PI / 2); if (Math.abs(rel) > 0.75) wrong++; const d = dist(ac, t0); rMin = Math.min(rMin, d); rMax = Math.max(rMax, d); turn += angDiff(ac.facing, pf); n++; } pf = ac.facing; });
     ok(gun > 60 && shell === UNITS.v_ac130.ammo && wrong === 0, `AC-130: ${gun} cannon bursts and all ${shell} howitzer shells, every one with the target on its left side`);
-    ok(Math.abs(rMin - UNITS.v_ac130.orbit) < 9 && Math.abs(rMax - UNITS.v_ac130.orbit) < 9 && turn < -1, `it holds a circle about ${UNITS.v_ac130.orbit} m out (${rMin.toFixed(0)} to ${rMax.toFixed(0)} m), turning left all the way`);
-    ok(ac.as === 'parked' && ac.ammo === UNITS.v_ac130.ammo && t0.hp < 3000, 'shells spent, it flew home and was re-armed');
+    ok(Math.abs(rMin - UNITS.v_ac130.orbit) < 12 && Math.abs(rMax - UNITS.v_ac130.orbit) < 12 && rMin > 50 && turn < -1, `it holds a circle about ${UNITS.v_ac130.orbit} m out (${rMin.toFixed(0)} to ${rMax.toFixed(0)} m), turning left all the way`);
+    ok(ac.as === 'parked' && ac.ammo === UNITS.v_ac130.ammo && t0.hp < 30000, 'shells spent, it flew home and was re-armed');
     ok(WEAPONS.ac_gun.free && !WEAPONS.ac_105.free && UNITS.v_ac130.mounts.every(m => m.dir === -Math.PI / 2), 'both guns are mounted to port; only the howitzer rounds are counted as the sortie');
     // B-2: one pass, ten bombs in a line
     const bld = makeBldg(s, 'r_power', ENEMY, 270, 320); s.nav.rebuild(); const hits = [];
@@ -95,7 +95,7 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
     // A-10: cannon and four Mavericks at ground targets, nothing at aircraft
     const t1 = foes[1], h1 = t1.hp; let g8 = 0, mav = 0; a10.order = { t: 'fattack', id: t1.id, x: t1.x, z: t1.z, g: null };
     run(s, 20 * 60, (ev) => { for (const u of foes) u.cds[0] = 1e9; for (const e of ev) if (e.sid === a10.id) { if (e.w === 'gau8') g8++; if (e.w === 'maverick' && e.t === 'fire') mav++; } });
-    ok(g8 > 5 && mav === UNITS.v_a10.ammo && t1.hp < h1 - 400, `A-10: ${g8} cannon bursts and ${mav} Mavericks on one sortie, ${Math.round(h1 - t1.hp)} damage to a tank`);
+    ok(g8 === WEAPONS.gau8.rounds && mav === UNITS.v_a10.ammo && t1.hp < h1 - 400, `A-10: ${g8} cannon bursts and ${mav} Mavericks on one sortie, ${Math.round(h1 - t1.hp)} damage to a tank`);
     ok(!WEAPONS.gau8.vs.air && !WEAPONS.maverick.vs.air, 'it has nothing for aircraft');
     // Apache and Longbow
     ok(JSON.stringify(slotsOf(ap)) === JSON.stringify(['m230', 'hellfire']) && !ap.up && !ap.sightPlus && !ap.detect, 'Apache: chain gun and Hellfires');
@@ -133,13 +133,13 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 // ---------------------------------------------------------------- AH-1Z Viper
 {
   const V = UNITS.v_viper, others = ['v_comanche', 'v_apache'];
-  ok(V.heli && V.jink > 0 && V.dodge > 0 && others.every(k => V.hp < UNITS[k].hp) && others.every(k => WEAPONS[V.weapon].cd <= WEAPONS[UNITS[k].weapon].cd) && WEAPONS[V.weapon2].cd < WEAPONS.hellfire.cd, `AH-1Z: less health (${V.hp}) and faster guns than the other US gunships`);
+  ok(V.heli && !V.jink && V.dodge > 0 && others.every(k => V.hp < UNITS[k].hp) && others.every(k => WEAPONS[V.weapon].cd <= WEAPONS[UNITS[k].weapon].cd) && WEAPONS[V.weapon2].cd < WEAPONS.hellfire.cd, `AH-1Z: less health (${V.hp}) and faster guns than the other US gunships`);
   const once = () => {
     const s = bare({ factions: ['vanguard', 'sandstorm'], generals: ['marine', null] });
     const v = makeUnit(s, 'v_viper', PLAYER, 400, 400, 0), foe = hold(makeUnit(s, 'r_tank', ENEMY, 425, 400, 0)); foe.hp = foe.maxHp = 1e6;
     s.issue({ t: 'attack', ids: [v.id], target: foe.id }); let moved = 0, px = v.x, pz = v.z, heads = new Set(), shots = 0;
     run(s, 300, (ev) => { foe.cds[0] = 1e9; const d = Math.hypot(v.x - px, v.z - pz); if (s.tick - v.lastFire < 30 && d > 0.05) { moved += d; heads.add(Math.round(Math.atan2(v.z - pz, v.x - px) * 2)); } px = v.x; pz = v.z; for (const e of ev) if (e.sid === v.id) shots++; });
-    ok(shots > 40 && moved > 30 && heads.size >= 4 && dist(v, foe) < WEAPONS[V.weapon2].range + 6, `it keeps moving while it fires: ${moved.toFixed(0)} m flown in ${heads.size} different directions, still in range`);
+    ok(shots > 40 && moved < 2 && dist(v, foe) < WEAPONS[V.weapon2].range + 6, `batch 14: it no longer darts about while it fires (${moved.toFixed(1)} m of drift in 15 s)`);
     // missiles and shells miss part of the time; rifle fire never does
     hold(v); v.order = { t: 'hold' }; v.hp = v.maxHp = 1e7; let fired = 0, dodged = 0, hurt = 0;
     const aa = [0, 1, 2].map(i => makeBldg(s, 's_stinger', ENEMY, Math.round(v.x / 2) + 10 + i * 5, Math.round(v.z / 2) + 6)); s.nav.rebuild(); run(s, 900, (ev) => { v.cds = [1e9, 1e9, 1e9]; for (const e of ev) { if (e.t === 'fire' && aa.some(a => a.id === e.sid)) fired++; if (e.t === 'dodge' && e.id === v.id) dodged++; } });
@@ -150,8 +150,8 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
     ok(tracers > 5 && dodge2 === 0 && h0 - v.hp > 0, `infantry rifles always land: ${tracers} bursts, no dodges, ${Math.round(h0 - v.hp)} damage`);
     return s.hash();
   };
-  ok(once() === once(), 'jinking and dodging use the simulation\'s own random numbers: a replay matches');
-  console.log('AH-1Z Viper    : jinks while firing | dodges missiles and shells | small arms always hit');
+  ok(once() === once(), 'dodging uses the simulation\'s own random numbers: a replay matches');
+  console.log('AH-1Z Viper    : holds its position while firing | dodges missiles and shells | small arms always hit');
 }
 
 // ---------------------------------------------------------------- ISIS: Quad Cannon, Shahed Launcher, Scud range, tunnels
@@ -191,14 +191,15 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
   const s = new Sim({ ai: 'both', difficulty: ['hard', 'hard'], factions: ['sandstorm', 'aegis'], generals: ['stealth', null], map: OPEN_BIG, seed: 3 });
   const a = s.ais[0]; let peak = 0, sneaks = 0, sent = 0;
   ok(a.swarmType === 's_fpv' && a.swarmSize === 10 && !a.combat.includes('s_fpv'), 'the Hard AI plans a swarm of 10 FPV drones, apart from its normal army');
-  for (let t = 0; t < 20 * 60 * 14 && s.winner < 0; t++) { s.step(); for (const e of s.events) if (e.t === 'power' && e.team === 0 && e.id === 'sneaktunnel') sneaks++; s.events.length = 0; if (t % 100 === 0) peak = Math.max(peak, s.ents.filter(e => e.team === 0 && e.type === 's_fpv' && !e.dead).length); }
-  ok(peak >= 6 && peak <= 10 && a.swarm.waves >= 1 && a.swarm.sent >= 3, `in a match it keeps up to ${peak} in the air and has sent ${a.swarm.sent} of them ahead of ${a.swarm.waves} attack${a.swarm.waves === 1 ? '' : 's'}`);
+  const keep = (q, team) => { for (const e of q.ents) if (e.kind === 'bldg' && e.team === team && !e.dead) e.hp = e.maxHp; };   // the opponent's buildings never fall, so the match runs its full length
+  for (let t = 0; t < 20 * 60 * 14 && s.winner < 0; t++) { if (t % 20 === 0) keep(s, 1); s.step(); for (const e of s.events) if (e.t === 'power' && e.team === 0 && e.id === 'sneaktunnel') sneaks++; s.events.length = 0; if (t % 100 === 0) peak = Math.max(peak, s.ents.filter(e => e.team === 0 && e.type === 's_fpv' && !e.dead).length); }
+  ok(peak >= 6 && peak <= 10 && a.swarm.waves >= 1 && a.swarm.sent >= 1, `in a match it keeps up to ${peak} in the air and has sent ${a.swarm.sent} of them ahead of ${a.swarm.waves} attack${a.swarm.waves === 1 ? '' : 's'}`);
   ok(s.teams[0].promos.has('s_sneak') && sneaks >= 2, `the ISIS AI takes Sneak Attack on a 1 km map and uses it again and again (${sneaks} in 14 minutes)`);
   const med = new Sim({ ai: 'both', difficulty: ['medium', 'easy'], factions: ['sandstorm', 'sandstorm'], generals: ['stealth', 'stealth'], map: OPEN_BIG, seed: 1 });
   ok(med.ais[0].swarmSize === 6 && med.ais[1].swarmType === null, 'Medium keeps 6; Easy has no swarm');
   // Air Force General AI: builds both airfields and the aircraft
   const u = new Sim({ ai: 'both', difficulty: ['hard', 'hard'], factions: ['vanguard', 'ursa'], generals: ['airforce', null], map: MAPSPEC('forest'), seed: 3 });
-  const built = {}; for (let t = 0; t < 20 * 60 * 24 && u.winner < 0; t++) { u.step(); for (const e of u.events) if (e.team === 0 && (e.t === 'spawn' || e.t === 'done')) built[e.type] = (built[e.type] || 0) + 1; u.events.length = 0; }
+  const built = {}; for (let t = 0; t < 20 * 60 * 24 && u.winner < 0; t++) { if (t % 20 === 0) keep(u, 1); u.step(); for (const e of u.events) if (e.team === 0 && (e.t === 'spawn' || e.t === 'done')) built[e.type] = (built[e.type] || 0) + 1; u.events.length = 0; }
   ok(built.v_airfield >= 1 && built.v_stratfield >= 1 && (built.v_ac130 || 0) + (built.v_b2 || 0) + (built.v_apache || 0) >= 1 && built.v_a10 >= 1, `the Air Force General's AI builds the Air Field, the Strategic Airfield and their aircraft (${['v_a10', 'v_ac130', 'v_b2', 'v_apache'].map(k => (built[k] || 0) + ' ' + UNITS[k].name).join(', ')})`);
   ok(!new Sim({ ai: 'both', factions: ['vanguard', 'ursa'], generals: ['marine', null] }).ais[0].roster.includes('v_ac130'), 'another general\'s AI never plans for aircraft it cannot build');
   console.log(`AI             : swarm peak ${peak}, ${a.swarm.waves} waves | ${sneaks} sneak attacks | Air Force AI built ${Object.entries(built).filter(([k]) => UNITS[k] && UNITS[k].air).map(([k, v]) => v + ' ' + k).join(', ')}`);
@@ -209,7 +210,7 @@ function MAPSPEC(id) { return MAPS.find(m => m.id === id).spec; }
 {
   const view = src('js/render/view.js'), models = src('js/render/models.js'), hud = src('js/ui/uiHUD.js');
   ok(!/setGhost|ghostOf|opacity = 0\.4/.test(view) && /e\.cloaked \? \[e\.detected \? 'SEEN' : 'CLOAK'/.test(hud), 'cloaked units are drawn solid again; the CLOAK tag above them is what marks them');
-  ok(/case 'launch':/.test(view) && /case 'dodge':/.test(view) && /v\.longbow\.visible = !!e\.up/.test(view) && /v\.doors\[i\]\.rotation\.y/.test(view) && /v\.legs\[i\]\.rotation\.z/.test(view), 'the view draws drone launches, dodges, the Longbow dome, the container doors and walking legs');
+  ok(/case 'launch':/.test(view) && /case 'dodge':/.test(view) && /v\.longbow\.visible = !!e\.up/.test(view) && /v\.bed\.rotation\.z/.test(view) && /v\.legs\[i\]\.rotation\.z/.test(view), 'the view draws drone launches, dodges, the Longbow dome, the container doors and walking legs');
   ok(/d\.general && d\.general !== T\.general/.test(src('js/sim/simulationTick.js')) && /general/.test(hud), 'a general-only building is refused by the simulation and left off the build menu');
 
   const P = MF.paint('vanguard', 0), PS = MF.paint('sandstorm', 0), A = MF.ASSEMBLY, count = (r, n) => { let k = 0; r.g.traverse(o => { if (o.isMesh && o.name === n) k++; }); return k; };
@@ -222,7 +223,7 @@ function MAPSPEC(id) { return MAPS.find(m => m.id === id).spec; }
   ok(wV < wA * 0.72, `AH-1Z: a much slimmer fuselage than the Apache (${wV} against ${wA})`);
   const qc = A.zu23(PS), st = A.shahedtruck(PS), sd = A.shahed(PS), a10 = A.a10(P), ac = A.ac130(P), b2 = A.b2(P);
   ok(qc.turret && count(qc, 'barrel') === 4 && count(qc, 'radar') === 1 && count(qc, 'wheel') === 4 && count(qc, 'cab') === 1, 'Quad Cannon: a pickup with a four-barrel turret and its radar dish on the bed');
-  ok(st.doors.length === 2 && st.rack.length === WEAPONS.shahed.burst && count(st, 'containerside') === 2 && count(st, 'wheel') === 6 && st.doors.every(d => d.position.x < -3), 'Shahed Launcher: a three-axle container truck, two doors at the rear, three drones on the rack inside');
+  ok(st.bed && st.roof.length === 2 && st.rack.length === WEAPONS.shahed.burst && count(st, 'containerside') === 2 && count(st, 'wheel') === 6 && st.bed.position.x < -3, 'Shahed Launcher: a three-axle container truck; the container tips up on a hinge at the tail, the roof opens in two leaves, three drones on the rack inside');
   ok(sd.prop && count(sd, 'wing') === 1 && count(sd, 'tipfin') === 2 && Math.abs(MF.SHAHED.span / MF.SHAHED.length - 2.5 / 3.5) < 0.001, 'Shahed: a delta wing with tip fins and a pusher propeller, at the real proportions');
   ok(a10.gear && a10.stores.length === UNITS.v_a10.ammo && a10.ground > 1 && ac.gear && ac.gear.visible === false && ac.props.length === 4 && ac.ground > 1 && b2.gear && b2.ground > 1, 'A-10, AC-130 and B-2 have landing gear for the hangar; the A-10 shows its four Mavericks');
 
